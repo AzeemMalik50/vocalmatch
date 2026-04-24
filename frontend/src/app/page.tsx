@@ -115,7 +115,7 @@ export default function HomePage() {
       <footer className="relative z-10 border-t-2 border-ink mt-20">
         <div className="max-w-6xl mx-auto px-6 py-8 flex items-center justify-between text-xs uppercase tracking-widest opacity-60">
           <span>Reelvote · 2026</span>
-          <span>Built with Next.js & NestJS</span>
+          {/* <span>Built with Next.js & NestJS</span> */}
         </div>
       </footer>
     </>
