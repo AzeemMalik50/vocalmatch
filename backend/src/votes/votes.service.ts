@@ -16,8 +16,8 @@ export class VotesService {
   ) {}
 
   /**
-   * Toggle behavior: if the user already voted, remove it. Otherwise create it.
-   * Returns the current state for that video so UI can update instantly.
+   * One vote per user per video. If the user already voted, reject the request
+   * so the count stays stable and the UI can show "You already voted".
    */
   async toggleVote(userId: string, videoId: string) {
     const video = await this.videos.findOne({ where: { id: videoId } });
@@ -28,22 +28,21 @@ export class VotesService {
     });
 
     if (existing) {
-      await this.votes.remove(existing);
-    } else {
-      try {
-        const vote = this.votes.create({ userId, videoId });
-        await this.votes.save(vote);
-      } catch (err: any) {
-        // Defensive: unique constraint race condition
-        if (err?.code === 'SQLITE_CONSTRAINT' || err?.code === '23505') {
-          throw new ConflictException('Already voted');
-        }
-        throw err;
+      throw new ConflictException('You already voted');
+    }
+
+    try {
+      const vote = this.votes.create({ userId, videoId });
+      await this.votes.save(vote);
+    } catch (err: any) {
+      if (err?.code === 'SQLITE_CONSTRAINT' || err?.code === '23505') {
+        throw new ConflictException('You already voted');
       }
+      throw err;
     }
 
     const voteCount = await this.votes.count({ where: { videoId } });
-    return { videoId, hasVoted: !existing, voteCount };
+    return { videoId, hasVoted: true, voteCount };
   }
 
   async getCount(videoId: string) {

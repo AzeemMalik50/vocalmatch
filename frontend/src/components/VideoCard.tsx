@@ -34,23 +34,31 @@ export default function VideoCard({ video }: Props) {
       return;
     }
     if (submitting) return;
+    if (hasVoted) {
+      setErr('You already voted');
+      return;
+    }
     setSubmitting(true);
     setErr(null);
 
-    // optimistic update
-    const prevVoted = hasVoted;
     const prevCount = count;
-    setHasVoted(!prevVoted);
-    setCount(prevVoted ? prevCount - 1 : prevCount + 1);
+    setHasVoted(true);
+    setCount(prevCount + 1);
 
     try {
       const res = await api.toggleVote(video.id);
       setHasVoted(res.hasVoted);
       setCount(res.voteCount);
     } catch (e: any) {
-      setHasVoted(prevVoted);
-      setCount(prevCount);
-      setErr(e.message);
+      const msg = e?.message ?? 'Could not vote';
+      if (/already voted/i.test(msg)) {
+        setHasVoted(true);
+        setErr('You already voted');
+      } else {
+        setHasVoted(false);
+        setCount(prevCount);
+        setErr(msg);
+      }
     } finally {
       setSubmitting(false);
     }
