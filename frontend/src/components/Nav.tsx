@@ -12,7 +12,7 @@ export default function Nav() {
     <header className="relative z-10 border-b-2 border-ink">
       <div className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
         <Link href="/" className="font-display text-3xl font-bold tracking-tight">
-          Reel<span className="text-accent">·</span>vote
+          Vocal<span className="text-accent">·</span>Match
         </Link>
 
         <nav className="flex items-center gap-3 text-sm">

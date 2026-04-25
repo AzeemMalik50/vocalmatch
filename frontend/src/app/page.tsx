@@ -37,7 +37,9 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-6 py-16 md:py-24 grid md:grid-cols-12 gap-8 items-end">
           <div className="md:col-span-8">
             <p className="text-xs uppercase tracking-[0.3em] opacity-60 mb-4">
-              Vol. 01 — Community Picks
+              {/* Vol. 01 — Community Picks
+               */}
+               {/* Community Picks */}
             </p>
             <h1 className="font-display text-6xl md:text-8xl font-black leading-[0.9]">
               Upload.<br />
@@ -47,8 +49,8 @@ export default function HomePage() {
           </div>
           <div className="md:col-span-4">
             <p className="text-lg leading-relaxed opacity-80">
-              A minimal stage for short videos. Everyone gets one vote per clip —
-              no gaming the count, no second chances.
+              {/* A minimal stage for short videos. Everyone gets one vote per clip —
+              no gaming the count, no second chances. */}
             </p>
             {!user && !authLoading && (
               <div className="mt-6 flex gap-3">
@@ -114,7 +116,7 @@ export default function HomePage() {
 
       <footer className="relative z-10 border-t-2 border-ink mt-20">
         <div className="max-w-6xl mx-auto px-6 py-8 flex items-center justify-between text-xs uppercase tracking-widest opacity-60">
-          <span>Reelvote · 2026</span>
+          <span>Vocal Match · 2026</span>
           {/* <span>Built with Next.js & NestJS</span> */}
         </div>
       </footer>

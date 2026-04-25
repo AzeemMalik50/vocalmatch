@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { AuthProvider } from '@/lib/auth-context';
 
 export const metadata: Metadata = {
-  title: 'Reelvote — Vote on videos',
+  title: 'Vocal Match — Vote on videos',
   description: 'Upload a video. Cast one vote. Watch the counts climb.',
 };
 
