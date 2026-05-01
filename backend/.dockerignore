@@ -3,9 +3,6 @@ dist
 .env
 .env.*
 *.sqlite
-database.sqlite
 .git
 .gitignore
 README.md
-npm-debug.log
-.DS_Store

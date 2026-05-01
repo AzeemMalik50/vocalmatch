@@ -5,13 +5,58 @@
 :root {
   --font-display: 'Fraunces', 'Playfair Display', Georgia, serif;
   --font-sans: 'Inter', system-ui, sans-serif;
+
+  /* Stage (dark) — default */
+  --c-stage-950: 8 7 13;
+  --c-stage-900: 14 12 23;
+  --c-stage-800: 23 19 35;
+  --c-stage-700: 34 29 51;
+  --c-stage-600: 51 44 74;
+  --c-spotlight: 255 45 85;
+  --c-spotlight-dim: 204 36 68;
+  --c-gold: 245 196 81;
+  --c-haze: 168 157 199;
+
+  --c-body-bg: 8 7 13;
+  --c-body-text: 240 238 247;
+  --c-vignette-edge: 0 0 0;
+  --c-vignette-alpha: 0.5;
+  --c-scrollbar-track: 8 7 13;
+  --c-scrollbar-thumb: 34 29 51;
+  --c-scrollbar-thumb-hover: 51 44 74;
+  --c-stage-tint-1: 0.08;
+  --c-stage-tint-2: 0.04;
+}
+
+html.theme-light {
+  /* Studio (light) — paper-warm, dimmed glow */
+  --c-stage-950: 250 247 240;
+  --c-stage-900: 245 241 232;
+  --c-stage-800: 233 226 213;
+  --c-stage-700: 200 190 170;
+  --c-stage-600: 165 153 130;
+  --c-spotlight: 207 30 68;
+  --c-spotlight-dim: 165 22 52;
+  --c-gold: 184 130 24;
+  --c-haze: 95 86 70;
+
+  --c-body-bg: 250 247 240;
+  --c-body-text: 27 22 19;
+  --c-vignette-edge: 90 70 50;
+  --c-vignette-alpha: 0.12;
+  --c-scrollbar-track: 245 241 232;
+  --c-scrollbar-thumb: 200 190 170;
+  --c-scrollbar-thumb-hover: 165 153 130;
+  --c-stage-tint-1: 0.05;
+  --c-stage-tint-2: 0.03;
 }
 
 html, body {
-  background: #f5f1e8;
-  color: #0a0a0a;
+  background: rgb(var(--c-body-bg));
+  color: rgb(var(--c-body-text));
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
 }
 
 .font-display {
@@ -19,13 +64,71 @@ html, body {
   letter-spacing: -0.02em;
 }
 
-/* subtle paper grain */
-.grain::before {
+/* Stage backdrop — radial gradient, subtle */
+.stage-bg {
+  background:
+    radial-gradient(ellipse at 30% 0%, rgba(var(--c-spotlight) / var(--c-stage-tint-1)) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 30%, rgba(var(--c-gold) / var(--c-stage-tint-2)) 0%, transparent 50%),
+    rgb(var(--c-body-bg));
+}
+
+/* Spotlight cone behind hero — animated, decorative */
+.spotlight-cone {
+  position: absolute;
+  width: 800px;
+  height: 800px;
+  background: radial-gradient(
+    circle at center,
+    rgba(var(--c-spotlight) / 0.15) 0%,
+    rgba(var(--c-spotlight) / 0.05) 30%,
+    transparent 60%
+  );
+  filter: blur(40px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Vignette over the whole page */
+.vignette::after {
   content: '';
   position: fixed;
   inset: 0;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 40%,
+    rgba(var(--c-vignette-edge) / var(--c-vignette-alpha)) 100%
+  );
   pointer-events: none;
   z-index: 1;
-  opacity: 0.04;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+/* Hide native focus, replace with custom */
+*:focus-visible {
+  outline: 2px solid rgb(var(--c-spotlight));
+  outline-offset: 2px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: rgb(var(--c-scrollbar-track)); }
+::-webkit-scrollbar-thumb { background: rgb(var(--c-scrollbar-thumb)); border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--c-scrollbar-thumb-hover)); }
+
+/* Number tabular */
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* Skeleton shimmer used for loading cards */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgb(var(--c-stage-900)) 0%,
+    rgb(var(--c-stage-800)) 50%,
+    rgb(var(--c-stage-900)) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
