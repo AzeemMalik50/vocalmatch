@@ -1,12 +1,15 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+
 import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
 import { VideosModule } from './videos/videos.module';
-import { VotesModule } from './votes/votes.module';
-import { User } from './auth/user.entity';
+
+import { User } from './users/user.entity';
 import { Video } from './videos/video.entity';
-import { Vote } from './votes/vote.entity';
+
+const entities = [User, Video];
 
 @Module({
   imports: [
@@ -16,20 +19,20 @@ import { Vote } from './votes/vote.entity';
         ? {
             type: 'postgres',
             url: process.env.DATABASE_URL,
-            entities: [User, Video, Vote],
-            synchronize: true, // fine for a demo; use migrations in real prod
-            ssl: { rejectUnauthorized: false }, // Neon requires SSL
+            entities,
+            synchronize: true, // OK for Phase 1; use migrations from Phase 3
+            ssl: { rejectUnauthorized: false },
           }
         : {
             type: 'sqlite',
-            database: process.env.DB_NAME || 'database.sqlite',
-            entities: [User, Video, Vote],
+            database: 'vocalmatch.sqlite',
+            entities,
             synchronize: true,
           },
     ),
     AuthModule,
+    UsersModule,
     VideosModule,
-    VotesModule,
   ],
 })
 export class AppModule {}

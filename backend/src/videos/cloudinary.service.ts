@@ -17,16 +17,24 @@ export class CloudinaryService {
       const stream = cloudinary.uploader.upload_stream(
         {
           resource_type: 'video',
-          folder: 'video-vote-app',
-          eager: [{ format: 'jpg', width: 640, crop: 'scale' }], // auto thumbnail
+          folder: 'vocalmatch/videos',
+          eager: [
+            {
+              format: 'jpg',
+              width: 720,
+              crop: 'scale',
+              start_offset: 'auto',
+            },
+          ],
         },
         (err, result) => {
-          if (err || !result)
+          if (err || !result) {
             return reject(
               new InternalServerErrorException(
-                err?.message ?? 'Cloudinary upload failed',
+                err?.message ?? 'Cloudinary video upload failed',
               ),
             );
+          }
           resolve(result);
         },
       );
@@ -34,7 +42,49 @@ export class CloudinaryService {
     });
   }
 
-  async deleteVideo(publicId: string) {
+  /**
+   * Upload an image (e.g. avatar). Auto square-crops with face detection
+   * and serves at 512x512 — perfect for circular avatars.
+   */
+  uploadImage(
+    buffer: Buffer,
+    subfolder: string = 'images',
+  ): Promise<UploadApiResponse> {
+    return new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          resource_type: 'image',
+          folder: `vocalmatch/${subfolder}`,
+          transformation: [
+            {
+              width: 512,
+              height: 512,
+              crop: 'fill',
+              gravity: 'face',
+            },
+            { quality: 'auto', fetch_format: 'auto' },
+          ],
+        },
+        (err, result) => {
+          if (err || !result) {
+            return reject(
+              new InternalServerErrorException(
+                err?.message ?? 'Cloudinary image upload failed',
+              ),
+            );
+          }
+          resolve(result);
+        },
+      );
+      streamifier.createReadStream(buffer).pipe(stream);
+    });
+  }
+
+  deleteVideo(publicId: string) {
     return cloudinary.uploader.destroy(publicId, { resource_type: 'video' });
+  }
+
+  deleteImage(publicId: string) {
+    return cloudinary.uploader.destroy(publicId, { resource_type: 'image' });
   }
 }
