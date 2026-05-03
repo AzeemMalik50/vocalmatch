@@ -162,51 +162,47 @@ export default function HomePage() {
 
         <div className="relative z-10 max-w-7xl mx-auto px-6 py-20 md:py-28 grid md:grid-cols-12 gap-10 items-end">
           <div className="md:col-span-7">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 mb-6 bg-spotlight/10 border border-spotlight/30 rounded-full">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-spotlight opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-spotlight" />
-              </span>
-              <span className="text-xs uppercase tracking-widest font-bold text-spotlight">
-                Open Mic — Soundcheck
-              </span>
-            </div>
-
             <h1 className="font-display font-black text-6xl md:text-8xl leading-[0.9] mb-6">
               One song.<br />
               <span className="italic font-normal text-haze">Two voices.</span><br />
               <span className="text-spotlight">One crown.</span>
             </h1>
 
+            <p className="font-display italic text-2xl md:text-3xl text-spotlight mb-6">
+              Who owns it?
+            </p>
+
+            <p className="text-lg md:text-xl text-haze max-w-xl leading-relaxed mb-3">
+              Two singers perform the same song; you decide who wins.
+            </p>
+
             <p className="text-lg md:text-xl text-haze max-w-xl leading-relaxed mb-8">
-              VocalMatch is a continuous competition for vocal performance.
-              Watch → Vote → Challenge → Return. Upload your take, build a
-              name — the first battle opens the Main Stage.
+              The winner becomes the{' '}
+              <span className="font-bold text-white">Official Voice</span> of
+              the song… until someone beats them.
             </p>
 
             <div className="flex flex-wrap gap-3">
+              <a
+                href="#feed"
+                className="px-6 py-3.5 bg-spotlight text-white font-bold hover:bg-spotlight-dim transition-colors rounded-md shadow-lg shadow-spotlight/30 uppercase tracking-widest text-sm"
+              >
+                Watch &amp; Vote
+              </a>
               {user ? (
                 <Link
                   href="/upload"
-                  className="px-6 py-3.5 bg-spotlight text-white font-bold hover:bg-spotlight-dim transition-colors rounded-md shadow-lg shadow-spotlight/30"
+                  className="px-6 py-3.5 border border-stage-700 text-haze hover:opacity-90 hover:border-stage-600 font-bold transition-colors rounded-md uppercase tracking-widest text-sm"
                 >
-                  Upload your performance →
+                  Take the Stage
                 </Link>
               ) : (
-                <>
-                  <Link
-                    href="/signup"
-                    className="px-6 py-3.5 bg-spotlight text-white font-bold hover:bg-spotlight-dim transition-colors rounded-md shadow-lg shadow-spotlight/30"
-                  >
-                    Take the stage →
-                  </Link>
-                  <Link
-                    href="/login"
-                    className="px-6 py-3.5 border border-stage-700 text-haze hover:opacity-90 hover:border-stage-600 font-bold transition-colors rounded-md"
-                  >
-                    Sign in
-                  </Link>
-                </>
+                <Link
+                  href="/signup"
+                  className="px-6 py-3.5 border border-stage-700 text-haze hover:opacity-90 hover:border-stage-600 font-bold transition-colors rounded-md uppercase tracking-widest text-sm"
+                >
+                  Take the Stage
+                </Link>
               )}
             </div>
           </div>
@@ -215,17 +211,15 @@ export default function HomePage() {
             <div className="relative bg-stage-900 border border-stage-700 rounded-2xl p-6 overflow-hidden">
               <div className="absolute -top-20 -right-20 w-48 h-48 rounded-full bg-spotlight/20 blur-3xl" />
               <div className="relative z-10">
-                <p className="text-xs uppercase tracking-widest text-haze/60 mb-3">
-                  ↗ Main Stage · next
-                </p>
-                <h3 className="font-display text-2xl font-bold mb-3">
+                <p className="text-xs uppercase tracking-widest text-spotlight font-bold mb-3">
                   The First Battle
+                </p>
+                <h3 className="font-display text-2xl font-bold mb-3 leading-tight">
+                  Two performers.<br />
+                  One Centerstage Song.
                 </h3>
                 <p className="text-sm text-haze leading-relaxed mb-5">
-                  Two performers. One Centerstage Song. 24–48 hours of voting.
-                  The winner becomes the <span className="font-bold">Official
-                  Voice of the Song</span> and defends the crown — Red Phone
-                  challengers can step up at any time.
+                  24–48 hours to decide. You can only pick one.
                 </p>
                 <div className="flex items-center justify-center gap-3 py-4 border-y border-stage-700/60 mb-4">
                   <div className="flex flex-col items-center">
@@ -249,7 +243,7 @@ export default function HomePage() {
                   </div>
                 </div>
                 <p className="text-xs text-haze/60 leading-relaxed">
-                  Sign up now and you'll get the first vote when battles go live.
+                  Sign up to cast the first vote.
                 </p>
               </div>
             </div>
@@ -257,56 +251,73 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* FIRST BATTLE PREP */}
+      {/* FIRST BATTLE COMING SOON */}
       <section className="relative z-10 border-b border-stage-700/40">
-        <div className="max-w-7xl mx-auto px-6 py-10">
-          <div className="flex items-end justify-between mb-5">
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-spotlight font-bold mb-2">
-                First Battle · Prep
-              </p>
-              <h2 className="font-display text-2xl md:text-3xl font-bold">
-                Building the first match
-              </h2>
-            </div>
-            <p className="hidden sm:block text-xs text-haze/60 max-w-xs text-right">
-              When all four are locked, the Main Stage opens and voting starts.
+        <div className="max-w-7xl mx-auto px-6 py-12 text-center">
+          <p className="text-xs uppercase tracking-[0.3em] text-spotlight font-bold mb-3">
+            First Battle Coming Soon
+          </p>
+          <h2 className="font-display text-3xl md:text-4xl font-bold mb-3">
+            We're preparing the first matchup now.
+          </h2>
+          <p className="text-haze">Once ready, voting opens.</p>
+        </div>
+      </section>
+
+      {/* THE CHALLENGE — Red Phone */}
+      <section className="relative z-10 border-b border-stage-700/40 overflow-hidden">
+        <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-spotlight/10 blur-3xl" />
+        <div className="relative max-w-7xl mx-auto px-6 py-20 grid md:grid-cols-2 gap-10 items-center">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-spotlight font-bold mb-3">
+              The Challenge
             </p>
+            <h2 className="font-display text-4xl md:text-5xl font-bold mb-6 leading-tight">
+              Think you can take<br />the crown?
+            </h2>
+            <p className="text-haze mb-2">If selected, you face the champion.</p>
           </div>
-          <ul className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <PrepItem
-              n={1}
-              title="Centerstage Song"
-              hint="The cover song the first battle is sung over."
-            />
-            <PrepItem
-              n={2}
-              title="Two performances"
-              hint="2–3 takes of that same song, ready to face off."
-            />
-            <PrepItem
-              n={3}
-              title="Performer names"
-              hint="Clear stage names so voters know who they're picking."
-            />
-            <PrepItem
-              n={4}
-              title="Battle title"
-              hint="One line that frames the matchup."
-            />
-          </ul>
+          <ol className="space-y-4">
+            <li className="flex items-start gap-4 bg-stage-900/60 border border-stage-700/60 rounded-xl p-5">
+              <span className="w-9 h-9 rounded-full bg-spotlight/15 border border-spotlight/40 flex items-center justify-center font-bold text-spotlight shrink-0">
+                1
+              </span>
+              <div>
+                <p className="font-display text-lg font-bold">Download the track.</p>
+                <p className="text-sm text-haze/70">The official Centerstage Song.</p>
+              </div>
+            </li>
+            <li className="flex items-start gap-4 bg-stage-900/60 border border-stage-700/60 rounded-xl p-5">
+              <span className="w-9 h-9 rounded-full bg-spotlight/15 border border-spotlight/40 flex items-center justify-center font-bold text-spotlight shrink-0">
+                2
+              </span>
+              <div>
+                <p className="font-display text-lg font-bold">Record your version.</p>
+                <p className="text-sm text-haze/70">Your voice, your take.</p>
+              </div>
+            </li>
+            <li className="flex items-start gap-4 bg-stage-900/60 border border-stage-700/60 rounded-xl p-5">
+              <span className="w-9 h-9 rounded-full bg-spotlight/15 border border-spotlight/40 flex items-center justify-center font-bold text-spotlight shrink-0">
+                3
+              </span>
+              <div>
+                <p className="font-display text-lg font-bold">Upload your challenge.</p>
+                <p className="text-sm text-haze/70">Step into the queue.</p>
+              </div>
+            </li>
+          </ol>
         </div>
       </section>
 
       {/* FEED */}
-      <main className="relative z-10 max-w-7xl mx-auto px-6 py-16">
+      <main id="feed" className="relative z-10 max-w-7xl mx-auto px-6 py-16 scroll-mt-20">
         <div className="flex items-end justify-between mb-8">
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-haze/60 mb-2">
-              The Feed
+              The Stage
             </p>
             <h2 className="font-display text-4xl font-bold">
-              Latest performances
+              Watch new performances
             </h2>
           </div>
           {user && (
@@ -487,30 +498,6 @@ export default function HomePage() {
 
       <Footer />
     </>
-  );
-}
-
-function PrepItem({
-  n,
-  title,
-  hint,
-}: {
-  n: number;
-  title: string;
-  hint: string;
-}) {
-  return (
-    <li className="bg-stage-900/60 border border-stage-700/60 rounded-xl p-4">
-      <div className="flex items-center gap-3 mb-2">
-        <span className="w-7 h-7 rounded-full bg-stage-800 border border-stage-700 flex items-center justify-center text-xs font-bold tabular text-haze">
-          {n}
-        </span>
-        <p className="font-display text-base font-bold leading-tight">
-          {title}
-        </p>
-      </div>
-      <p className="text-xs text-haze/70 leading-relaxed">{hint}</p>
-    </li>
   );
 }
 
