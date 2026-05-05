@@ -13,7 +13,7 @@ export default function Logo({ size = 'md' }: Props) {
       : 'text-2xl';
 
   return (
-    <span className={`font-display font-black tracking-tight ${cls}`}>
+    <span className={`font-display font-black tracking-tight whitespace-nowrap ${cls}`}>
       Vocal
       <span className="text-spotlight">Match</span>
       <span

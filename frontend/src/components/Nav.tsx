@@ -28,12 +28,12 @@ export default function Nav() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-stage-700/60 backdrop-blur-md bg-stage-950/80">
-      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-        <Link href="/" className="hover:opacity-90 transition-opacity">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
+        <Link href="/" className="hover:opacity-90 transition-opacity shrink-0">
           <Logo />
         </Link>
 
-        <nav className="flex items-center gap-2 sm:gap-3 text-sm">
+        <nav className="flex items-center gap-1.5 sm:gap-3 text-sm shrink-0">
           <button
             type="button"
             onClick={toggleTheme}
@@ -56,7 +56,7 @@ export default function Nav() {
             <>
               <Link
                 href="/upload"
-                className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 bg-spotlight text-white font-bold hover:bg-spotlight-dim transition-colors rounded-md shadow-lg shadow-spotlight/20"
+                className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 bg-spotlight text-white font-bold hover:bg-spotlight-dim transition-colors rounded-md shadow-lg shadow-spotlight/20 whitespace-nowrap"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                   <path d="M7 1v12M1 7h12" stroke="white" strokeWidth="2" />
@@ -152,13 +152,19 @@ export default function Nav() {
             <>
               <Link
                 href="/login"
-                className="px-3 py-2 text-haze hover:text-white font-medium transition-colors"
+                className="px-2 sm:px-3 py-2 text-haze hover:text-white font-medium transition-colors whitespace-nowrap"
               >
                 Sign in
               </Link>
               <Link
                 href="/signup"
-                className="px-4 py-2 bg-spotlight text-white font-bold hover:bg-spotlight-dim transition-colors rounded-md shadow-lg shadow-spotlight/20"
+                className="sm:hidden px-3 py-2 bg-spotlight text-white font-bold hover:bg-spotlight-dim transition-colors rounded-md shadow-lg shadow-spotlight/20 whitespace-nowrap"
+              >
+                Join
+              </Link>
+              <Link
+                href="/signup"
+                className="hidden sm:inline-flex items-center px-4 py-2 bg-spotlight text-white font-bold hover:bg-spotlight-dim transition-colors rounded-md shadow-lg shadow-spotlight/20 whitespace-nowrap"
               >
                 Join the Stage
               </Link>
