@@ -8,6 +8,9 @@ import {
   Index,
 } from 'typeorm';
 import { User } from '../users/user.entity';
+// NOTE: deliberately not importing Song/Battle here to avoid a circular type
+// graph at compile time. Phase 2A links via songId column only; the
+// FK is declared on the Song side and via SQL relations.
 
 export type VideoCategory = 'solo' | 'battle_entry' | 'challenge_entry';
 export type VideoVisibility = 'public' | 'unlisted' | 'private';
@@ -72,6 +75,20 @@ export class Video {
   // Light per-video stats — counted at write time so we never compute on read
   @Column({ default: 0 })
   viewCount: number;
+
+  // ─── Phase 2A: Centerstage Song link ────────────────────────────
+  // Optional. Required when this video competes in a battle.
+  @Index()
+  @Column({ nullable: true, type: 'uuid' })
+  songId: string | null;
+
+  // ─── Phase 2A: soft-delete (Vincent's decision D) ───────────────
+  // Once a performance has been used in a battle, hard-delete is blocked.
+  // Setting deletedAt hides the video from feed/profile while leaving the
+  // battle history intact.
+  @Index()
+  @Column({ type: 'timestamp', nullable: true })
+  deletedAt: Date | null;
 
   @CreateDateColumn()
   createdAt: Date;
