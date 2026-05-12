@@ -53,8 +53,8 @@ export default function FeaturedBattle({ fallback }: Props) {
   const { battle, song, performanceA, performanceB } = data;
 
   return (
-    <div className="relative bg-stage-900 border border-stage-700 rounded-2xl p-6 overflow-hidden">
-      <div className="absolute -top-20 -right-20 w-48 h-48 rounded-full bg-spotlight/20 blur-3xl" />
+    <div className="relative bg-stage-900 border border-stage-700 rounded-2xl p-5 sm:p-6 md:p-8 overflow-hidden">
+      <div className="absolute -top-20 -right-20 w-48 h-48 md:w-64 md:h-64 rounded-full bg-spotlight/20 blur-3xl" />
       <div className="relative z-10">
         <div className="flex items-center gap-2 mb-3">
           <span className="relative flex h-2 w-2">
@@ -65,18 +65,18 @@ export default function FeaturedBattle({ fallback }: Props) {
             Live battle
           </p>
         </div>
-        <h3 className="font-display text-2xl font-bold mb-2 leading-tight">
+        <h3 className="font-display text-xl sm:text-2xl md:text-3xl font-bold mb-2 leading-tight">
           {battle.title || (song ? song.title : 'A VocalMatch battle')}
         </h3>
         {song && (
-          <p className="text-sm text-haze mb-4">
+          <p className="text-sm md:text-base text-haze mb-4">
             {song.title}
             {song.artist && <span className="text-haze/60"> · {song.artist}</span>}
           </p>
         )}
-        <div className="flex items-center justify-center gap-4 py-4 border-y border-stage-700/60 mb-4">
+        <div className="flex items-center justify-center gap-3 sm:gap-4 md:gap-6 py-4 md:py-5 border-y border-stage-700/60 mb-4">
           <Performer label="A" username={performanceA?.uploader?.username} accent="spotlight" />
-          <span className="font-display font-black text-2xl text-spotlight italic">
+          <span className="font-display font-black text-xl sm:text-2xl md:text-3xl text-spotlight italic">
             vs
           </span>
           <Performer label="B" username={performanceB?.uploader?.username} accent="gold" />
@@ -89,7 +89,7 @@ export default function FeaturedBattle({ fallback }: Props) {
         </div>
         <Link
           href={`/battle/${battle.id}`}
-          className="block w-full text-center px-4 py-3 bg-spotlight text-white font-bold rounded-md hover:bg-spotlight-dim transition-colors uppercase tracking-widest text-sm"
+          className="block w-full text-center px-4 py-3 md:py-3.5 bg-spotlight text-white font-bold rounded-md hover:bg-spotlight-dim transition-colors uppercase tracking-widest text-sm md:text-base"
         >
           Watch &amp; Vote →
         </Link>
@@ -109,13 +109,13 @@ function Performer({
 }) {
   const border = accent === 'spotlight' ? 'border-spotlight/40' : 'border-gold/40';
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center min-w-0">
       <div
-        className={`w-12 h-12 rounded-full bg-stage-800 border-2 ${border} flex items-center justify-center font-bold text-haze`}
+        className={`w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-full bg-stage-800 border-2 ${border} flex items-center justify-center font-bold text-haze text-sm md:text-base`}
       >
         {username ? username[0]?.toUpperCase() : label}
       </div>
-      <span className="text-[10px] uppercase tracking-widest text-haze/60 mt-1 max-w-[80px] truncate">
+      <span className="text-[10px] uppercase tracking-widest text-haze/60 mt-1 max-w-[64px] sm:max-w-[80px] truncate">
         {username ? `@${username}` : 'Singer'}
       </span>
     </div>
