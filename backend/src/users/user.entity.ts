@@ -94,6 +94,13 @@ export class User {
   @Column({ nullable: true, type: 'text' })
   championTitle: string | null;
 
+  // ─── Phase 2A roles (boolean flags, not an enum — see PHASE_2A_SCHEMA.md §7) ─
+  @Column({ default: false })
+  isAdmin: boolean;
+
+  @Column({ default: false })
+  isSongwriter: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 }

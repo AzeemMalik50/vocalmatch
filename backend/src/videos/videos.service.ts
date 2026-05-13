@@ -4,9 +4,10 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { Video, VideoCategory, VideoVisibility } from './video.entity';
 import { CloudinaryService } from './cloudinary.service';
+import { Battle } from '../battles/battle.entity';
 
 export type VideoSort = 'newest' | 'most_viewed' | 'trending';
 
@@ -32,6 +33,7 @@ export interface VideoListQuery {
 export class VideosService {
   constructor(
     @InjectRepository(Video) private readonly videos: Repository<Video>,
+    @InjectRepository(Battle) private readonly battles: Repository<Battle>,
     private readonly cloudinary: CloudinaryService,
   ) {}
 
@@ -39,6 +41,7 @@ export class VideosService {
     title: string;
     description?: string;
     songTitle?: string;
+    songId?: string;
     uploaderId: string;
     fileBuffer: Buffer;
     category?: VideoCategory;
@@ -51,6 +54,7 @@ export class VideosService {
       title: params.title,
       description: params.description ?? null,
       songTitle: params.songTitle ?? null,
+      songId: params.songId ?? null,
       url: upload.secure_url,
       thumbnailUrl: upload.eager?.[0]?.secure_url ?? null,
       durationSeconds: upload.duration ? Math.round(upload.duration) : null,
@@ -70,6 +74,7 @@ export class VideosService {
     const qb = this.videos
       .createQueryBuilder('v')
       .leftJoinAndSelect('v.uploader', 'uploader')
+      .andWhere('v.deletedAt IS NULL') // soft-delete filter (decision D)
       .take(limit + 1) // grab one extra to detect "has more"
       .skip(offset);
 
@@ -149,10 +154,49 @@ export class VideosService {
     return { items, hasMore, nextOffset: hasMore ? offset + limit : null };
   }
 
+  /**
+   * Public lookup — soft-deleted videos appear as "not found".
+   * Battle pages use `findOneIncludingDeleted()` instead.
+   */
   async findOne(id: string) {
+    const v = await this.videos.findOne({ where: { id, deletedAt: IsNull() } });
+    if (!v) throw new NotFoundException('Video not found');
+    return v;
+  }
+
+  /**
+   * Battle-page lookup — returns the row even if soft-deleted, so historical
+   * battles still resolve their performance media. Public-facing surfaces
+   * (feed, profile, search) must keep using `findOne()` instead.
+   */
+  async findOneIncludingDeleted(id: string) {
     const v = await this.videos.findOne({ where: { id } });
     if (!v) throw new NotFoundException('Video not found');
     return v;
+  }
+
+  /**
+   * List by uploader — used by profile pages. Skips soft-deleted.
+   */
+  async findByUploader(uploaderId: string) {
+    return this.videos.find({
+      where: { uploaderId, deletedAt: IsNull() },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  /**
+   * Used by the admin "create battle" flow to list candidate performances
+   * for a given Centerstage Song.
+   */
+  async findEligibleForBattle(songId: string) {
+    return this.videos
+      .createQueryBuilder('v')
+      .leftJoinAndSelect('v.uploader', 'uploader')
+      .where('v.songId = :songId', { songId })
+      .andWhere('v.deletedAt IS NULL')
+      .orderBy('v.createdAt', 'DESC')
+      .getMany();
   }
 
   /**
@@ -173,14 +217,37 @@ export class VideosService {
     await this.videos.increment({ id }, 'viewCount', 1);
   }
 
+  /**
+   * Delete a performance. Vincent's decision D:
+   *   - If the video has been used in any battle (as A or B in any status),
+   *     it can NOT be hard-deleted. We soft-delete instead — sets deletedAt,
+   *     keeps the row + Cloudinary asset so historical battles still resolve.
+   *   - Otherwise hard-delete: remove the row and the Cloudinary asset.
+   *
+   * Returns { mode: 'soft' | 'hard' } so the UI can word the confirmation.
+   */
   async delete(id: string, requestingUserId: string) {
     const video = await this.findOne(id);
     if (video.uploaderId !== requestingUserId) {
       throw new ForbiddenException('You can only delete your own videos');
     }
+
+    const usedInBattle = await this.battles
+      .createQueryBuilder('b')
+      .where('b.performanceAId = :id OR b.performanceBId = :id', { id })
+      .getCount();
+
+    if (usedInBattle > 0) {
+      // Soft-delete: hide from feed/profile but keep battle history intact
+      video.deletedAt = new Date();
+      await this.videos.save(video);
+      return { ok: true, mode: 'soft' as const };
+    }
+
+    // Safe to hard-delete
     await this.cloudinary.deleteVideo(video.cloudinaryPublicId);
     await this.videos.remove(video);
-    return { ok: true };
+    return { ok: true, mode: 'hard' as const };
   }
 
   // Used by frontend to render uploader info nicely
@@ -190,6 +257,7 @@ export class VideosService {
       title: video.title,
       description: video.description,
       songTitle: video.songTitle,
+      songId: video.songId,
       url: video.url,
       thumbnailUrl: video.thumbnailUrl,
       durationSeconds: video.durationSeconds,
@@ -198,6 +266,7 @@ export class VideosService {
       tags: video.tags ?? [],
       viewCount: video.viewCount,
       createdAt: video.createdAt,
+      // deletedAt is intentionally NOT exposed — it's an internal soft-delete flag.
       uploader: video.uploader
         ? {
             id: video.uploader.id,

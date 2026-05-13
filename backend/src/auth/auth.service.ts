@@ -154,6 +154,9 @@ export class AuthService {
         email: user.email,
         username: user.username,
         avatarUrl: user.avatarUrl,
+        // Phase 2A — surface flags so the frontend can show admin / songwriter UI
+        isAdmin: !!user.isAdmin,
+        isSongwriter: !!user.isSongwriter,
       },
     };
   }

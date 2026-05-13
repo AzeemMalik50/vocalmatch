@@ -20,12 +20,14 @@ import {
   IsIn,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   MinLength,
 } from 'class-validator';
 import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/jwt-auth.guard';
 import { VideosService, VideoSort } from './videos.service';
 import { VideoCategory, VideoVisibility } from './video.entity';
+import { BattlesService } from '../battles/battles.service';
 
 const SORTS: VideoSort[] = ['newest', 'most_viewed', 'trending'];
 const VISIBILITIES: VideoVisibility[] = ['public', 'unlisted', 'private'];
@@ -40,6 +42,10 @@ class CreateVideoDto {
   @IsOptional() @IsString() @MaxLength(120)
   songTitle?: string;
 
+  /** Optional Centerstage Song link. Required if uploading as a battle entry. */
+  @IsOptional() @IsUUID()
+  songId?: string;
+
   @IsOptional() @IsIn(['solo', 'battle_entry', 'challenge_entry'])
   category?: VideoCategory;
 
@@ -53,7 +59,10 @@ class CreateVideoDto {
 
 @Controller('videos')
 export class VideosController {
-  constructor(private readonly videos: VideosService) {}
+  constructor(
+    private readonly videos: VideosService,
+    private readonly battles: BattlesService,
+  ) {}
 
   @Get()
   @UseGuards(OptionalJwtAuthGuard)
@@ -96,7 +105,23 @@ export class VideosController {
     if (req.user?.userId !== video.uploaderId) {
       this.videos.incrementView(id).catch(() => {});
     }
-    return this.videos.toPublic(video);
+    // Phase 2A: surface the battle this video is in (if any) so the frontend
+    // can transform /v/:id into a battle-aware view (redirect to /battle/:id
+    // when live, show a "this performance was in..." banner when completed).
+    const battle = await this.battles.findLatestBattleForVideo(id);
+    return {
+      ...this.videos.toPublic(video),
+      battle: battle
+        ? {
+            id: battle.id,
+            status: battle.status,
+            title: battle.title,
+            songId: battle.songId,
+            votingClosesAt: battle.votingClosesAt,
+            winnerPerformanceId: battle.winnerPerformanceId,
+          }
+        : null,
+    };
   }
 
   @Post()
@@ -126,6 +151,7 @@ export class VideosController {
       title: dto.title,
       description: dto.description,
       songTitle: dto.songTitle,
+      songId: dto.songId,
       uploaderId: req.user.userId,
       fileBuffer: file.buffer,
       category: dto.category ?? 'solo',

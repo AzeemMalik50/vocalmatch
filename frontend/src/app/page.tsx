@@ -5,6 +5,8 @@ import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import PerformanceCard from '@/components/PerformanceCard';
+import FeaturedBattle from '@/components/FeaturedBattle';
+import HomeBattleStatus from '@/components/HomeBattleStatus';
 import {
   api,
   GENRE_OPTIONS,
@@ -208,61 +210,58 @@ export default function HomePage() {
           </div>
 
           <div className="md:col-span-5">
-            <div className="relative bg-stage-900 border border-stage-700 rounded-2xl p-6 overflow-hidden">
-              <div className="absolute -top-20 -right-20 w-48 h-48 rounded-full bg-spotlight/20 blur-3xl" />
-              <div className="relative z-10">
-                <p className="text-xs uppercase tracking-widest text-spotlight font-bold mb-3">
-                  The First Battle
-                </p>
-                <h3 className="font-display text-2xl font-bold mb-3 leading-tight">
-                  Two performers.<br />
-                  One Centerstage Song.
-                </h3>
-                <p className="text-sm text-haze leading-relaxed mb-5">
-                  24–48 hours to decide. You can only pick one.
-                </p>
-                <div className="flex items-center justify-center gap-3 py-4 border-y border-stage-700/60 mb-4">
-                  <div className="flex flex-col items-center">
-                    <div className="w-12 h-12 rounded-full bg-stage-800 border-2 border-spotlight/40 flex items-center justify-center font-bold text-haze">
-                      A
+            <FeaturedBattle
+              fallback={
+                <div className="relative bg-stage-900 border border-stage-700 rounded-2xl p-6 overflow-hidden">
+                  <div className="absolute -top-20 -right-20 w-48 h-48 rounded-full bg-spotlight/20 blur-3xl" />
+                  <div className="relative z-10">
+                    <p className="text-xs uppercase tracking-widest text-spotlight font-bold mb-3">
+                      The First Battle
+                    </p>
+                    <h3 className="font-display text-2xl font-bold mb-3 leading-tight">
+                      Two performers.<br />
+                      One Centerstage Song.
+                    </h3>
+                    <p className="text-sm text-haze leading-relaxed mb-5">
+                      24–48 hours to decide. You can only pick one.
+                    </p>
+                    <div className="flex items-center justify-center gap-3 py-4 border-y border-stage-700/60 mb-4">
+                      <div className="flex flex-col items-center">
+                        <div className="w-12 h-12 rounded-full bg-stage-800 border-2 border-spotlight/40 flex items-center justify-center font-bold text-haze">
+                          A
+                        </div>
+                        <span className="text-[10px] uppercase tracking-widest text-haze/60 mt-1">
+                          Singer
+                        </span>
+                      </div>
+                      <span className="font-display font-black text-2xl text-spotlight italic">
+                        vs
+                      </span>
+                      <div className="flex flex-col items-center">
+                        <div className="w-12 h-12 rounded-full bg-stage-800 border-2 border-gold/40 flex items-center justify-center font-bold text-haze">
+                          B
+                        </div>
+                        <span className="text-[10px] uppercase tracking-widest text-haze/60 mt-1">
+                          Singer
+                        </span>
+                      </div>
                     </div>
-                    <span className="text-[10px] uppercase tracking-widest text-haze/60 mt-1">
-                      Singer
-                    </span>
-                  </div>
-                  <span className="font-display font-black text-2xl text-spotlight italic">
-                    vs
-                  </span>
-                  <div className="flex flex-col items-center">
-                    <div className="w-12 h-12 rounded-full bg-stage-800 border-2 border-gold/40 flex items-center justify-center font-bold text-haze">
-                      B
-                    </div>
-                    <span className="text-[10px] uppercase tracking-widest text-haze/60 mt-1">
-                      Singer
-                    </span>
+                    <p className="text-xs text-haze/60 leading-relaxed">
+                      Sign up to cast the first vote.
+                    </p>
                   </div>
                 </div>
-                <p className="text-xs text-haze/60 leading-relaxed">
-                  Sign up to cast the first vote.
-                </p>
-              </div>
-            </div>
+              }
+            />
           </div>
         </div>
       </section>
 
-      {/* FIRST BATTLE COMING SOON */}
-      <section className="relative z-10 border-b border-stage-700/40">
-        <div className="max-w-7xl mx-auto px-6 py-12 text-center">
-          <p className="text-xs uppercase tracking-[0.3em] text-spotlight font-bold mb-3">
-            First Battle Coming Soon
-          </p>
-          <h2 className="font-display text-3xl md:text-4xl font-bold mb-3">
-            We're preparing the first matchup now.
-          </h2>
-          <p className="text-haze">Once ready, voting opens.</p>
-        </div>
-      </section>
+      {/* BATTLE STATUS — picks one of three states based on what's happening:
+            live battles → "Open battles" grid with countdowns
+            only completed → "Between matchups" with the defending champion
+            never any → "First Battle Coming Soon" teaser */}
+      <HomeBattleStatus />
 
       {/* THE CHALLENGE — Red Phone */}
       <section className="relative z-10 border-b border-stage-700/40 overflow-hidden">

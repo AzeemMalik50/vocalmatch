@@ -54,6 +54,15 @@ export default function Nav() {
           </button>
           {loading ? null : user ? (
             <>
+              {user.isAdmin && (
+                <Link
+                  href="/admin"
+                  className="hidden md:inline-flex items-center px-3 py-2 text-spotlight font-bold hover:opacity-90 transition-opacity uppercase tracking-widest text-xs whitespace-nowrap"
+                  title="Admin dashboard"
+                >
+                  Admin
+                </Link>
+              )}
               <Link
                 href="/upload"
                 className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 bg-spotlight text-white font-bold hover:bg-spotlight-dim transition-colors rounded-md shadow-lg shadow-spotlight/20 whitespace-nowrap"
@@ -127,6 +136,15 @@ export default function Nav() {
                     >
                       Upload performance
                     </Link>
+                    {user.isAdmin && (
+                      <Link
+                        href="/admin"
+                        onClick={() => setMenuOpen(false)}
+                        className="md:hidden block px-4 py-3 text-sm font-semibold text-spotlight hover:bg-stage-800 transition-colors"
+                      >
+                        Admin dashboard
+                      </Link>
+                    )}
                     <Link
                       href="/settings"
                       onClick={() => setMenuOpen(false)}

@@ -1,26 +1,42 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
+// ─── Domain modules ───────────────────────────────────────────────
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { VideosModule } from './videos/videos.module';
+import { SongsModule } from './songs/songs.module';
+import { BattlesModule } from './battles/battles.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { AdminModule } from './admin/admin.module';
 
+// ─── Entities (registered with TypeORM at the root) ───────────────
 import { User } from './users/user.entity';
 import { Video } from './videos/video.entity';
+import { Song } from './songs/song.entity';
+import { Battle } from './battles/battle.entity';
+import { Vote } from './battles/vote.entity';
+import { Notification } from './notifications/notification.entity';
 
-const entities = [User, Video];
+const entities = [User, Video, Song, Battle, Vote, Notification];
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(), // enables @Cron in BattlesScheduler
     TypeOrmModule.forRoot(
       process.env.DATABASE_URL
         ? {
             type: 'postgres',
             url: process.env.DATABASE_URL,
             entities,
-            synchronize: true, // OK for Phase 1; use migrations from Phase 3
+            // Auto-sync is fine for dev/staging during Phase 2A iteration, but
+            // disabled in production so a stray entity edit can't silently
+            // ALTER prod columns. From Phase 3 onward, all schema moves happen
+            // through hand-written migrations.
+            synchronize: process.env.NODE_ENV !== 'production',
             ssl: { rejectUnauthorized: false },
           }
         : {
@@ -30,9 +46,16 @@ const entities = [User, Video];
             synchronize: true,
           },
     ),
+
+    // Order: AdminModule before SongsModule/BattlesModule so the AdminGuard
+    // is available when those modules' controllers are wired up.
     AuthModule,
+    AdminModule,
     UsersModule,
     VideosModule,
+    SongsModule,
+    BattlesModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}
