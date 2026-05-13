@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import PerformanceCard from '@/components/PerformanceCard';
@@ -22,6 +23,15 @@ const PAGE_SIZE = 12;
 
 export default function HomePage() {
   const { user, loading: authLoading, refresh } = useAuth();
+  const router = useRouter();
+
+  // Admins don't have a singer/voter surface — funnel them straight to the
+  // admin dashboard so they never land on the consumer homepage.
+  useEffect(() => {
+    if (!authLoading && user?.isAdmin) {
+      router.replace('/admin');
+    }
+  }, [authLoading, user?.isAdmin, router]);
 
   // Filters
   const [search, setSearch] = useState('');

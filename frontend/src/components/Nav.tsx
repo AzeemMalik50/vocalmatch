@@ -63,15 +63,19 @@ export default function Nav() {
                   Admin
                 </Link>
               )}
-              <Link
-                href="/upload"
-                className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 bg-spotlight text-white font-bold hover:bg-spotlight-dim transition-colors rounded-md shadow-lg shadow-spotlight/20 whitespace-nowrap"
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-                  <path d="M7 1v12M1 7h12" stroke="white" strokeWidth="2" />
-                </svg>
-                Upload
-              </Link>
+              {/* Upload is a singer action — admins don't have a singer surface,
+                  so we hide the prominent CTA for them. */}
+              {!user.isAdmin && (
+                <Link
+                  href="/upload"
+                  className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 bg-spotlight text-white font-bold hover:bg-spotlight-dim transition-colors rounded-md shadow-lg shadow-spotlight/20 whitespace-nowrap"
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                    <path d="M7 1v12M1 7h12" stroke="white" strokeWidth="2" />
+                  </svg>
+                  Upload
+                </Link>
+              )}
 
               {/* Avatar menu */}
               <div className="relative" ref={menuRef}>
@@ -129,13 +133,15 @@ export default function Nav() {
                         @{user.username}
                       </p>
                     </Link>
-                    <Link
-                      href="/upload"
-                      onClick={() => setMenuOpen(false)}
-                      className="sm:hidden block px-4 py-3 text-sm font-semibold hover:bg-stage-800 transition-colors"
-                    >
-                      Upload performance
-                    </Link>
+                    {!user.isAdmin && (
+                      <Link
+                        href="/upload"
+                        onClick={() => setMenuOpen(false)}
+                        className="sm:hidden block px-4 py-3 text-sm font-semibold hover:bg-stage-800 transition-colors"
+                      >
+                        Upload performance
+                      </Link>
+                    )}
                     {user.isAdmin && (
                       <Link
                         href="/admin"
