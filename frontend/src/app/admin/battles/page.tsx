@@ -138,8 +138,15 @@ function BattleRow({
   onResolved: () => void;
 }) {
   return (
-    <li className="bg-stage-900 border border-stage-700/60 rounded-xl p-4 md:p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <li className="relative bg-stage-900 border border-stage-700/60 rounded-xl p-4 md:p-5 hover:border-spotlight/40 transition-colors">
+      {/* Full-card click target. Sits behind action buttons (z-0 vs z-10)
+          so clicks on Close/Cancel/Resolve don't trigger navigation. */}
+      <Link
+        href={`/admin/battles/${battle.id}`}
+        aria-label={`Open ${battle.title || 'battle'}`}
+        className="absolute inset-0 z-0 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-spotlight"
+      />
+      <div className="relative z-0 flex flex-wrap items-start justify-between gap-3 pointer-events-none">
         <div className="min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <StatusBadge status={battle.status} />
@@ -147,12 +154,9 @@ function BattleRow({
               {new Date(battle.createdAt).toLocaleDateString()}
             </span>
           </div>
-          <Link
-            href={`/battle/${battle.id}`}
-            className="font-display font-bold text-lg hover:text-spotlight transition-colors"
-          >
+          <p className="font-display font-bold text-lg">
             {battle.title || 'Untitled battle'}
-          </Link>
+          </p>
           <p className="text-xs text-haze mt-1 tabular-nums">
             {battle.status === 'live' && (
               <>Closes {new Date(battle.votingClosesAt).toLocaleString()}</>
@@ -169,7 +173,8 @@ function BattleRow({
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        {/* Action buttons re-enable pointer events and sit above the link. */}
+        <div className="relative z-10 pointer-events-auto flex flex-wrap gap-2">
           {battle.status === 'live' && (
             <>
               <ActionButton onClick={onClose} disabled={busy}>
