@@ -8,10 +8,13 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from '../admin/admin.guard';
 import { BattlesService } from './battles.service';
 import { BattleStatus } from './battle.entity';
+import { User } from '../users/user.entity';
 import {
   CastVoteDto,
   CreateBattleDto,
@@ -20,7 +23,10 @@ import {
 
 @Controller('battles')
 export class BattlesController {
-  constructor(private readonly battles: BattlesService) {}
+  constructor(
+    private readonly battles: BattlesService,
+    @InjectRepository(User) private readonly users: Repository<User>,
+  ) {}
 
   // ─── Public reads ───────────────────────────────────────────────
 
@@ -53,16 +59,24 @@ export class BattlesController {
 
   /**
    * Detail page — gates standings behind whether the requesting user has
-   * voted on this battle (Vincent's decision C).
+   * voted on this battle (Vincent's decision C). Admins always see standings
+   * since the admin dashboard needs them to monitor live battles.
    */
   @Get(':id')
   @UseGuards(OptionalJwtAuthGuard)
   async getOne(@Req() req: any, @Param('id') id: string) {
     const battle = await this.battles.findOne(id);
-    const requesterHasVoted = await this.battles.hasUserVoted(
-      id,
-      req.user?.userId,
-    );
+    const userId: string | undefined = req.user?.userId;
+
+    let requesterHasVoted = false;
+    if (userId) {
+      const user = await this.users.findOne({ where: { id: userId } });
+      if (user?.isAdmin) {
+        requesterHasVoted = true;
+      } else {
+        requesterHasVoted = await this.battles.hasUserVoted(id, userId);
+      }
+    }
     return this.battles.toPublic(battle, requesterHasVoted);
   }
 

@@ -93,7 +93,7 @@ export default function AdminNewBattlePage() {
         title: title.trim() || undefined,
         votingClosesAt: closesAt,
       });
-      router.push(`/battle/${battle.id}`);
+      router.push(`/admin/battles/${battle.id}`);
     } catch (e: any) {
       setError(e.message || 'Could not create battle');
       setSubmitting(false);

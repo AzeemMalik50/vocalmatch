@@ -112,7 +112,7 @@ export default function AdminOverviewPage() {
               {recentLive.map((b) => (
                 <Link
                   key={b.id}
-                  href={`/battle/${b.id}`}
+                  href={`/admin/battles/${b.id}`}
                   className="block bg-stage-900 border border-stage-700/60 rounded-xl p-4 hover:border-spotlight/40 transition-colors"
                 >
                   <p className="font-semibold">{b.title || 'Untitled battle'}</p>
