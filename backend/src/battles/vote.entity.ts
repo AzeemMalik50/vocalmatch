@@ -31,6 +31,6 @@ export class Vote {
   @Column({ type: 'uuid' })
   performanceId: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 }

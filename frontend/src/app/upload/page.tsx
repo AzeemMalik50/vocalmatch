@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import Nav from '@/components/Nav';
 import { useAuth } from '@/lib/auth-context';
 import {
+  api,
+  SongDto,
   uploadVideoWithProgress,
   UploadHandle,
   VideoVisibility,
@@ -19,7 +21,11 @@ export default function UploadPage() {
   const router = useRouter();
 
   const [title, setTitle] = useState('');
-  const [songTitle, setSongTitle] = useState('');
+  const [songs, setSongs] = useState<SongDto[]>([]);
+  const [songsLoading, setSongsLoading] = useState(true);
+  const [songSearch, setSongSearch] = useState('');
+  const [songId, setSongId] = useState<string>('');
+  const [songPickerOpen, setSongPickerOpen] = useState(false);
   const [description, setDescription] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [visibility, setVisibility] = useState<VideoVisibility>('public');
@@ -35,6 +41,39 @@ export default function UploadPage() {
   useEffect(() => {
     if (!authLoading && !user) router.push('/login');
   }, [authLoading, user, router]);
+
+  // Load the active Centerstage Songs catalog. The picker is the one source of
+  // truth — performances must link to a song id so the battle-create endpoint
+  // can enforce "both performances of the same song".
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const resp = await api.listSongs('active');
+        if (!cancelled) setSongs(resp.items);
+      } catch {
+        // Non-fatal — user just won't be able to pick a song. The form
+        // surfaces this state below.
+      } finally {
+        if (!cancelled) setSongsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedSong = songs.find((s) => s.id === songId) ?? null;
+
+  const filteredSongs = (() => {
+    const q = songSearch.trim().toLowerCase();
+    if (!q) return songs;
+    return songs.filter(
+      (s) =>
+        s.title.toLowerCase().includes(q) ||
+        s.artist.toLowerCase().includes(q),
+    );
+  })();
 
   // Paste a video file from the clipboard
   useEffect(() => {
@@ -95,9 +134,15 @@ export default function UploadPage() {
     setProgress(0);
     setUploaded(0);
 
+    if (!songId) {
+      setErr('Pick a Centerstage Song from the list.');
+      return;
+    }
+
     const fd = new FormData();
     fd.append('title', title);
-    if (songTitle) fd.append('songTitle', songTitle);
+    fd.append('songId', songId);
+    if (selectedSong) fd.append('songTitle', selectedSong.title);
     if (description) fd.append('description', description);
     fd.append('visibility', visibility);
     if (tags.length > 0) fd.append('tags', tags.join(','));
@@ -173,20 +218,132 @@ export default function UploadPage() {
 
           <div>
             <label className="block text-xs uppercase tracking-widest mb-2 font-bold text-haze/80">
-              Song <span className="text-haze/40">(optional but recommended)</span>
+              Centerstage Song
             </label>
-            <input
-              type="text"
-              maxLength={120}
-              value={songTitle}
-              onChange={(e) => setSongTitle(e.target.value)}
-              className="w-full px-4 py-3 bg-stage-900 border border-stage-700 rounded-md focus:outline-none focus:border-spotlight transition-colors"
-              placeholder='e.g. "Hallelujah — Leonard Cohen"'
-            />
+            {songsLoading ? (
+              <div className="w-full px-4 py-3 bg-stage-900 border border-stage-700 rounded-md text-sm text-haze/60">
+                Loading songs…
+              </div>
+            ) : songs.length === 0 ? (
+              <div className="w-full px-4 py-3 bg-stage-900 border border-stage-700 rounded-md text-sm text-haze/70">
+                No Centerstage Songs are active yet. An admin needs to publish
+                at least one before you can upload a performance.
+              </div>
+            ) : (
+              <div className="relative">
+                {selectedSong ? (
+                  <div className="w-full flex items-stretch bg-stage-900 border border-spotlight/50 rounded-md overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSongId('');
+                        setSongSearch('');
+                        setSongPickerOpen(true);
+                      }}
+                      className="flex-1 flex items-center justify-between px-4 py-3 text-left hover:bg-stage-800/40 transition-colors"
+                    >
+                      <span>
+                        <span className="font-bold">{selectedSong.title}</span>
+                        <span className="text-haze/60"> · {selectedSong.artist}</span>
+                      </span>
+                      <span className="text-xs text-spotlight font-bold uppercase tracking-widest">
+                        Change
+                      </span>
+                    </button>
+                    {selectedSong.trackUrl && (
+                      <a
+                        href={selectedSong.trackUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-4 text-[11px] uppercase tracking-widest font-bold text-spotlight hover:bg-stage-800 border-l border-spotlight/30"
+                        title="Open backing track in a new tab"
+                      >
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                          aria-hidden="true"
+                        >
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                        Play sound
+                      </a>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      value={songSearch}
+                      onChange={(e) => {
+                        setSongSearch(e.target.value);
+                        setSongPickerOpen(true);
+                      }}
+                      onFocus={() => setSongPickerOpen(true)}
+                      placeholder="Search the catalog by title or artist"
+                      className="w-full px-4 py-3 bg-stage-900 border border-stage-700 rounded-md focus:outline-none focus:border-spotlight transition-colors"
+                    />
+                    {songPickerOpen && (
+                      <ul className="absolute z-10 mt-1 w-full max-h-60 overflow-auto bg-stage-900 border border-stage-700 rounded-md shadow-lg">
+                        {filteredSongs.length === 0 ? (
+                          <li className="px-4 py-3 text-sm text-haze/60">
+                            No matches. Ask an admin to add this song to the catalog.
+                          </li>
+                        ) : (
+                          filteredSongs.map((s) => (
+                            <li key={s.id} className="flex items-stretch border-b border-stage-800 last:border-b-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSongId(s.id);
+                                  setSongSearch('');
+                                  setSongPickerOpen(false);
+                                }}
+                                className="flex-1 text-left px-4 py-2.5 hover:bg-stage-800 transition-colors"
+                              >
+                                <span className="font-bold">{s.title}</span>
+                                <span className="text-haze/60"> · {s.artist}</span>
+                              </button>
+                              {s.trackUrl && (
+                                <a
+                                  href={s.trackUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  // Stop propagation so opening the track
+                                  // doesn't also select the song. mousedown
+                                  // matters because the parent input has an
+                                  // onBlur path that would close the picker
+                                  // before click fires.
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex items-center gap-1.5 px-3 text-[11px] uppercase tracking-widest font-bold text-spotlight hover:bg-stage-800 border-l border-stage-800"
+                                  title="Open backing track in a new tab"
+                                >
+                                  <svg
+                                    width="12"
+                                    height="12"
+                                    viewBox="0 0 24 24"
+                                    fill="currentColor"
+                                    aria-hidden="true"
+                                  >
+                                    <path d="M8 5v14l11-7z" />
+                                  </svg>
+                                  Play sound
+                                </a>
+                              )}
+                            </li>
+                          ))
+                        )}
+                      </ul>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
             <p className="mt-1.5 text-xs text-haze/50">
-              Battles match performers who covered the same song. Singing the
-              <span className="text-spotlight font-bold"> Centerstage Song</span>{' '}
-              (announced soon) makes you eligible for the very first battle.
+              Battles match performers who covered the same Centerstage Song.
+              Pick one from the catalog so admins can pair your performance.
             </p>
           </div>
 

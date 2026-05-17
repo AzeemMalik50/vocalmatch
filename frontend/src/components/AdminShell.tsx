@@ -16,6 +16,7 @@ const TABS: { href: string; label: string }[] = [
   { href: '/admin', label: 'Backstage' },
   { href: '/admin/battles', label: 'Battles' },
   { href: '/admin/songs', label: 'Songs' },
+  { href: '/admin/performances', label: 'Performances' },
   { href: '/admin/users', label: 'People' },
 ];
 

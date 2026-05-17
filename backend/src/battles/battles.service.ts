@@ -101,11 +101,30 @@ export class BattlesService {
 
   // ─── Reads ──────────────────────────────────────────────────────
 
-  async findAll(opts: { status?: BattleStatus; songId?: string } = {}) {
-    const qb = this.battles.createQueryBuilder('b').orderBy('b.createdAt', 'DESC');
+  async findAll(opts: {
+    status?: BattleStatus;
+    songId?: string;
+    limit?: number;
+    offset?: number;
+  } = {}) {
+    const limit = Math.min(opts.limit ?? 50, 200);
+    const offset = opts.offset ?? 0;
+    const qb = this.battles
+      .createQueryBuilder('b')
+      .orderBy('b.createdAt', 'DESC')
+      // +1 to detect whether more rows exist beyond this page, without a COUNT.
+      .take(limit + 1)
+      .skip(offset);
     if (opts.status) qb.andWhere('b.status = :status', { status: opts.status });
     if (opts.songId) qb.andWhere('b.songId = :songId', { songId: opts.songId });
-    return qb.getMany();
+    const rows = await qb.getMany();
+    const hasMore = rows.length > limit;
+    const items = hasMore ? rows.slice(0, limit) : rows;
+    return {
+      items,
+      hasMore,
+      nextOffset: hasMore ? offset + limit : null,
+    };
   }
 
   async findOne(id: string) {

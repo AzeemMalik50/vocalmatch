@@ -9,6 +9,7 @@
     "start:prod": "node dist/main",
     "seed:admin": "ts-node --transpile-only src/scripts/seed-admin.ts",
     "seed:sample": "ts-node --transpile-only src/scripts/seed-sample.ts",
+    "fix:phase-2a": "ts-node --transpile-only src/scripts/phase-2a-fixes.ts",
     "test": "jest"
   },
   "jest": {

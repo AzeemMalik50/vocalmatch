@@ -1,15 +1,28 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import { Button, Field, TextInput } from '@/components/forms';
 import { useAuth } from '@/lib/auth-context';
 
+/**
+ * Pick a safe redirect target from `?next=`. Restricts to same-origin paths
+ * (must start with "/" and not "//") so a malicious next= cannot send the
+ * user to an external site.
+ */
+function safeNext(next: string | null): string {
+  if (!next) return '/';
+  if (!next.startsWith('/') || next.startsWith('//')) return '/';
+  return next;
+}
+
 export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = safeNext(searchParams?.get('next') ?? null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -22,7 +35,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      router.push('/');
+      router.push(next);
     } catch (e: any) {
       setErr(e.message);
     } finally {
@@ -89,7 +102,7 @@ export default function LoginPage() {
         <p className="mt-8 text-center text-sm text-haze">
           New to the stage?{' '}
           <Link
-            href="/signup"
+            href={next === '/' ? '/signup' : `/signup?next=${encodeURIComponent(next)}`}
             className="text-spotlight font-bold hover:text-white transition-colors"
           >
             Create an account

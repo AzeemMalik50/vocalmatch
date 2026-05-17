@@ -102,8 +102,13 @@ export class VideosController {
   @UseGuards(OptionalJwtAuthGuard)
   async getOne(@Req() req: any, @Param('id') id: string) {
     const video = await this.videos.findOneAuthorized(id, req.user?.userId);
-    if (req.user?.userId !== video.uploaderId) {
-      this.videos.incrementView(id).catch(() => {});
+    // Count one view per unique signed-in user. Anonymous views are not
+    // counted (no userId means no dedupe surface). Self-views (uploader
+    // visiting their own page) are also excluded so the count reflects
+    // real audience.
+    const viewerId: string | undefined = req.user?.userId;
+    if (viewerId && viewerId !== video.uploaderId) {
+      this.videos.recordView(id, viewerId).catch(() => {});
     }
     // Phase 2A: surface the battle this video is in (if any) so the frontend
     // can transform /v/:id into a battle-aware view (redirect to /battle/:id

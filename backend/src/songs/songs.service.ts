@@ -22,12 +22,30 @@ export class SongsService {
     return this.songs.save(song);
   }
 
-  async findAll(opts: { status?: SongStatus | 'all' } = {}) {
-    const qb = this.songs.createQueryBuilder('s').orderBy('s.createdAt', 'DESC');
+  async findAll(opts: {
+    status?: SongStatus | 'all';
+    limit?: number;
+    offset?: number;
+  } = {}) {
+    const limit = Math.min(opts.limit ?? 50, 200);
+    const offset = opts.offset ?? 0;
+    const qb = this.songs
+      .createQueryBuilder('s')
+      .orderBy('s.createdAt', 'DESC')
+      // +1 to detect whether more rows exist beyond this page.
+      .take(limit + 1)
+      .skip(offset);
     if (opts.status && opts.status !== 'all') {
       qb.andWhere('s.status = :status', { status: opts.status });
     }
-    return qb.getMany();
+    const rows = await qb.getMany();
+    const hasMore = rows.length > limit;
+    const items = hasMore ? rows.slice(0, limit) : rows;
+    return {
+      items,
+      hasMore,
+      nextOffset: hasMore ? offset + limit : null,
+    };
   }
 
   async findOne(id: string) {
