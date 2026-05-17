@@ -14,10 +14,16 @@ interface SongFormState {
 
 const empty: SongFormState = { title: '', artist: '', trackUrl: '', coverArtUrl: '' };
 
+const PAGE_SIZE = 20;
+
 export default function AdminSongsPage() {
   const [songs, setSongs] = useState<SongDto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [nextOffset, setNextOffset] = useState(0);
+  // Form mode: null = closed, 'new' = create, song.id = edit existing
+  const [mode, setMode] = useState<null | 'new' | string>(null);
   const [form, setForm] = useState<SongFormState>(empty);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,10 +31,29 @@ export default function AdminSongsPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const resp = await api.listSongs('all');
+      const resp = await api.listSongs({ status: 'all', limit: PAGE_SIZE, offset: 0 });
       setSongs(resp.items);
+      setHasMore(resp.hasMore);
+      setNextOffset(resp.nextOffset ?? 0);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const resp = await api.listSongs({
+        status: 'all',
+        limit: PAGE_SIZE,
+        offset: nextOffset,
+      });
+      setSongs((prev) => [...prev, ...resp.items]);
+      setHasMore(resp.hasMore);
+      setNextOffset(resp.nextOffset ?? nextOffset + PAGE_SIZE);
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -36,23 +61,53 @@ export default function AdminSongsPage() {
     load();
   }, []);
 
+  const openNew = () => {
+    setMode('new');
+    setForm(empty);
+    setError(null);
+  };
+
+  const openEdit = (s: SongDto) => {
+    setMode(s.id);
+    setForm({
+      title: s.title,
+      artist: s.artist,
+      trackUrl: s.trackUrl ?? '',
+      coverArtUrl: s.coverArtUrl ?? '',
+    });
+    setError(null);
+  };
+
+  const closeForm = () => {
+    setMode(null);
+    setForm(empty);
+    setError(null);
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title.trim() || !form.artist.trim()) return;
     setSubmitting(true);
     setError(null);
     try {
-      await api.createSong({
+      const payload = {
         title: form.title.trim(),
         artist: form.artist.trim(),
         trackUrl: form.trackUrl.trim() || undefined,
         coverArtUrl: form.coverArtUrl.trim() || undefined,
-      });
-      setForm(empty);
-      setShowForm(false);
+      };
+      if (mode === 'new') {
+        await api.createSong(payload);
+      } else if (mode) {
+        await api.updateSong(mode, payload);
+      }
+      closeForm();
       await load();
     } catch (e: any) {
-      setError(e.message || 'Could not create song');
+      setError(
+        e.message ||
+          (mode === 'new' ? 'Could not create song' : 'Could not update song'),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -75,18 +130,21 @@ export default function AdminSongsPage() {
         </div>
         <button
           type="button"
-          onClick={() => setShowForm((v) => !v)}
+          onClick={() => (mode === 'new' ? closeForm() : openNew())}
           className="px-5 py-2.5 bg-spotlight text-white font-bold rounded-md hover:bg-spotlight-dim transition-colors"
         >
-          {showForm ? 'Cancel' : '+ New song'}
+          {mode === 'new' ? 'Cancel' : '+ New song'}
         </button>
       </div>
 
-      {showForm && (
+      {mode && (
         <form
           onSubmit={submit}
           className="bg-stage-900 border border-stage-700/60 rounded-xl p-5 mb-8 space-y-4 max-w-2xl"
         >
+          <p className="text-xs uppercase tracking-widest font-bold text-haze">
+            {mode === 'new' ? 'New song' : 'Edit song'}
+          </p>
           <Field label="Title" required>
             <input
               type="text"
@@ -130,13 +188,23 @@ export default function AdminSongsPage() {
           {error && (
             <p className="text-sm text-red-400">{error}</p>
           )}
-          <button
-            type="submit"
-            disabled={submitting}
-            className="px-6 py-2.5 bg-spotlight text-white font-bold rounded-md hover:bg-spotlight-dim transition-colors disabled:opacity-50"
-          >
-            {submitting ? 'Saving…' : 'Save song'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-6 py-2.5 bg-spotlight text-white font-bold rounded-md hover:bg-spotlight-dim transition-colors disabled:opacity-50"
+            >
+              {submitting ? 'Saving…' : mode === 'new' ? 'Save song' : 'Save changes'}
+            </button>
+            <button
+              type="button"
+              onClick={closeForm}
+              disabled={submitting}
+              className="px-4 py-2.5 text-sm font-bold text-haze hover:text-white"
+            >
+              Cancel
+            </button>
+          </div>
         </form>
       )}
 
@@ -148,6 +216,7 @@ export default function AdminSongsPage() {
           <p className="text-haze">Create the first Centerstage Song to host battles.</p>
         </div>
       ) : (
+        <>
         <ul className="space-y-2">
           {songs.map((s) => (
             <li
@@ -173,6 +242,13 @@ export default function AdminSongsPage() {
                 </span>
                 <button
                   type="button"
+                  onClick={() => openEdit(s)}
+                  className="px-3 py-1.5 text-xs font-bold rounded-md bg-stage-800 border border-stage-700 hover:border-spotlight/40 transition-colors"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
                   onClick={() => toggleStatus(s)}
                   className="px-3 py-1.5 text-xs font-bold rounded-md bg-stage-800 border border-stage-700 hover:border-spotlight/40 transition-colors"
                 >
@@ -182,6 +258,19 @@ export default function AdminSongsPage() {
             </li>
           ))}
         </ul>
+        {hasMore && (
+          <div className="flex justify-center mt-6">
+            <button
+              type="button"
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="px-5 py-2.5 bg-stage-800 border border-stage-700 hover:border-spotlight/40 font-bold rounded-md transition-colors disabled:opacity-50"
+            >
+              {loadingMore ? 'Loading…' : 'Load more'}
+            </button>
+          </div>
+        )}
+        </>
       )}
     </AdminShell>
   );

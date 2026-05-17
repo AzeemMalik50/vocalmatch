@@ -1,0 +1,364 @@
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
+import AdminShell from '@/components/AdminShell';
+import { TableRowsSkeleton } from '@/components/Loaders';
+import {
+  AdminPerformanceDto,
+  SongDto,
+  api,
+} from '@/lib/api';
+
+const PAGE_SIZE = 25;
+
+/**
+ * Admin performances triage. Lists uploads, lets admins backfill the
+ * Centerstage Song link on legacy/QA uploads, and soft-delete if needed.
+ */
+export default function AdminPerformancesPage() {
+  const [items, setItems] = useState<AdminPerformanceDto[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [missingSong, setMissingSong] = useState(false);
+  const [includeDeleted, setIncludeDeleted] = useState(false);
+  const [songs, setSongs] = useState<SongDto[]>([]);
+  const [working, setWorking] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  // Debounce search
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Load songs once for the assign-song picker
+  useEffect(() => {
+    api
+      .listSongs('all')
+      .then((r) => setSongs(r.items))
+      .catch(() => setSongs([]));
+  }, []);
+
+  const load = useCallback(
+    async (reset: boolean) => {
+      setLoading(true);
+      try {
+        const nextOffset = reset ? 0 : offset;
+        const resp = await api.adminListPerformances({
+          search: debouncedSearch || undefined,
+          missingSong: missingSong || undefined,
+          includeDeleted: includeDeleted || undefined,
+          limit: PAGE_SIZE,
+          offset: nextOffset,
+        });
+        setItems(reset ? resp.items : [...items, ...resp.items]);
+        setHasMore(resp.hasMore);
+        setOffset((resp.nextOffset ?? nextOffset + PAGE_SIZE));
+      } finally {
+        setLoading(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [debouncedSearch, missingSong, includeDeleted],
+  );
+
+  useEffect(() => {
+    load(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, missingSong, includeDeleted]);
+
+  const handleAssign = async (id: string, songId: string | null) => {
+    setWorking(id);
+    setActionError(null);
+    try {
+      const updated = await api.adminAssignPerformanceSong(id, songId);
+      setItems((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                songId: updated.songId,
+                songTitle: updated.songTitle,
+                song: updated.songId
+                  ? songs
+                      .filter((s) => s.id === updated.songId)
+                      .map((s) => ({
+                        id: s.id,
+                        title: s.title,
+                        artist: s.artist,
+                      }))[0] ?? null
+                  : null,
+              }
+            : p,
+        ),
+      );
+    } catch (e: any) {
+      setActionError(e.message || 'Could not assign song');
+    } finally {
+      setWorking(null);
+    }
+  };
+
+  const handleSoftDelete = async (id: string) => {
+    if (!confirm('Hide this performance from the public feed?')) return;
+    setWorking(id);
+    setActionError(null);
+    try {
+      const updated = await api.adminSoftDeletePerformance(id);
+      setItems((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, deletedAt: updated.deletedAt } : p)),
+      );
+    } catch (e: any) {
+      setActionError(e.message || 'Could not delete performance');
+    } finally {
+      setWorking(null);
+    }
+  };
+
+  return (
+    <AdminShell>
+      <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
+        <div>
+          <h1 className="font-display font-black text-3xl mb-1">Performances</h1>
+          <p className="text-haze">
+            Triage uploads — assign a Centerstage Song to legacy or QA
+            performances and soft-delete content that doesn't belong.
+          </p>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-stage-900/60 border border-stage-700/60 rounded-xl p-3 mb-5 flex flex-wrap items-center gap-3">
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search title, song, or @uploader"
+          className="flex-1 min-w-[200px] px-3 py-2 bg-stage-900 border border-stage-700 rounded-md text-sm focus:outline-none focus:border-spotlight transition-colors"
+        />
+        <label className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold cursor-pointer">
+          <input
+            type="checkbox"
+            checked={missingSong}
+            onChange={(e) => setMissingSong(e.target.checked)}
+            className="accent-spotlight"
+          />
+          Missing song only
+        </label>
+        <label className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold cursor-pointer">
+          <input
+            type="checkbox"
+            checked={includeDeleted}
+            onChange={(e) => setIncludeDeleted(e.target.checked)}
+            className="accent-spotlight"
+          />
+          Show deleted
+        </label>
+      </div>
+
+      {actionError && (
+        <p className="text-sm text-red-400 mb-3">{actionError}</p>
+      )}
+
+      {loading && items.length === 0 ? (
+        <TableRowsSkeleton rows={4} />
+      ) : items.length === 0 ? (
+        <div className="text-center py-16 border-2 border-dashed border-stage-700 rounded-2xl">
+          <p className="font-display text-2xl mb-2">No performances</p>
+          <p className="text-haze">Try a different filter.</p>
+        </div>
+      ) : (
+        <ul className="space-y-2">
+          {items.map((p) => (
+            <PerformanceRow
+              key={p.id}
+              perf={p}
+              songs={songs}
+              busy={working === p.id}
+              onAssign={(songId) => handleAssign(p.id, songId)}
+              onSoftDelete={() => handleSoftDelete(p.id)}
+            />
+          ))}
+        </ul>
+      )}
+
+      {hasMore && (
+        <div className="flex justify-center mt-6">
+          <button
+            type="button"
+            onClick={() => load(false)}
+            disabled={loading}
+            className="px-5 py-2.5 bg-stage-800 border border-stage-700 hover:border-spotlight/40 font-bold rounded-md transition-colors disabled:opacity-50"
+          >
+            {loading ? 'Loading…' : 'Load more'}
+          </button>
+        </div>
+      )}
+    </AdminShell>
+  );
+}
+
+function PerformanceRow({
+  perf,
+  songs,
+  busy,
+  onAssign,
+  onSoftDelete,
+}: {
+  perf: AdminPerformanceDto;
+  songs: SongDto[];
+  busy: boolean;
+  onAssign: (songId: string | null) => void;
+  onSoftDelete: () => void;
+}) {
+  const [picking, setPicking] = useState(false);
+  return (
+    <li
+      className={`bg-stage-900 border rounded-xl p-4 flex flex-wrap items-start justify-between gap-3 ${
+        perf.deletedAt
+          ? 'border-red-500/30 opacity-60'
+          : 'border-stage-700/60'
+      }`}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
+          <p className="font-bold">{perf.title}</p>
+          {perf.deletedAt && (
+            <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-red-500/15 text-red-300 border border-red-500/30">
+              Deleted
+            </span>
+          )}
+          {!perf.songId && (
+            <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-300 border border-yellow-500/30">
+              No song
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-haze">
+          {perf.uploader ? (
+            <Link
+              href={`/u/${perf.uploader.username}`}
+              className="hover:text-white"
+            >
+              @{perf.uploader.username}
+            </Link>
+          ) : (
+            <span className="italic">no uploader</span>
+          )}
+          <span className="text-haze/60">
+            {' '}
+            · uploaded {new Date(perf.createdAt).toLocaleDateString()}
+          </span>
+          <span className="text-haze/60">
+            {' · '}
+            <span className={perf.voteCount > 0 ? 'text-spotlight font-semibold' : ''}>
+              {perf.voteCount} {perf.voteCount === 1 ? 'vote' : 'votes'}
+            </span>
+          </span>
+          <span className="text-haze/60">
+            {' · '}
+            {perf.viewCount} {perf.viewCount === 1 ? 'view' : 'views'}
+          </span>
+        </p>
+        <p className="text-xs text-haze/70 mt-1">
+          {perf.song ? (
+            <>
+              Linked to{' '}
+              <span className="text-white font-semibold">{perf.song.title}</span>{' '}
+              · {perf.song.artist}
+            </>
+          ) : perf.songTitle ? (
+            <>
+              Unlinked songTitle: <span className="italic">{perf.songTitle}</span>
+            </>
+          ) : (
+            <span className="italic">No song linked</span>
+          )}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        {picking ? (
+          <SongPicker
+            songs={songs}
+            currentId={perf.songId}
+            onCancel={() => setPicking(false)}
+            onPick={(id) => {
+              setPicking(false);
+              onAssign(id);
+            }}
+          />
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => setPicking(true)}
+              disabled={busy}
+              className="px-3 py-1.5 text-xs font-bold rounded-md bg-stage-800 border border-stage-700 hover:border-spotlight/40 disabled:opacity-50 transition-colors"
+            >
+              {perf.songId ? 'Reassign song' : 'Assign song'}
+            </button>
+            {!perf.deletedAt && (
+              <button
+                type="button"
+                onClick={onSoftDelete}
+                disabled={busy}
+                className="px-3 py-1.5 text-xs font-bold rounded-md bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 disabled:opacity-50 transition-colors"
+              >
+                Soft-delete
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function SongPicker({
+  songs,
+  currentId,
+  onPick,
+  onCancel,
+}: {
+  songs: SongDto[];
+  currentId: string | null;
+  onPick: (songId: string | null) => void;
+  onCancel: () => void;
+}) {
+  const [val, setVal] = useState(currentId ?? '');
+  return (
+    <div className="flex items-center gap-2">
+      <select
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        className="px-3 py-1.5 text-xs bg-stage-900 border border-stage-700 rounded-md focus:outline-none focus:border-spotlight"
+      >
+        <option value="">(clear song link)</option>
+        {songs.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.title} — {s.artist}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        onClick={() => onPick(val || null)}
+        className="px-3 py-1.5 text-xs font-bold rounded-md bg-spotlight text-white"
+      >
+        Save
+      </button>
+      <button
+        type="button"
+        onClick={onCancel}
+        className="px-3 py-1.5 text-xs font-bold rounded-md bg-stage-800 border border-stage-700 text-haze"
+      >
+        Cancel
+      </button>
+    </div>
+  );
+}

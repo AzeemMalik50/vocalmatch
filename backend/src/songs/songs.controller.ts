@@ -25,16 +25,29 @@ export class SongsController {
    */
   @Get()
   @UseGuards(OptionalJwtAuthGuard)
-  async list(@Req() req: any, @Query('status') status?: SongStatus | 'all') {
+  async list(
+    @Req() req: any,
+    @Query('status') status?: SongStatus | 'all',
+    @Query('limit') limitRaw?: string,
+    @Query('offset') offsetRaw?: string,
+  ) {
     const isAdmin = req.user
       ? // We can't see isAdmin from the JWT alone; default to 'active' for
         // non-admins. Admins viewing the dashboard pass status explicitly.
         false
       : false;
-    const items = await this.songs.findAll({
+    const limit = limitRaw ? parseInt(limitRaw, 10) || undefined : undefined;
+    const offset = offsetRaw ? parseInt(offsetRaw, 10) || 0 : undefined;
+    const { items, hasMore, nextOffset } = await this.songs.findAll({
       status: status ?? (isAdmin ? 'all' : 'active'),
+      limit,
+      offset,
     });
-    return { items: items.map((s) => this.songs.toPublic(s)) };
+    return {
+      items: items.map((s) => this.songs.toPublic(s)),
+      hasMore,
+      nextOffset,
+    };
   }
 
   @Get(':id')

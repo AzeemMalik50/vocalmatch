@@ -87,9 +87,9 @@ export class Video {
   // Setting deletedAt hides the video from feed/profile while leaving the
   // battle history intact.
   @Index()
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   deletedAt: Date | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 }

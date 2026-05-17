@@ -48,11 +48,11 @@ export class Battle {
   @Column({ type: 'uuid' })
   performanceBId: string;
 
-  @Column({ type: 'timestamp' })
+  @Column({ type: 'timestamptz' })
   votingOpensAt: Date;
 
   @Index()
-  @Column({ type: 'timestamp' })
+  @Column({ type: 'timestamptz' })
   votingClosesAt: Date;
 
   @Index()
@@ -80,9 +80,9 @@ export class Battle {
   @Column({ type: 'uuid', nullable: true })
   tieResolvedByAdminId: string | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   closedAt: Date | null;
 }

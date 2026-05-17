@@ -35,8 +35,17 @@ export class BattlesController {
   async list(
     @Query('status') status?: BattleStatus,
     @Query('songId') songId?: string,
+    @Query('limit') limitRaw?: string,
+    @Query('offset') offsetRaw?: string,
   ) {
-    const items = await this.battles.findAll({ status, songId });
+    const limit = limitRaw ? parseInt(limitRaw, 10) || undefined : undefined;
+    const offset = offsetRaw ? parseInt(offsetRaw, 10) || 0 : undefined;
+    const { items, hasMore, nextOffset } = await this.battles.findAll({
+      status,
+      songId,
+      limit,
+      offset,
+    });
     // Listing endpoint hides standings — clients render cards from card-level
     // data (title, status, songId), not vote counts. The detail endpoint is
     // where the per-user vote-percentage gate matters.
@@ -54,6 +63,8 @@ export class BattlesController {
         closedAt: b.closedAt,
         winnerPerformanceId: b.winnerPerformanceId,
       })),
+      hasMore,
+      nextOffset,
     };
   }
 

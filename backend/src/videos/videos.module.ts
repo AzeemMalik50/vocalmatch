@@ -4,6 +4,7 @@ import { VideosController } from './videos.controller';
 import { VideosService } from './videos.service';
 import { CloudinaryService } from './cloudinary.service';
 import { Video } from './video.entity';
+import { VideoView } from './video-view.entity';
 import { Battle } from '../battles/battle.entity';
 import { AuthModule } from '../auth/auth.module';
 import { BattlesModule } from '../battles/battles.module';
@@ -15,7 +16,7 @@ import { BattlesModule } from '../battles/battles.module';
   // on the Video entity) so VideosController can call BattlesService to attach
   // battle context to /videos/:id responses.
   imports: [
-    TypeOrmModule.forFeature([Video, Battle]),
+    TypeOrmModule.forFeature([Video, VideoView, Battle]),
     AuthModule,
     forwardRef(() => BattlesModule),
   ],

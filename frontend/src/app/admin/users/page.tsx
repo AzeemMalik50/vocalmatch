@@ -6,12 +6,17 @@ import { TableRowsSkeleton } from '@/components/Loaders';
 import { api, AdminUserDto } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
+const PAGE_SIZE = 25;
+
 export default function AdminUsersPage() {
   const { user: me } = useAuth();
   const [users, setUsers] = useState<AdminUserDto[]>([]);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [nextOffset, setNextOffset] = useState(0);
   const [working, setWorking] = useState<string | null>(null);
 
   useEffect(() => {
@@ -22,10 +27,33 @@ export default function AdminUsersPage() {
   const load = async (term: string) => {
     setLoading(true);
     try {
-      const resp = await api.adminListUsers({ search: term || undefined, limit: 100 });
+      const resp = await api.adminListUsers({
+        search: term || undefined,
+        limit: PAGE_SIZE,
+        offset: 0,
+      });
       setUsers(resp.items);
+      setHasMore(resp.hasMore);
+      setNextOffset(resp.nextOffset ?? 0);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const resp = await api.adminListUsers({
+        search: debouncedSearch || undefined,
+        limit: PAGE_SIZE,
+        offset: nextOffset,
+      });
+      setUsers((prev) => [...prev, ...resp.items]);
+      setHasMore(resp.hasMore);
+      setNextOffset(resp.nextOffset ?? nextOffset + PAGE_SIZE);
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -149,6 +177,18 @@ export default function AdminUsersPage() {
               )}
             </tbody>
           </table>
+          {hasMore && (
+            <div className="flex justify-center mt-6">
+              <button
+                type="button"
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="px-5 py-2.5 bg-stage-800 border border-stage-700 hover:border-spotlight/40 font-bold rounded-md transition-colors disabled:opacity-50"
+              >
+                {loadingMore ? 'Loading…' : 'Load more'}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </AdminShell>

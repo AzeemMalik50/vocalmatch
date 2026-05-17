@@ -22,10 +22,15 @@ const FILTERS: { value: FilterStatus; label: string }[] = [
   { value: 'all', label: 'All' },
 ];
 
+const PAGE_SIZE = 20;
+
 export default function AdminBattlesPage() {
   const [filter, setFilter] = useState<FilterStatus>('live');
   const [items, setItems] = useState<BattleSummaryDto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [nextOffset, setNextOffset] = useState(0);
   const [working, setWorking] = useState<string | null>(null);
 
   const load = async (status: FilterStatus) => {
@@ -33,10 +38,31 @@ export default function AdminBattlesPage() {
     try {
       const resp = await api.listBattles({
         status: status === 'all' ? undefined : status,
+        limit: PAGE_SIZE,
+        offset: 0,
       });
       setItems(resp.items);
+      setHasMore(resp.hasMore);
+      setNextOffset(resp.nextOffset ?? 0);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const resp = await api.listBattles({
+        status: filter === 'all' ? undefined : filter,
+        limit: PAGE_SIZE,
+        offset: nextOffset,
+      });
+      setItems((prev) => [...prev, ...resp.items]);
+      setHasMore(resp.hasMore);
+      setNextOffset(resp.nextOffset ?? nextOffset + PAGE_SIZE);
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -107,18 +133,32 @@ export default function AdminBattlesPage() {
           <p className="text-haze">Try a different filter, or create one.</p>
         </div>
       ) : (
-        <ul className="space-y-3">
-          {items.map((b) => (
-            <BattleRow
-              key={b.id}
-              battle={b}
-              busy={working === b.id}
-              onClose={() => handleClose(b.id)}
-              onCancel={() => handleCancel(b.id)}
-              onResolved={() => load(filter)}
-            />
-          ))}
-        </ul>
+        <>
+          <ul className="space-y-3">
+            {items.map((b) => (
+              <BattleRow
+                key={b.id}
+                battle={b}
+                busy={working === b.id}
+                onClose={() => handleClose(b.id)}
+                onCancel={() => handleCancel(b.id)}
+                onResolved={() => load(filter)}
+              />
+            ))}
+          </ul>
+          {hasMore && (
+            <div className="flex justify-center mt-6">
+              <button
+                type="button"
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="px-5 py-2.5 bg-stage-800 border border-stage-700 hover:border-spotlight/40 font-bold rounded-md transition-colors disabled:opacity-50"
+              >
+                {loadingMore ? 'Loading…' : 'Load more'}
+              </button>
+            </div>
+          )}
+        </>
       )}
     </AdminShell>
   );

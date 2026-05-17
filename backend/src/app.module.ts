@@ -15,12 +15,13 @@ import { AdminModule } from './admin/admin.module';
 // ─── Entities (registered with TypeORM at the root) ───────────────
 import { User } from './users/user.entity';
 import { Video } from './videos/video.entity';
+import { VideoView } from './videos/video-view.entity';
 import { Song } from './songs/song.entity';
 import { Battle } from './battles/battle.entity';
 import { Vote } from './battles/vote.entity';
 import { Notification } from './notifications/notification.entity';
 
-const entities = [User, Video, Song, Battle, Vote, Notification];
+const entities = [User, Video, VideoView, Song, Battle, Vote, Notification];
 
 @Module({
   imports: [

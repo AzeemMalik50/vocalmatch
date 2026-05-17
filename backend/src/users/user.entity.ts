@@ -101,6 +101,6 @@ export class User {
   @Column({ default: false })
   isSongwriter: boolean;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 }

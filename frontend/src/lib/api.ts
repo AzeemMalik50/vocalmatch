@@ -295,6 +295,27 @@ export interface AdminUserDto {
   createdAt: string;
 }
 
+export interface AdminPerformanceDto {
+  id: string;
+  title: string;
+  songTitle: string | null;
+  songId: string | null;
+  song: { id: string; title: string; artist: string } | null;
+  thumbnailUrl: string | null;
+  category: 'solo' | 'battle_entry' | 'challenge_entry';
+  visibility: 'public' | 'unlisted' | 'private';
+  viewCount: number;
+  /** Total votes received across every battle this performance has been in. */
+  voteCount: number;
+  deletedAt: string | null;
+  createdAt: string;
+  uploader: {
+    id: string;
+    username: string;
+    avatarUrl: string | null;
+  } | null;
+}
+
 export interface NotificationDto {
   id: string;
   kind: 'challenger_selected' | 'battle_starting' | 'battle_result' | 'system';
@@ -427,9 +448,26 @@ export const api = {
     }),
 
   // ─── Songs ──────────────────────────────────────────────────────
-  listSongs: (status?: SongStatus | 'all') => {
-    const qs = status ? `?status=${status}` : '';
-    return request<{ items: SongDto[] }>(`/songs${qs}`);
+  listSongs: (
+    statusOrParams?:
+      | SongStatus
+      | 'all'
+      | { status?: SongStatus | 'all'; limit?: number; offset?: number },
+  ) => {
+    const params =
+      typeof statusOrParams === 'string'
+        ? { status: statusOrParams }
+        : statusOrParams ?? {};
+    const qs = new URLSearchParams();
+    if (params.status) qs.set('status', params.status);
+    if (params.limit != null) qs.set('limit', String(params.limit));
+    if (params.offset != null) qs.set('offset', String(params.offset));
+    const suffix = qs.toString() ? `?${qs}` : '';
+    return request<{
+      items: SongDto[];
+      hasMore: boolean;
+      nextOffset: number | null;
+    }>(`/songs${suffix}`);
   },
   getSong: (id: string) => request<SongDto>(`/songs/${id}`),
   createSong: (body: Pick<SongDto, 'title' | 'artist'> & { trackUrl?: string; coverArtUrl?: string }) =>
@@ -441,12 +479,25 @@ export const api = {
     request<SongDto>(`/songs/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
 
   // ─── Battles ────────────────────────────────────────────────────
-  listBattles: (params: { status?: BattleStatus; songId?: string } = {}) => {
+  listBattles: (
+    params: {
+      status?: BattleStatus;
+      songId?: string;
+      limit?: number;
+      offset?: number;
+    } = {},
+  ) => {
     const qs = new URLSearchParams();
     if (params.status) qs.set('status', params.status);
     if (params.songId) qs.set('songId', params.songId);
+    if (params.limit != null) qs.set('limit', String(params.limit));
+    if (params.offset != null) qs.set('offset', String(params.offset));
     const suffix = qs.toString() ? `?${qs}` : '';
-    return request<{ items: BattleSummaryDto[] }>(`/battles${suffix}`);
+    return request<{
+      items: BattleSummaryDto[];
+      hasMore: boolean;
+      nextOffset: number | null;
+    }>(`/battles${suffix}`);
   },
   getBattle: (id: string) => request<BattleDto>(`/battles/${id}`),
   createBattle: (body: {
@@ -493,6 +544,40 @@ export const api = {
     request<{ id: string; isAdmin: boolean; isSongwriter: boolean }>(
       `/admin/users/${id}/flags`,
       { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  // ─── Admin: performances ────────────────────────────────────────
+  adminListPerformances: (params: {
+    search?: string;
+    songId?: string;
+    missingSong?: boolean;
+    includeDeleted?: boolean;
+    limit?: number;
+    offset?: number;
+  } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.search) qs.set('search', params.search);
+    if (params.songId) qs.set('songId', params.songId);
+    if (params.missingSong) qs.set('missingSong', 'true');
+    if (params.includeDeleted) qs.set('includeDeleted', 'true');
+    if (params.limit != null) qs.set('limit', String(params.limit));
+    if (params.offset != null) qs.set('offset', String(params.offset));
+    const suffix = qs.toString() ? `?${qs}` : '';
+    return request<{
+      items: AdminPerformanceDto[];
+      hasMore: boolean;
+      nextOffset: number | null;
+    }>(`/admin/performances${suffix}`);
+  },
+  adminAssignPerformanceSong: (id: string, songId: string | null) =>
+    request<{ id: string; songId: string | null; songTitle: string | null }>(
+      `/admin/performances/${id}`,
+      { method: 'PATCH', body: JSON.stringify({ songId }) },
+    ),
+  adminSoftDeletePerformance: (id: string) =>
+    request<{ id: string; deletedAt: string }>(
+      `/admin/performances/${id}`,
+      { method: 'DELETE' },
     ),
 
   // ─── Notifications ──────────────────────────────────────────────

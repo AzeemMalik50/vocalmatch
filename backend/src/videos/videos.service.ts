@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { Video, VideoCategory, VideoVisibility } from './video.entity';
+import { VideoView } from './video-view.entity';
 import { CloudinaryService } from './cloudinary.service';
 import { Battle } from '../battles/battle.entity';
 
@@ -33,6 +34,7 @@ export interface VideoListQuery {
 export class VideosService {
   constructor(
     @InjectRepository(Video) private readonly videos: Repository<Video>,
+    @InjectRepository(VideoView) private readonly videoViews: Repository<VideoView>,
     @InjectRepository(Battle) private readonly battles: Repository<Battle>,
     private readonly cloudinary: CloudinaryService,
   ) {}
@@ -213,8 +215,31 @@ export class VideosService {
     return v;
   }
 
-  async incrementView(id: string) {
-    await this.videos.increment({ id }, 'viewCount', 1);
+  /**
+   * Record a unique view from an authenticated user. Counts each
+   * (videoId, userId) pair at most once — the UNIQUE constraint on
+   * VideoView is the source of truth. Returns true on a brand-new
+   * view (counter incremented), false on a duplicate (counter untouched).
+   *
+   * Callers must pre-filter out self-views (uploader viewing their own
+   * video) and anonymous views — this method records anything it's given.
+   */
+  async recordView(videoId: string, userId: string): Promise<boolean> {
+    try {
+      await this.videoViews.insert({ videoId, userId });
+    } catch (err: any) {
+      // SQLite: SQLITE_CONSTRAINT (code 19); Postgres: 23505 unique_violation
+      if (
+        err?.code === 'SQLITE_CONSTRAINT' ||
+        err?.code === '23505' ||
+        /UNIQUE/i.test(err?.message ?? '')
+      ) {
+        return false;
+      }
+      throw err;
+    }
+    await this.videos.increment({ id: videoId }, 'viewCount', 1);
+    return true;
   }
 
   /**
