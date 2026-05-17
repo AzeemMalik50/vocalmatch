@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
@@ -18,7 +18,35 @@ function safeNext(next: string | null): string {
   return next;
 }
 
+/**
+ * Next.js 14 requires useSearchParams() to be inside a <Suspense> boundary
+ * for static prerendering to succeed — otherwise the build bails on /login.
+ * The outer page mounts a thin Suspense wrapper; the form lives in the
+ * inner component so it can read the param safely.
+ */
 export default function LoginPage() {
+  return (
+    <>
+      <Nav />
+      <main className="relative z-10 max-w-md mx-auto px-6 py-16 md:py-20">
+        <div className="text-center mb-10">
+          <p className="text-xs uppercase tracking-[0.3em] text-haze/60 mb-3">
+            Welcome back
+          </p>
+          <h1 className="font-display text-4xl md:text-5xl font-bold">
+            Step <span className="text-spotlight italic">back</span> on stage.
+          </h1>
+        </div>
+
+        <Suspense fallback={<LoginFormSkeleton />}>
+          <LoginForm />
+        </Suspense>
+      </main>
+    </>
+  );
+}
+
+function LoginForm() {
   const { login } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -45,70 +73,68 @@ export default function LoginPage() {
 
   return (
     <>
-      <Nav />
-      <main className="relative z-10 max-w-md mx-auto px-6 py-16 md:py-20">
-        <div className="text-center mb-10">
-          <p className="text-xs uppercase tracking-[0.3em] text-haze/60 mb-3">
-            Welcome back
-          </p>
-          <h1 className="font-display text-4xl md:text-5xl font-bold">
-            Step <span className="text-spotlight italic">back</span> on stage.
-          </h1>
-        </div>
+      <form onSubmit={submit} className="space-y-5">
+        <Field label="Email">
+          <TextInput
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+            placeholder="you@example.com"
+          />
+        </Field>
 
-        <form onSubmit={submit} className="space-y-5">
-          <Field label="Email">
+        <Field label="Password">
+          <div className="relative">
             <TextInput
-              type="email"
+              type={showPassword ? 'text' : 'password'}
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-              placeholder="you@example.com"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              className="pr-12"
             />
-          </Field>
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs uppercase tracking-widest font-bold text-haze/60 hover:text-spotlight transition-colors"
+            >
+              {showPassword ? 'Hide' : 'Show'}
+            </button>
+          </div>
+        </Field>
 
-          <Field label="Password">
-            <div className="relative">
-              <TextInput
-                type={showPassword ? 'text' : 'password'}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                className="pr-12"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs uppercase tracking-widest font-bold text-haze/60 hover:text-spotlight transition-colors"
-              >
-                {showPassword ? 'Hide' : 'Show'}
-              </button>
-            </div>
-          </Field>
+        {err && (
+          <div className="text-sm text-red-300 bg-red-950/40 border border-red-900/40 rounded-md px-4 py-3">
+            {err}
+          </div>
+        )}
 
-          {err && (
-            <div className="text-sm text-red-300 bg-red-950/40 border border-red-900/40 rounded-md px-4 py-3">
-              {err}
-            </div>
-          )}
+        <Button type="submit" size="lg" fullWidth loading={loading}>
+          Sign in →
+        </Button>
+      </form>
 
-          <Button type="submit" size="lg" fullWidth loading={loading}>
-            Sign in →
-          </Button>
-        </form>
-
-        <p className="mt-8 text-center text-sm text-haze">
-          New to the stage?{' '}
-          <Link
-            href={next === '/' ? '/signup' : `/signup?next=${encodeURIComponent(next)}`}
-            className="text-spotlight font-bold hover:text-white transition-colors"
-          >
-            Create an account
-          </Link>
-        </p>
-      </main>
+      <p className="mt-8 text-center text-sm text-haze">
+        New to the stage?{' '}
+        <Link
+          href={next === '/' ? '/signup' : `/signup?next=${encodeURIComponent(next)}`}
+          className="text-spotlight font-bold hover:text-white transition-colors"
+        >
+          Create an account
+        </Link>
+      </p>
     </>
+  );
+}
+
+function LoginFormSkeleton() {
+  return (
+    <div className="space-y-5 animate-pulse">
+      <div className="h-12 bg-stage-900 border border-stage-700 rounded-md" />
+      <div className="h-12 bg-stage-900 border border-stage-700 rounded-md" />
+      <div className="h-12 bg-stage-800 rounded-md" />
+    </div>
   );
 }
