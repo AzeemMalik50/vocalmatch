@@ -132,19 +132,34 @@ export default function BattleVotePanel({
         />
       )}
 
-      {/* Post-vote share prompt */}
+      {/* Post-vote engagement prompt — drives return behavior + sharing. */}
       {battle.requesterHasVoted && isLive && (
         <div className="mt-6 pt-6 border-t border-stage-700/60 text-center">
-          <p className="font-display text-lg font-bold mb-3">
-            You&apos;ve voted. Share this battle to see who wins.
+          <p className="font-display text-lg md:text-xl font-bold mb-1">
+            Vote locked in.
           </p>
-          <button
-            type="button"
-            onClick={handleShare}
-            className="inline-flex items-center gap-2 px-5 py-3 bg-spotlight text-white font-bold rounded-md hover:bg-spotlight-dim transition-colors"
-          >
-            {shareCopied ? 'Link copied!' : 'Share this battle'}
-          </button>
+          <p className="text-sm text-haze mb-4">
+            Come back when the timer hits zero to see who took it. Share to bring
+            more voters in.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={handleShare}
+              className="inline-flex items-center gap-2 px-5 py-3 bg-spotlight text-white font-bold rounded-md hover:bg-spotlight-dim transition-colors"
+            >
+              {shareCopied ? 'Link copied!' : 'Share this battle'}
+            </button>
+            <a
+              href={`data:text/calendar;charset=utf-8,${encodeURIComponent(
+                buildIcs(battle, performanceA, performanceB),
+              )}`}
+              download={`vocalmatch-battle-${battle.id}.ics`}
+              className="inline-flex items-center gap-2 px-5 py-3 bg-stage-800 border border-stage-700 hover:border-spotlight/40 text-haze hover:text-white font-bold rounded-md transition-colors text-sm"
+            >
+              📅 Remind me
+            </a>
+          </div>
         </div>
       )}
 
@@ -323,4 +338,42 @@ function StandingRow({
       </div>
     </div>
   );
+}
+
+/**
+ * Build a minimal RFC-5545 .ics so a tap on "Remind me" drops the battle
+ * close time into the user's calendar. Goes wide on platforms — iOS, Android,
+ * Google Calendar, Outlook all accept this shape.
+ */
+function buildIcs(
+  battle: BattleDto,
+  performanceA: VideoDto,
+  performanceB: VideoDto,
+): string {
+  const start = new Date(battle.votingClosesAt);
+  const end = new Date(start.getTime() + 15 * 60_000); // 15-min default
+  const fmt = (d: Date) =>
+    d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+  const a = performanceA.uploader?.username ?? 'A';
+  const b = performanceB.uploader?.username ?? 'B';
+  const summary = `VocalMatch: @${a} vs @${b} closes`;
+  const url =
+    typeof window !== 'undefined'
+      ? `${window.location.origin}/battle/${battle.id}`
+      : `/battle/${battle.id}`;
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//VocalMatch//Battle//EN',
+    'BEGIN:VEVENT',
+    `UID:battle-${battle.id}@vocalmatch`,
+    `DTSTAMP:${fmt(new Date())}`,
+    `DTSTART:${fmt(start)}`,
+    `DTEND:${fmt(end)}`,
+    `SUMMARY:${summary}`,
+    `URL:${url}`,
+    `DESCRIPTION:See who won the battle.\\n${url}`,
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
 }
