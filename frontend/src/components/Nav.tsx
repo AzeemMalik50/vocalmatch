@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@/lib/theme-context';
 import Logo from './Logo';
+import NotificationBell from './NotificationBell';
 
 export default function Nav() {
   const { user, logout, loading } = useAuth();
@@ -54,6 +55,7 @@ export default function Nav() {
           </button>
           {loading ? null : user ? (
             <>
+              <NotificationBell />
               {user.isAdmin && (
                 <Link
                   href="/admin"
