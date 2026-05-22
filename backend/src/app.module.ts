@@ -11,6 +11,7 @@ import { SongsModule } from './songs/songs.module';
 import { BattlesModule } from './battles/battles.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AdminModule } from './admin/admin.module';
+import { RealtimeModule } from './realtime/realtime.module';
 
 // ─── Entities (registered with TypeORM at the root) ───────────────
 import { User } from './users/user.entity';
@@ -19,9 +20,19 @@ import { VideoView } from './videos/video-view.entity';
 import { Song } from './songs/song.entity';
 import { Battle } from './battles/battle.entity';
 import { Vote } from './battles/vote.entity';
+import { ChallengeSubmission } from './battles/challenge-submission.entity';
 import { Notification } from './notifications/notification.entity';
 
-const entities = [User, Video, VideoView, Song, Battle, Vote, Notification];
+const entities = [
+  User,
+  Video,
+  VideoView,
+  Song,
+  Battle,
+  Vote,
+  ChallengeSubmission,
+  Notification,
+];
 
 @Module({
   imports: [
@@ -57,6 +68,7 @@ const entities = [User, Video, VideoView, Song, Battle, Vote, Notification];
     SongsModule,
     BattlesModule,
     NotificationsModule,
+    RealtimeModule,
   ],
 })
 export class AppModule {}
