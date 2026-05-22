@@ -299,6 +299,9 @@ export class VideosService {
             avatarUrl: video.uploader.avatarUrl,
             championTitle: video.uploader.championTitle,
             winCount: video.uploader.winCount,
+            // Phase 2B: needed to render the "🔥 X wins in a row" chip on the
+            // battle/profile/performance card without an extra fetch.
+            currentStreak: video.uploader.currentStreak,
           }
         : null,
     };
