@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Nav from '@/components/Nav';
+import { StageLoader } from '@/components/Loaders';
 import { useAuth } from '@/lib/auth-context';
 import {
   api,
@@ -16,9 +17,40 @@ import {
 const MAX_BYTES = 100 * 1024 * 1024;
 const MAX_TAGS = 10;
 
+/**
+ * /upload supports two modes:
+ *   default       → plain upload, lands on /v/:id
+ *   ?challenge=1  → upload + immediately submit as a Red Phone challenge for
+ *                   the prefilled song; lands on /u/<me> with the challenge
+ *                   queued for admin review. Driven by the Challenge CTA on
+ *                   battle pages so the WATCH → CHALLENGE bridge is one tap.
+ *
+ * Wrapped in <Suspense> because useSearchParams() requires it for static
+ * prerendering (same pattern as /login).
+ */
 export default function UploadPage() {
+  return (
+    <Suspense
+      fallback={
+        <>
+          <Nav />
+          <main className="max-w-md mx-auto px-6 py-16">
+            <StageLoader message="Loading…" />
+          </main>
+        </>
+      }
+    >
+      <UploadForm />
+    </Suspense>
+  );
+}
+
+function UploadForm() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const challengeMode = searchParams?.get('challenge') === '1';
+  const prefilledSongId = searchParams?.get('songId') ?? '';
 
   const [title, setTitle] = useState('');
   const [songs, setSongs] = useState<SongDto[]>([]);
@@ -39,8 +71,20 @@ export default function UploadPage() {
   const handleRef = useRef<UploadHandle | null>(null);
 
   useEffect(() => {
-    if (!authLoading && !user) router.push('/login');
-  }, [authLoading, user, router]);
+    if (!authLoading && !user) {
+      // Preserve the challenge intent through the login bounce so the user
+      // lands back on the same upload-as-challenge flow after signing in.
+      const here = `/upload${
+        challengeMode || prefilledSongId
+          ? `?${new URLSearchParams({
+              ...(challengeMode ? { challenge: '1' } : {}),
+              ...(prefilledSongId ? { songId: prefilledSongId } : {}),
+            }).toString()}`
+          : ''
+      }`;
+      router.push(`/login?next=${encodeURIComponent(here)}`);
+    }
+  }, [authLoading, user, router, challengeMode, prefilledSongId]);
 
   // Load the active Centerstage Songs catalog. The picker is the one source of
   // truth — performances must link to a song id so the battle-create endpoint
@@ -62,6 +106,16 @@ export default function UploadPage() {
       cancelled = true;
     };
   }, []);
+
+  // Prefill the song picker when arrived via the Challenge CTA. Runs once
+  // after the songs catalog loads so we can confirm the id is valid.
+  useEffect(() => {
+    if (!prefilledSongId || songId) return;
+    if (songs.some((s) => s.id === prefilledSongId)) {
+      setSongId(prefilledSongId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [songs, prefilledSongId]);
 
   const selectedSong = songs.find((s) => s.id === songId) ?? null;
 
@@ -160,6 +214,27 @@ export default function UploadPage() {
     try {
       const created = await handle.promise;
       setProgress(100);
+
+      // Challenge mode: register the upload as a Red Phone submission for
+      // the prefilled song. On 409 (a queue already exists) we still send
+      // the user to the song's battle so they aren't stranded.
+      if (challengeMode && songId) {
+        try {
+          await api.submitChallenge(songId, created.id);
+          router.push(
+            user?.username ? `/u/${user.username}?challenge=submitted` : '/',
+          );
+          return;
+        } catch (e: any) {
+          setErr(
+            e?.message ??
+              'Upload saved, but we couldn\'t queue it as a challenge.',
+          );
+          setSubmitting(false);
+          return;
+        }
+      }
+
       router.push(`/v/${created.id}`);
     } catch (e: any) {
       setErr(e.message);
@@ -188,16 +263,20 @@ export default function UploadPage() {
     <>
       <Nav />
       <main className="relative z-10 max-w-2xl mx-auto px-6 py-16">
-        <p className="text-xs uppercase tracking-[0.3em] text-haze/60 mb-3">
-          New performance
+        <p className="text-xs uppercase tracking-[0.3em] text-spotlight font-bold mb-3">
+          {challengeMode ? 'Red Phone challenge' : 'New performance'}
         </p>
-        <h1 className="font-display text-5xl font-bold mb-3">
-          Take the <span className="text-spotlight italic">spotlight</span>.
+        <h1 className="font-display text-4xl md:text-5xl font-bold mb-3">
+          {challengeMode ? (
+            <>Take the <span className="text-spotlight italic">crown</span>.</>
+          ) : (
+            <>Take the <span className="text-spotlight italic">spotlight</span>.</>
+          )}
         </h1>
         <p className="text-haze mb-10 leading-relaxed">
-          A great performance is half stage presence, half song choice. Tag the
-          song you're covering — when battles open, you'll be matchable against
-          other performers of the same track.
+          {challengeMode
+            ? "Upload your version of the song. If admin picks you from the queue, you'll go head-to-head with the current champion."
+            : "A great performance is half stage presence, half song choice. Tag the song you're covering — when battles open, you'll be matchable against other performers of the same track."}
         </p>
 
         <form onSubmit={submit} className="space-y-5">
@@ -521,7 +600,13 @@ export default function UploadPage() {
             disabled={submitting}
             className="w-full px-4 py-3.5 bg-spotlight text-white font-bold rounded-md hover:bg-spotlight-dim transition-colors disabled:opacity-50 shadow-lg shadow-spotlight/30"
           >
-            {submitting ? 'Publishing…' : 'Publish performance →'}
+            {submitting
+              ? challengeMode
+                ? 'Submitting challenge…'
+                : 'Publishing…'
+              : challengeMode
+                ? 'Submit my challenge →'
+                : 'Publish performance →'}
           </button>
 
           <p className="text-xs text-haze/60 leading-relaxed">
