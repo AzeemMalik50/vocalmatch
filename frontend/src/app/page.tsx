@@ -8,6 +8,7 @@ import Footer from '@/components/Footer';
 import PerformanceCard from '@/components/PerformanceCard';
 import FeaturedBattle from '@/components/FeaturedBattle';
 import HomeBattleStatus from '@/components/HomeBattleStatus';
+import RecentWinners from '@/components/RecentWinners';
 import {
   api,
   GENRE_OPTIONS,
@@ -272,6 +273,10 @@ export default function HomePage() {
             only completed → "Between matchups" with the defending champion
             never any → "First Battle Coming Soon" teaser */}
       <HomeBattleStatus />
+
+      {/* Recent winners — return-behavior hook for visitors who missed
+          a battle. Auto-hides if nothing has completed yet. */}
+      <RecentWinners />
 
       {/* THE CHALLENGE — Red Phone */}
       <section className="relative z-10 border-b border-stage-700/40 overflow-hidden">
