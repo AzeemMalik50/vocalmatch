@@ -7,6 +7,20 @@ function getToken(): string | null {
   return localStorage.getItem('vm_token');
 }
 
+/**
+ * Build a Server-Sent Events URL with the auth token in the query string.
+ * EventSource can't send custom headers, so the token rides on the URL.
+ * Returns null when there's no token — callers should skip opening the
+ * stream in that case.
+ */
+export function buildStreamUrl(opts: { battleId?: string } = {}): string | null {
+  const token = getToken();
+  if (!token) return null;
+  const params = new URLSearchParams({ token });
+  if (opts.battleId) params.set('battleId', opts.battleId);
+  return `${API_URL}/stream?${params.toString()}`;
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
@@ -193,6 +207,7 @@ export interface VideoDto {
     avatarUrl: string | null;
     championTitle: string | null;
     winCount: number;
+    currentStreak: number;
   } | null;
   /**
    * Set when this video is part of a battle (most recent first; live > completed).
@@ -293,6 +308,47 @@ export interface AdminUserDto {
   battleCount: number;
   currentStreak: number;
   createdAt: string;
+}
+
+// ─── Phase 2B — Red Phone challenges ──────────────────────────────
+
+export type ChallengeStatus = 'pending' | 'selected' | 'rejected';
+
+/** Lightweight shape returned to the user (their own submissions). */
+export interface ChallengeSubmissionDto {
+  id: string;
+  songId: string;
+  videoId: string;
+  status: ChallengeStatus;
+  createdAt: string;
+  decidedAt: string | null;
+  resultingBattleId: string | null;
+}
+
+/** Enriched shape for the admin queue — includes song / user / video details. */
+export interface AdminChallengeDto {
+  id: string;
+  songId: string;
+  song: { id: string; title: string; artist: string } | null;
+  userId: string;
+  user: {
+    id: string;
+    username: string;
+    avatarUrl: string | null;
+    currentStreak: number;
+  } | null;
+  videoId: string;
+  video: {
+    id: string;
+    title: string;
+    thumbnailUrl: string | null;
+    url: string;
+  } | null;
+  status: ChallengeStatus;
+  createdAt: string;
+  decidedAt: string | null;
+  decidedByAdminId: string | null;
+  resultingBattleId: string | null;
 }
 
 export interface AdminPerformanceDto {
@@ -578,6 +634,51 @@ export const api = {
     request<{ id: string; deletedAt: string }>(
       `/admin/performances/${id}`,
       { method: 'DELETE' },
+    ),
+
+  // ─── Phase 2B: Red Phone challenges ─────────────────────────────
+  submitChallenge: (songId: string, videoId: string) =>
+    request<ChallengeSubmissionDto>(`/songs/${songId}/challenges`, {
+      method: 'POST',
+      body: JSON.stringify({ videoId }),
+    }),
+  listMyChallenges: () =>
+    request<{ items: ChallengeSubmissionDto[] }>('/me/challenges'),
+  adminListChallenges: (
+    params: {
+      songId?: string;
+      status?: ChallengeStatus | 'open';
+      limit?: number;
+      offset?: number;
+    } = {},
+  ) => {
+    const qs = new URLSearchParams();
+    if (params.songId) qs.set('songId', params.songId);
+    if (params.status) qs.set('status', params.status);
+    if (params.limit != null) qs.set('limit', String(params.limit));
+    if (params.offset != null) qs.set('offset', String(params.offset));
+    const suffix = qs.toString() ? `?${qs}` : '';
+    return request<{
+      items: AdminChallengeDto[];
+      hasMore: boolean;
+      nextOffset: number | null;
+    }>(`/admin/challenges${suffix}`);
+  },
+  adminSelectChallenge: (id: string) =>
+    request<AdminChallengeDto>(`/admin/challenges/${id}/select`, {
+      method: 'POST',
+    }),
+  adminRejectChallenge: (id: string) =>
+    request<AdminChallengeDto>(`/admin/challenges/${id}/reject`, {
+      method: 'POST',
+    }),
+  adminCreateBattleFromChallenge: (
+    id: string,
+    body: { hours?: number; title?: string } = {},
+  ) =>
+    request<{ id: string; songId: string; status: BattleStatus }>(
+      `/admin/battles/from-challenge/${id}`,
+      { method: 'POST', body: JSON.stringify(body) },
     ),
 
   // ─── Notifications ──────────────────────────────────────────────

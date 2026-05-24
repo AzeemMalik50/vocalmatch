@@ -14,6 +14,7 @@ import { User } from '../users/user.entity';
 import { SongsService } from '../songs/songs.service';
 import { CreateBattleDto, ResolveTieDto } from './battles.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { RealtimeService } from '../realtime/realtime.service';
 
 /**
  * BattlesService is the heart of Phase 2A. It owns:
@@ -36,8 +37,36 @@ export class BattlesService {
     @InjectRepository(User) private readonly users: Repository<User>,
     private readonly songs: SongsService,
     private readonly notifications: NotificationsService,
+    private readonly realtime: RealtimeService,
     private readonly dataSource: DataSource,
   ) {}
+
+  /**
+   * Build the public vote-count payload for SSE. Mirrors the fields
+   * toPublic() exposes — the frontend can merge these into its battle
+   * state without a refetch.
+   */
+  private buildLiveCountsPayload(battle: Battle) {
+    const total = battle.voteCountA + battle.voteCountB;
+    const percentA = total === 0 ? 0 : Math.round((battle.voteCountA / total) * 100);
+    const percentB = total === 0 ? 0 : 100 - percentA;
+    const leader: 'A' | 'B' | 'tie' =
+      battle.voteCountA === battle.voteCountB
+        ? 'tie'
+        : battle.voteCountA > battle.voteCountB
+          ? 'A'
+          : 'B';
+    return {
+      battleId: battle.id,
+      voteCountA: battle.voteCountA,
+      voteCountB: battle.voteCountB,
+      percentA,
+      percentB,
+      currentLeader: total === 0 ? null : leader,
+      totalVotes: total,
+      status: battle.status,
+    };
+  }
 
   // ─── Creation ───────────────────────────────────────────────────
 
@@ -208,7 +237,23 @@ export class BattlesService {
         .getRepository(Battle)
         .increment({ id: battleId }, isA ? 'voteCountA' : 'voteCountB', 1);
 
-      return manager.getRepository(Battle).findOne({ where: { id: battleId } });
+      const updated = await manager
+        .getRepository(Battle)
+        .findOne({ where: { id: battleId } });
+
+      // Push the new counts to anyone watching this battle in real time.
+      // Subscribers are already filtered by the gate (RealtimeController only
+      // subscribes voters / admins to the battle channel), so this can't
+      // leak counts to a not-yet-voted client.
+      if (updated) {
+        this.realtime.publish(
+          RealtimeService.battleChannel(battleId),
+          'vote',
+          this.buildLiveCountsPayload(updated),
+        );
+      }
+
+      return updated;
     });
   }
 
@@ -233,6 +278,11 @@ export class BattlesService {
       await this.battles.save(battle);
       this.logger.log(
         `Battle ${id} closed as tie (${battle.voteCountA} vs ${battle.voteCountB}) — needs admin decision`,
+      );
+      this.realtime.publish(
+        RealtimeService.battleChannel(id),
+        'status',
+        this.buildLiveCountsPayload(battle),
       );
       return battle;
     }
@@ -348,6 +398,19 @@ export class BattlesService {
       this.logger.log(
         `Battle ${battle.id} completed — winner ${winnerPerformance.uploaderId} ` +
           `(${battle.voteCountA} vs ${battle.voteCountB})`,
+      );
+
+      // Push the final-state event so anyone watching the battle page
+      // sees the winner appear without a refresh.
+      this.realtime.publish(
+        RealtimeService.battleChannel(battle.id),
+        'status',
+        {
+          ...this.buildLiveCountsPayload(battle),
+          winnerPerformanceId: battle.winnerPerformanceId,
+          winnerUserId: battle.winnerUserId,
+          closedAt: battle.closedAt,
+        },
       );
 
       return battle;

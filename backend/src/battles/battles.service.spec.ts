@@ -10,6 +10,7 @@ import { Video } from '../videos/video.entity';
 import { User } from '../users/user.entity';
 import { SongsService } from '../songs/songs.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { RealtimeService } from '../realtime/realtime.service';
 
 /**
  * Critical-path tests for BattlesService.
@@ -37,6 +38,7 @@ describe('BattlesService (critical paths)', () => {
   const userRepo: any = { findOne: jest.fn(), save: jest.fn() };
   const songsService: any = { findOne: jest.fn(), setChampion: jest.fn() };
   const notificationsService: any = { create: jest.fn() };
+  const realtimeService: any = { publish: jest.fn() };
 
   /**
    * Build a minimal DataSource stand-in. The service uses
@@ -68,6 +70,7 @@ describe('BattlesService (critical paths)', () => {
         { provide: getRepositoryToken(User), useValue: userRepo },
         { provide: SongsService, useValue: songsService },
         { provide: NotificationsService, useValue: notificationsService },
+        { provide: RealtimeService, useValue: realtimeService },
         { provide: DataSource, useValue: dataSource },
       ],
     }).compile();

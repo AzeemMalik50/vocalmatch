@@ -1,13 +1,16 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Notification, NotificationKind } from './notification.entity';
+import { RealtimeService } from '../realtime/realtime.service';
 
 @Injectable()
 export class NotificationsService {
   constructor(
     @InjectRepository(Notification)
     private readonly notifications: Repository<Notification>,
+    @Inject(forwardRef(() => RealtimeService))
+    private readonly realtime: RealtimeService,
   ) {}
 
   async create(params: {
@@ -24,7 +27,19 @@ export class NotificationsService {
       body: params.body,
       href: params.href ?? null,
     });
-    return this.notifications.save(n);
+    const saved = await this.notifications.save(n);
+
+    // Push to any open SSE stream for this user so the bell updates
+    // without waiting for the next poll. Read-status updates aren't
+    // published — they're trivially recomputed client-side.
+    const unread = await this.unreadCount(params.userId);
+    this.realtime.publish(
+      RealtimeService.userChannel(params.userId),
+      'notification',
+      { notification: this.toPublic(saved), unreadCount: unread },
+    );
+
+    return saved;
   }
 
   async findForUser(userId: string, opts: { limit?: number } = {}) {

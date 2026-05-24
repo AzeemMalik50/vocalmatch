@@ -12,9 +12,11 @@ import {
   api,
   BattleDto,
   BATTLE_STATUS_LABELS,
+  buildStreamUrl,
   SongDto,
   VideoDto,
 } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
 
 /**
  * Public battle page (Phase 2A primary surface).
@@ -30,6 +32,7 @@ import {
 export default function BattlePage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const { user } = useAuth();
   const id = params?.id;
 
   const [battle, setBattle] = useState<BattleDto | null>(null);
@@ -65,6 +68,57 @@ export default function BattlePage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Live vote counts via SSE. The backend only subscribes us to the battle
+  // channel if we've voted (or we're an admin) so this is also the gate
+  // that respects vote-percentage hiding. Re-runs when the battle id
+  // changes or when the requesterHasVoted flag flips from false → true
+  // (i.e. right after the user casts their vote, we open a fresh stream
+  // and start receiving counts).
+  useEffect(() => {
+    if (!id) return;
+    if (!user) return; // anonymous viewers don't get live counts
+    if (!battle?.requesterHasVoted && !user.isAdmin) return;
+
+    const url = buildStreamUrl({ battleId: id });
+    if (!url) return;
+    const es = new EventSource(url);
+
+    const merge = (e: MessageEvent) => {
+      try {
+        const payload = JSON.parse(e.data) as Partial<BattleDto> & {
+          battleId: string;
+        };
+        if (payload.battleId !== id) return;
+        setBattle((prev) =>
+          prev
+            ? {
+                ...prev,
+                voteCountA: payload.voteCountA ?? prev.voteCountA,
+                voteCountB: payload.voteCountB ?? prev.voteCountB,
+                percentA: payload.percentA ?? prev.percentA,
+                percentB: payload.percentB ?? prev.percentB,
+                currentLeader: payload.currentLeader ?? prev.currentLeader,
+                totalVotes: payload.totalVotes ?? prev.totalVotes,
+                status: payload.status ?? prev.status,
+                winnerPerformanceId:
+                  payload.winnerPerformanceId ?? prev.winnerPerformanceId,
+                winnerUserId: payload.winnerUserId ?? prev.winnerUserId,
+                closedAt: payload.closedAt ?? prev.closedAt,
+              }
+            : prev,
+        );
+      } catch {
+        // Skip malformed frames.
+      }
+    };
+    es.addEventListener('vote', merge);
+    es.addEventListener('status', merge);
+
+    return () => {
+      es.close();
+    };
+  }, [id, user, battle?.requesterHasVoted]);
 
   const handleShare = useCallback(async () => {
     if (typeof window === 'undefined') return;
@@ -178,6 +232,18 @@ export default function BattlePage() {
           )}
         </header>
 
+        {/* Winner callout — replaces the countdown for completed battles.
+            The single most prestigious surface in the app: full-width gold
+            banner naming the winner. Returning visitors see this first and
+            know immediately who took the crown. */}
+        {battle.status === 'completed' && battle.winnerPerformanceId && (
+          <WinnerBanner
+            battle={battle}
+            performanceA={performanceA}
+            performanceB={performanceB}
+          />
+        )}
+
         {/* Big countdown for live battles */}
         {battle.status === 'live' && (
           <div className="mb-8 flex justify-center">
@@ -194,12 +260,26 @@ export default function BattlePage() {
         {/* The two videos */}
         <div className="grid md:grid-cols-2 gap-4 md:gap-6 mb-8">
           {performanceA ? (
-            <PerformancePane performance={performanceA} side="A" />
+            <PerformancePane
+              performance={performanceA}
+              side="A"
+              isDefendingChampion={
+                !!song?.currentChampionPerformanceId &&
+                song.currentChampionPerformanceId === performanceA.id
+              }
+            />
           ) : (
             <PerformancePaneSkeleton side="A" />
           )}
           {performanceB ? (
-            <PerformancePane performance={performanceB} side="B" />
+            <PerformancePane
+              performance={performanceB}
+              side="B"
+              isDefendingChampion={
+                !!song?.currentChampionPerformanceId &&
+                song.currentChampionPerformanceId === performanceB.id
+              }
+            />
           ) : (
             <PerformancePaneSkeleton side="B" />
           )}
@@ -219,6 +299,20 @@ export default function BattlePage() {
           </div>
         )}
 
+        {/* Challenge CTA — the WATCH → VOTE → CHALLENGE bridge.
+            Only shown when:
+              - the song has a current champion (someone to dethrone)
+              - the viewer isn't that champion (no self-challenge)
+              - the viewer isn't already a participant in this battle */}
+        {song?.currentChampionUserId &&
+          performanceA &&
+          performanceB &&
+          user?.id !== song.currentChampionUserId &&
+          user?.id !== performanceA.uploader?.id &&
+          user?.id !== performanceB.uploader?.id && (
+            <ChallengeCta song={song} authed={!!user} />
+          )}
+
         {/* Back link */}
         <div className="mt-10 text-center">
           <Link
@@ -231,6 +325,117 @@ export default function BattlePage() {
       </main>
       <Footer />
     </>
+  );
+}
+
+/**
+ * Winner banner — the prestige moment. Renders only on completed battles
+ * with a confirmed winnerPerformanceId. Pulls the winner's username +
+ * avatar from whichever side won so it reads instantly.
+ */
+function WinnerBanner({
+  battle,
+  performanceA,
+  performanceB,
+}: {
+  battle: BattleDto;
+  performanceA: VideoDto | null;
+  performanceB: VideoDto | null;
+}) {
+  const winnerSide: 'A' | 'B' | null =
+    battle.winnerPerformanceId === battle.performanceAId
+      ? 'A'
+      : battle.winnerPerformanceId === battle.performanceBId
+        ? 'B'
+        : null;
+  const winnerPerf =
+    winnerSide === 'A' ? performanceA : winnerSide === 'B' ? performanceB : null;
+  const username = winnerPerf?.uploader?.username ?? null;
+  const streak = winnerPerf?.uploader?.currentStreak ?? 0;
+  const totalVotes = battle.totalVotes ?? 0;
+
+  return (
+    <div className="mb-8 relative overflow-hidden rounded-2xl border-2 border-gold bg-gradient-to-br from-gold/15 via-stage-900 to-stage-900 px-5 py-5 sm:px-6 sm:py-6 md:px-8 md:py-7">
+      <div className="absolute -top-16 -left-12 w-64 h-64 rounded-full bg-gold/20 blur-3xl pointer-events-none" />
+      <div className="relative z-10 flex flex-col sm:flex-row sm:items-center gap-4">
+        <span className="inline-flex items-center justify-center text-3xl sm:text-4xl" aria-hidden="true">
+          🏆
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] sm:text-xs uppercase tracking-[0.3em] text-gold font-bold mb-1">
+            Winner · Side {winnerSide ?? '—'}
+          </p>
+          <p className="font-display text-2xl md:text-3xl font-black leading-tight">
+            {username ? (
+              <Link href={`/u/${username}`} className="hover:opacity-90">
+                @{username}
+              </Link>
+            ) : (
+              <span>Crowned</span>
+            )}
+            {streak >= 2 && (
+              <span className="ml-3 inline-flex items-center gap-1 px-2 py-1 text-[11px] uppercase tracking-widest font-bold bg-gold/20 text-gold rounded align-middle">
+                🔥 {streak} wins in a row
+              </span>
+            )}
+          </p>
+          <p className="text-sm text-haze mt-1 tabular-nums">
+            {battle.voteCountA ?? 0} – {battle.voteCountB ?? 0} · {totalVotes}{' '}
+            {totalVotes === 1 ? 'vote' : 'votes'} total
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Post-vote call to action — the "CHALLENGE → RETURN" half of the loop.
+ *
+ * Copy varies with stakes: when the current champion is on a streak (>=2),
+ * the button leans into it ("Beat the 3-time champion") so the emotional
+ * weight of toppling them is front-and-center. Mobile-first padding +
+ * single-column on small screens; one tap to either upload or sign up.
+ */
+function ChallengeCta({ song, authed }: { song: SongDto; authed: boolean }) {
+  const streak = song.currentChampionStreak ?? 0;
+  const headline =
+    streak >= 2
+      ? `Think you can beat the ${streak}-time champion?`
+      : `Think you can sing it better?`;
+  const subline =
+    streak >= 2
+      ? `Upload your version of "${song.title}". If admin picks you, you're in the next battle.`
+      : `Upload your version of "${song.title}" and step into the next battle.`;
+
+  // Authed users go straight to upload; unauthed users go to login with the
+  // upload page (challenge mode) as the post-login destination.
+  const uploadHref = `/upload?songId=${encodeURIComponent(song.id)}&challenge=1`;
+  const href = authed
+    ? uploadHref
+    : `/login?next=${encodeURIComponent(uploadHref)}`;
+
+  return (
+    <section className="mt-8 relative overflow-hidden rounded-2xl border border-spotlight/40 bg-gradient-to-br from-spotlight/10 via-stage-900 to-stage-900 p-5 sm:p-6 md:p-8">
+      <div className="absolute -top-20 -right-20 w-48 h-48 md:w-64 md:h-64 rounded-full bg-spotlight/20 blur-3xl pointer-events-none" />
+      <div className="relative z-10 flex flex-col md:flex-row md:items-center gap-5">
+        <div className="flex-1 min-w-0">
+          <p className="text-xs uppercase tracking-[0.3em] text-spotlight font-bold mb-2">
+            The Challenge
+          </p>
+          <h3 className="font-display text-2xl md:text-3xl font-black leading-tight mb-2">
+            {headline}
+          </h3>
+          <p className="text-sm md:text-base text-haze">{subline}</p>
+        </div>
+        <Link
+          href={href}
+          className="inline-flex items-center justify-center px-5 py-3 md:py-3.5 bg-spotlight text-white font-bold rounded-md hover:bg-spotlight-dim transition-colors uppercase tracking-widest text-sm shadow-lg shadow-spotlight/30 whitespace-nowrap"
+        >
+          {authed ? 'Upload your version →' : 'Sign up to challenge →'}
+        </Link>
+      </div>
+    </section>
   );
 }
 
@@ -261,13 +466,23 @@ function StatusPill({ status }: { status: BattleDto['status'] }) {
 function PerformancePane({
   performance,
   side,
+  isDefendingChampion,
 }: {
   performance: VideoDto;
   side: 'A' | 'B';
+  isDefendingChampion?: boolean;
 }) {
   const accent = side === 'A' ? 'border-spotlight/30' : 'border-gold/30';
   return (
-    <div className={`bg-stage-900 border-2 ${accent} rounded-xl overflow-hidden`}>
+    <div className={`relative bg-stage-900 border-2 ${accent} rounded-xl overflow-hidden`}>
+      {/* Champion identity: a single, unmissable badge so returning visitors
+          instantly recognize who's defending. Drives prestige. */}
+      {isDefendingChampion && (
+        <span className="absolute top-3 left-3 z-10 inline-flex items-center gap-1 px-2 py-1 text-[10px] uppercase tracking-widest font-bold rounded-full bg-gold text-stage-950 shadow-lg">
+          <span aria-hidden="true">👑</span>
+          Defending Champion
+        </span>
+      )}
       <div className="aspect-video bg-stage-950">
         <video
           key={performance.id}
@@ -289,12 +504,21 @@ function PerformancePane({
         {performance.uploader && (
           <Link
             href={`/u/${performance.uploader.username}`}
-            className="inline-flex items-center gap-2 mt-2 text-sm text-haze hover:text-white transition-colors"
+            className="inline-flex items-center gap-2 mt-2 text-sm text-haze hover:text-white transition-colors flex-wrap"
           >
             @{performance.uploader.username}
             {performance.uploader.championTitle && (
               <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-widest bg-gold/15 text-gold rounded">
                 {performance.uploader.championTitle}
+              </span>
+            )}
+            {performance.uploader.currentStreak >= 2 && (
+              <span
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-widest bg-gold/15 text-gold rounded"
+                title={`${performance.uploader.currentStreak} wins in a row`}
+              >
+                <span aria-hidden="true">🔥</span>
+                {performance.uploader.currentStreak} streak
               </span>
             )}
           </Link>
