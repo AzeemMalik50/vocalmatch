@@ -9,6 +9,12 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { IsBoolean, IsOptional } from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from './admin.guard';
@@ -26,6 +32,8 @@ class UpdateUserFlagsDto {
  * Admin-only user management. All endpoints require BOTH JwtAuthGuard
  * (verify token) and AdminGuard (verify isAdmin === true at request time).
  */
+@ApiTags('Admin – Users')
+@ApiBearerAuth('bearer')
 @Controller('admin/users')
 @UseGuards(JwtAuthGuard, AdminGuard)
 export class AdminController {
@@ -34,6 +42,13 @@ export class AdminController {
   ) {}
 
   @Get()
+  @ApiOperation({
+    summary: 'Admin — list users (paginated, searchable)',
+    description: 'Admin only. Search matches case-insensitive substrings on email and username.',
+  })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Max 200. Default 50.' })
+  @ApiQuery({ name: 'offset', required: false, type: Number })
   async list(
     @Query('search') search?: string,
     @Query('limit') limitRaw?: string,
@@ -76,6 +91,10 @@ export class AdminController {
   }
 
   @Patch(':id/flags')
+  @ApiOperation({
+    summary: 'Admin — toggle a user’s admin / songwriter flags',
+    description: 'Admin only. Promote a user to admin, or grant the songwriter flag for upcoming songwriter-portal features.',
+  })
   async updateFlags(
     @Param('id') id: string,
     @Body() dto: UpdateUserFlagsDto,

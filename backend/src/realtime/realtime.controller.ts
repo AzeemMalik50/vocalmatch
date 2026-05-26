@@ -6,6 +6,11 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
+import {
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { RealtimeService } from './realtime.service';
 import { BattlesService } from '../battles/battles.service';
@@ -28,6 +33,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
  * enforces — a not-yet-voter doesn't get live counts streamed). Admins
  * bypass that gate, mirroring GET /battles/:id.
  */
+@ApiTags('Realtime (SSE)')
 @Controller('stream')
 @UseGuards(JwtAuthGuard)
 export class RealtimeController {
@@ -37,6 +43,23 @@ export class RealtimeController {
   ) {}
 
   @Get()
+  @ApiOperation({
+    summary: 'Open a Server-Sent Events stream for live updates',
+    description:
+      'Returns `text/event-stream`. Always subscribes to the caller’s user channel (push notifications). When `battleId` is supplied and the caller has already voted on that battle (or is admin), also subscribes to the battle channel for live vote counts. Heartbeats every 25s. The JWT is passed via `?token=` because EventSource cannot set headers. Frame types: `ready` (initial), `notification`, `vote`, `status`, plus SSE comment heartbeats.',
+  })
+  @ApiQuery({
+    name: 'token',
+    required: true,
+    type: String,
+    description: 'JWT — same value as the `Authorization: Bearer …` token, supplied in the URL because EventSource can’t set headers.',
+  })
+  @ApiQuery({
+    name: 'battleId',
+    required: false,
+    type: String,
+    description: 'Subscribe to this battle’s live vote counts. Ignored if the caller hasn’t voted (and isn’t admin).',
+  })
   async stream(
     @Req() req: Request & { user: { userId: string; isAdmin: boolean } },
     @Res() res: Response,

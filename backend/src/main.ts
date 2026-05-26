@@ -50,7 +50,9 @@ async function bootstrap() {
     )
     .build();
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('docs', app, swaggerDocument, {
+  // Mount at the literal /api/docs (setGlobalPrefix isn't applied to
+  // SwaggerModule.setup paths, so we include the api/ prefix here).
+  SwaggerModule.setup('api/docs', app, swaggerDocument, {
     swaggerOptions: { persistAuthorization: true },
   });
 

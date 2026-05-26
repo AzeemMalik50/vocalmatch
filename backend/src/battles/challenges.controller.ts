@@ -7,6 +7,12 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { IsUUID } from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ChallengesService } from './challenges.service';
@@ -16,19 +22,23 @@ class CreateChallengeDto {
   videoId: string;
 }
 
-/**
- * Public-facing challenge endpoints.
- *
- * Mounted at `/songs/:songId/challenges` for the submit path, and
- * `/me/challenges` for the user's own list, so the URL reads naturally
- * from the consumer's POV.
- */
+@ApiTags('Challenges (Red Phone)')
 @Controller()
 export class ChallengesController {
   constructor(private readonly challenges: ChallengesService) {}
 
   @Post('songs/:songId/challenges')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('bearer')
+  @ApiOperation({
+    summary: 'Submit a performance as a Red Phone challenge',
+    description:
+      'Submits an existing performance (uploaded by the caller, tagged with this song) into the Red Phone queue. The submission lives at `status=pending` until an admin selects or rejects it.',
+  })
+  @ApiResponse({ status: 201, description: 'Challenge queued.' })
+  @ApiResponse({ status: 403, description: 'The performance does not belong to the caller.' })
+  @ApiResponse({ status: 400, description: 'The performance is not tagged with this Centerstage Song.' })
+  @ApiResponse({ status: 409, description: 'You are the current champion of this song, OR a pending/selected challenge already exists for this song.' })
   async submit(
     @Req() req: any,
     @Param('songId') songId: string,
@@ -42,9 +52,14 @@ export class ChallengesController {
     return this.challenges.toUserPublic(row);
   }
 
-  /** "My pending challenges" — feeds the profile section. */
   @Get('me/challenges')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('bearer')
+  @ApiOperation({
+    summary: 'List the caller’s own challenge submissions',
+    description:
+      'Returns every submission the caller has made, regardless of status. Used by the MyChallenges profile section.',
+  })
   async listMine(@Req() req: any) {
     const rows = await this.challenges.findByUser(req.user.userId);
     return { items: rows.map((r) => this.challenges.toUserPublic(r)) };
