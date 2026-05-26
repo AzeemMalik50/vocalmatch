@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -30,6 +31,28 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true }),
   );
+
+  // OpenAPI / Swagger UI at /api/docs, JSON spec at /api/docs-json.
+  // The CLI plugin (nest-cli.json) auto-derives @ApiProperty from
+  // class-validator decorators on DTOs, so request bodies render
+  // without per-field annotation. Routes and JWT auth surface
+  // automatically from the controllers.
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('VocalMatch API')
+    .setDescription(
+      'REST endpoints and SSE streams powering the VocalMatch platform — ' +
+        'auth, uploads, battles, voting, Red Phone challenges, and notifications.',
+    )
+    .setVersion('0.2.0')
+    .addBearerAuth(
+      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+      'bearer',
+    )
+    .build();
+  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('docs', app, swaggerDocument, {
+    swaggerOptions: { persistAuthorization: true },
+  });
 
   const port = process.env.PORT ?? 4000;
   await app.listen(port, '0.0.0.0');
