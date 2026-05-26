@@ -8,6 +8,12 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from '../admin/admin.guard';
@@ -30,12 +36,23 @@ class CreateBattleFromChallengeDto {
  * - POST   /admin/challenges/:id/reject   — reject one
  * - POST   /admin/battles/from-challenge/:id — promote a selected one into a live battle
  */
+@ApiTags('Admin – Challenges')
+@ApiBearerAuth('bearer')
 @Controller()
 @UseGuards(JwtAuthGuard, AdminGuard)
 export class AdminChallengesController {
   constructor(private readonly challenges: ChallengesService) {}
 
   @Get('admin/challenges')
+  @ApiOperation({
+    summary: 'Admin — list challenge submissions',
+    description:
+      'Admin only. Default surface is the actionable queue (`status=open` → pending submissions). Pass `status=selected`, `rejected`, or `pending` to filter explicitly; `songId` narrows to a single song.',
+  })
+  @ApiQuery({ name: 'songId', required: false, type: String })
+  @ApiQuery({ name: 'status', required: false, enum: ['pending', 'selected', 'rejected', 'open'] })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'offset', required: false, type: Number })
   async list(
     @Query('songId') songId?: string,
     @Query('status') status?: ChallengeStatus | 'open',
@@ -57,18 +74,33 @@ export class AdminChallengesController {
   }
 
   @Post('admin/challenges/:id/select')
+  @ApiOperation({
+    summary: 'Admin — select a challenger',
+    description:
+      'Marks the submission `status=selected` and writes a `challenger_selected` in-app notification to the challenger. Idempotent on already-selected rows.',
+  })
   async select(@Req() req: any, @Param('id') id: string) {
     const row = await this.challenges.select(id, req.user.userId);
     return this.challenges.toAdminPublic(row);
   }
 
   @Post('admin/challenges/:id/reject')
+  @ApiOperation({
+    summary: 'Admin — reject a challenger',
+    description:
+      'Marks the submission `status=rejected` (soft — row kept for audit) and writes a `challenger_rejected` notification to the challenger.',
+  })
   async reject(@Req() req: any, @Param('id') id: string) {
     const row = await this.challenges.reject(id, req.user.userId);
     return this.challenges.toAdminPublic(row);
   }
 
   @Post('admin/battles/from-challenge/:id')
+  @ApiOperation({
+    summary: 'Admin — promote a selected challenge into a live battle',
+    description:
+      'Creates a new battle pairing the song’s current champion performance (side A) against the challenger’s performance (side B). Goes through the normal battles pipeline so same-song / different-uploader / one-live-per-song invariants still apply.',
+  })
   async createBattle(
     @Req() req: any,
     @Param('id') id: string,

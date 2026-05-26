@@ -10,6 +10,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { IsOptional, IsUUID } from 'class-validator';
 import { IsNull, Repository } from 'typeorm';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -29,6 +35,8 @@ class AssignSongDto {
  * but is gated by AdminGuard and exposes the fields admins need to triage
  * uploads (songId backfill, soft-delete, search).
  */
+@ApiTags('Admin – Performances')
+@ApiBearerAuth('bearer')
 @Controller('admin/performances')
 @UseGuards(JwtAuthGuard, AdminGuard)
 export class AdminPerformancesController {
@@ -40,6 +48,17 @@ export class AdminPerformancesController {
   ) {}
 
   @Get()
+  @ApiOperation({
+    summary: 'Admin — list performances (triage view)',
+    description:
+      'Admin only. Joins uploader, song, and aggregate vote counts in a single response so the admin table renders without N+1. Supports search across title / songTitle / username, songId filter, missing-song filter, and an opt-in flag to include soft-deleted rows.',
+  })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'songId', required: false, type: String })
+  @ApiQuery({ name: 'missingSong', required: false, type: String, description: 'Set to `true` to only show performances with no song linked.' })
+  @ApiQuery({ name: 'includeDeleted', required: false, type: String, description: 'Set to `true` to include soft-deleted performances.' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Max 200. Default 50.' })
+  @ApiQuery({ name: 'offset', required: false, type: Number })
   async list(
     @Query('search') search?: string,
     @Query('songId') songIdFilter?: string,
@@ -145,6 +164,10 @@ export class AdminPerformancesController {
   }
 
   @Patch(':id')
+  @ApiOperation({
+    summary: 'Admin — assign or clear the song link on a performance',
+    description: 'Admin only. Pass `songId=null` to clear a stale link, or a UUID to assign. The performance’s `songTitle` is synced to match.',
+  })
   async assignSong(@Param('id') id: string, @Body() dto: AssignSongDto) {
     const video = await this.videos.findOne({ where: { id } });
     if (!video) throw new NotFoundException('Performance not found');
@@ -163,13 +186,12 @@ export class AdminPerformancesController {
     return { id: video.id, songId: video.songId, songTitle: video.songTitle };
   }
 
-  /**
-   * Soft-delete: sets deletedAt so the video disappears from public feeds /
-   * profile but battle history stays intact. Admins can do this regardless of
-   * whether the video has been in a battle (the per-user delete endpoint
-   * already has that constraint baked in for the uploader's own use).
-   */
   @Delete(':id')
+  @ApiOperation({
+    summary: 'Admin — soft-delete a performance',
+    description:
+      'Admin only. Sets `deletedAt` so the video disappears from public feeds / profiles, but battle history stays intact. Bypasses the "has-been-in-a-battle" check the uploader-facing delete enforces.',
+  })
   async softDelete(@Param('id') id: string) {
     const video = await this.videos.findOne({
       where: { id, deletedAt: IsNull() },

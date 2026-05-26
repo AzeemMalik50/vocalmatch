@@ -17,6 +17,14 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
+import {
   IsIn,
   IsOptional,
   IsString,
@@ -57,6 +65,7 @@ class CreateVideoDto {
   tags?: string;
 }
 
+@ApiTags('Videos')
 @Controller('videos')
 export class VideosController {
   constructor(
@@ -66,6 +75,20 @@ export class VideosController {
 
   @Get()
   @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({
+    summary: 'List performances (paginated, filterable)',
+    description:
+      'Anonymous-readable. Supports filtering by category, uploader, voice type, genre, free-text search, and whether a thumbnail is set. Sort is one of `newest`, `most_viewed`, `trending`.',
+  })
+  @ApiQuery({ name: 'category', required: false, enum: ['solo', 'battle_entry', 'challenge_entry'] })
+  @ApiQuery({ name: 'uploaderId', required: false, type: String })
+  @ApiQuery({ name: 'voiceType', required: false, type: String })
+  @ApiQuery({ name: 'genre', required: false, type: String })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'hasThumbnail', required: false, type: String })
+  @ApiQuery({ name: 'sort', required: false, enum: ['newest', 'most_viewed', 'trending'] })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'offset', required: false, type: Number })
   async list(
     @Req() req: any,
     @Query('category') category?: VideoCategory,
@@ -100,6 +123,11 @@ export class VideosController {
 
   @Get(':id')
   @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({
+    summary: 'Get a performance by id',
+    description:
+      'Records one view per unique signed-in viewer (self-views excluded). If the performance is currently in a live or completed battle, the `battle` field surfaces it so the frontend can redirect / annotate.',
+  })
   async getOne(@Req() req: any, @Param('id') id: string) {
     const video = await this.videos.findOneAuthorized(id, req.user?.userId);
     // Count one view per unique signed-in user. Anonymous views are not
@@ -131,6 +159,29 @@ export class VideosController {
 
   @Post()
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('bearer')
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['video', 'title'],
+      properties: {
+        video: { type: 'string', format: 'binary' },
+        title: { type: 'string', maxLength: 120 },
+        description: { type: 'string', maxLength: 1000 },
+        songTitle: { type: 'string', maxLength: 120 },
+        songId: { type: 'string', format: 'uuid' },
+        category: { type: 'string', enum: ['solo', 'battle_entry', 'challenge_entry'] },
+        visibility: { type: 'string', enum: ['public', 'unlisted', 'private'] },
+        tags: { type: 'string', description: 'Comma-separated, max 10 tags, 30 chars each.' },
+      },
+    },
+  })
+  @ApiOperation({
+    summary: 'Upload a performance',
+    description:
+      'Multipart upload. 100MB cap; `video/*` only. The video is stored on Cloudinary; the returned record includes the public URL and thumbnail. Tags must be comma-separated; leading `#` is stripped.',
+  })
   @UseInterceptors(FileInterceptor('video'))
   async upload(
     @Req() req: any,
@@ -168,6 +219,12 @@ export class VideosController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('bearer')
+  @ApiOperation({
+    summary: 'Soft-delete a performance',
+    description:
+      'Only the uploader can call this. Soft-deletes (`deletedAt` set) so battle history is preserved. Returns 409 if the performance has already participated in a battle — admins can override via `DELETE /admin/performances/:id`.',
+  })
   async remove(@Req() req: any, @Param('id') id: string) {
     return this.videos.delete(id, req.user.userId);
   }

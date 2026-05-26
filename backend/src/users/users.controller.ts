@@ -17,6 +17,13 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
+import {
   ArrayMaxSize,
   IsArray,
   IsBoolean,
@@ -80,6 +87,7 @@ class UpdateProfileDto {
   hideStatsUntilFirstBattle?: boolean;
 }
 
+@ApiTags('Users')
 @Controller('users')
 export class UsersController {
   constructor(
@@ -89,6 +97,11 @@ export class UsersController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('bearer')
+  @ApiOperation({
+    summary: 'Get the signed-in user’s profile',
+    description: 'Returns the full public projection including private fields the user can see about themselves.',
+  })
   async me(@Req() req: any) {
     const user = await this.users.findById(req.user.userId);
     return this.users.toPublic(user);
@@ -96,6 +109,12 @@ export class UsersController {
 
   @Patch('me')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('bearer')
+  @ApiOperation({
+    summary: 'Update the signed-in user’s profile',
+    description:
+      'Partial update — only the fields present in the body are written. Use for onboarding completion, profile edits, social links, voice type, and privacy toggles.',
+  })
   async update(@Req() req: any, @Body() dto: UpdateProfileDto) {
     const user = await this.users.updateProfile(req.user.userId, dto);
     return this.users.toPublic(user);
@@ -103,17 +122,31 @@ export class UsersController {
 
   @Post('me/skip-onboarding')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('bearer')
+  @ApiOperation({
+    summary: 'Mark onboarding as completed',
+    description: 'Sets `onboardingCompletedAt` to now so the onboarding wizard stops appearing.',
+  })
   async skipOnboarding(@Req() req: any) {
     const user = await this.users.markCompleted(req.user.userId);
     return this.users.toPublic(user);
   }
 
-  /**
-   * Upload an avatar image — returns the new public profile.
-   * 5MB cap; image/* only.
-   */
   @Post('me/avatar')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('bearer')
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { avatar: { type: 'string', format: 'binary' } },
+      required: ['avatar'],
+    },
+  })
+  @ApiOperation({
+    summary: 'Upload an avatar image',
+    description: '5MB cap; `image/*` only. Returns the updated public profile with the new avatar URL.',
+  })
   @UseInterceptors(FileInterceptor('avatar'))
   async uploadAvatar(
     @Req() req: any,
@@ -137,6 +170,11 @@ export class UsersController {
 
   @Get(':username')
   @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({
+    summary: 'Get a public profile by username',
+    description:
+      'Anonymous-readable. If the profile is marked private and the requester isn’t the owner, returns 403.',
+  })
   async byUsername(
     @Req() req: any,
     @Param('username') username: string,
