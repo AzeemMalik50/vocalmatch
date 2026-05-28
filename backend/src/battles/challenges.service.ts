@@ -261,7 +261,7 @@ export class ChallengesService {
   async createBattleFromChallenge(
     submissionId: string,
     adminId: string,
-    opts: { hours?: number; title?: string } = {},
+    opts: { hours?: number; votingClosesAt?: string; title?: string } = {},
   ) {
     const sub = await this.findOne(submissionId);
     if (sub.status !== 'selected') {
@@ -282,10 +282,17 @@ export class ChallengesService {
       );
     }
 
-    const hours = Math.min(Math.max(opts.hours ?? 48, 1), 24 * 14);
-    const votingClosesAt = new Date(
-      Date.now() + hours * 60 * 60 * 1000,
-    ).toISOString();
+    // Prefer an explicit `votingClosesAt` (matches the regular POST /battles
+    // contract); otherwise compute from `hours`, falling back to 48h.
+    let votingClosesAt: string;
+    if (opts.votingClosesAt) {
+      votingClosesAt = new Date(opts.votingClosesAt).toISOString();
+    } else {
+      const hours = Math.min(Math.max(opts.hours ?? 48, 1), 24 * 14);
+      votingClosesAt = new Date(
+        Date.now() + hours * 60 * 60 * 1000,
+      ).toISOString();
+    }
 
     // Delegate to the existing battle creation, which enforces the
     // same-song / different-uploader / one-live-per-song invariants.

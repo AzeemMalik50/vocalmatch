@@ -14,15 +14,35 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import {
+  IsDateString,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from '../admin/admin.guard';
 import { ChallengesService } from './challenges.service';
 import { ChallengeStatus } from './challenge-submission.entity';
 
 class CreateBattleFromChallengeDto {
+  /**
+   * Voting window duration in hours, 1–336 (14 days max). Used only when
+   * `votingClosesAt` is not supplied. Defaults to 48 if both are absent.
+   */
   @IsOptional() @IsInt() @Min(1) @Max(24 * 14)
   hours?: number;
+
+  /**
+   * Absolute close-time as an ISO 8601 string. Takes precedence over `hours`
+   * — matches the regular `POST /battles` contract so admin UIs that
+   * pre-compute the close time can use the same payload shape.
+   */
+  @IsOptional() @IsDateString()
+  votingClosesAt?: string;
 
   @IsOptional() @IsString() @MaxLength(120)
   title?: string;
@@ -109,7 +129,11 @@ export class AdminChallengesController {
     const battle = await this.challenges.createBattleFromChallenge(
       id,
       req.user.userId,
-      { hours: dto.hours, title: dto.title },
+      {
+        hours: dto.hours,
+        votingClosesAt: dto.votingClosesAt,
+        title: dto.title,
+      },
     );
     return { id: battle.id, songId: battle.songId, status: battle.status };
   }
