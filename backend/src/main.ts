@@ -29,7 +29,15 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
   app.useGlobalPipes(
-    new ValidationPipe({ whitelist: true, transform: true }),
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      // Reject requests that include unknown body fields rather than silently
+      // dropping them. Without this, mistakes like passing `votingClosesAt`
+      // to an endpoint that only accepts `hours` go unnoticed and the caller
+      // sees a default value applied instead of the value they sent.
+      forbidNonWhitelisted: true,
+    }),
   );
 
   // OpenAPI / Swagger UI at /api/docs, JSON spec at /api/docs-json.
