@@ -70,15 +70,13 @@ export default function BattlePage() {
   }, [load]);
 
   // Live vote counts via SSE. The backend only subscribes us to the battle
-  // channel if we've voted (or we're an admin) so this is also the gate
-  // that respects vote-percentage hiding. Re-runs when the battle id
-  // changes or when the requesterHasVoted flag flips from false → true
-  // (i.e. right after the user casts their vote, we open a fresh stream
-  // and start receiving counts).
+  // channel when we're allowed to see standings (admin or already-voted) so
+  // we mirror that gate here using `canSeeStandings`. Re-runs when it flips
+  // from false → true (i.e. right after the user casts their vote).
   useEffect(() => {
     if (!id) return;
     if (!user) return; // anonymous viewers don't get live counts
-    if (!battle?.requesterHasVoted && !user.isAdmin) return;
+    if (!battle?.canSeeStandings) return;
 
     const url = buildStreamUrl({ battleId: id });
     if (!url) return;
@@ -118,7 +116,7 @@ export default function BattlePage() {
     return () => {
       es.close();
     };
-  }, [id, user, battle?.requesterHasVoted]);
+  }, [id, user, battle?.canSeeStandings]);
 
   const handleShare = useCallback(async () => {
     if (typeof window === 'undefined') return;

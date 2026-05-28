@@ -96,16 +96,22 @@ export class BattlesController {
     const battle = await this.battles.findOne(id);
     const userId: string | undefined = req.user?.userId;
 
+    // `requesterHasVoted` is LITERAL — true only when the caller actually has
+    // a vote row. `canSeeStandings` is the gate for counts/percentages and
+    // is admin-elevated. The frontend uses these for two different decisions
+    // (vote-button visibility vs. standings panel visibility), so we keep
+    // them separate to avoid the "admin sees Vote locked in with 0 votes" bug.
     let requesterHasVoted = false;
+    let canSeeStandings = false;
     if (userId) {
       const user = await this.users.findOne({ where: { id: userId } });
-      if (user?.isAdmin) {
-        requesterHasVoted = true;
-      } else {
-        requesterHasVoted = await this.battles.hasUserVoted(id, userId);
-      }
+      requesterHasVoted = await this.battles.hasUserVoted(id, userId);
+      canSeeStandings = requesterHasVoted || !!user?.isAdmin;
     }
-    return this.battles.toPublic(battle, requesterHasVoted);
+    return this.battles.toPublic(battle, {
+      requesterHasVoted,
+      canSeeStandings,
+    });
   }
 
   // ─── Voting ─────────────────────────────────────────────────────
@@ -135,7 +141,12 @@ export class BattlesController {
       // Should never happen — castVote always returns the updated battle
       return null;
     }
-    return this.battles.toPublic(battle, true);
+    // The caller just voted: requesterHasVoted is genuinely true,
+    // and standings unlock as a consequence.
+    return this.battles.toPublic(battle, {
+      requesterHasVoted: true,
+      canSeeStandings: true,
+    });
   }
 
   // ─── Admin endpoints ────────────────────────────────────────────
@@ -150,7 +161,12 @@ export class BattlesController {
   })
   async create(@Req() req: any, @Body() dto: CreateBattleDto) {
     const battle = await this.battles.create(dto, req.user.userId);
-    return this.battles.toPublic(battle, true);
+    // Admin who just created this hasn't voted on it yet — but as admin
+    // they're allowed to see standings (which are 0–0 at this point anyway).
+    return this.battles.toPublic(battle, {
+      requesterHasVoted: false,
+      canSeeStandings: true,
+    });
   }
 
   @Post(':id/close')
@@ -162,7 +178,10 @@ export class BattlesController {
   })
   async close(@Param('id') id: string) {
     const battle = await this.battles.closeBattle(id);
-    return this.battles.toPublic(battle, true);
+    return this.battles.toPublic(battle, {
+      requesterHasVoted: false,
+      canSeeStandings: true,
+    });
   }
 
   @Post(':id/resolve-tie')
@@ -179,7 +198,10 @@ export class BattlesController {
     @Body() dto: ResolveTieDto,
   ) {
     const battle = await this.battles.resolveTie(id, dto, req.user.userId);
-    return this.battles.toPublic(battle, true);
+    return this.battles.toPublic(battle, {
+      requesterHasVoted: false,
+      canSeeStandings: true,
+    });
   }
 
   @Post(':id/cancel')
@@ -191,6 +213,9 @@ export class BattlesController {
   })
   async cancel(@Param('id') id: string) {
     const battle = await this.battles.cancel(id);
-    return this.battles.toPublic(battle, true);
+    return this.battles.toPublic(battle, {
+      requesterHasVoted: false,
+      canSeeStandings: true,
+    });
   }
 }

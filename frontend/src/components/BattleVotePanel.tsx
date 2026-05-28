@@ -36,7 +36,10 @@ export default function BattleVotePanel({
   const isCompleted =
     battle.status === 'completed' || battle.status === 'cancelled';
   const isLive = battle.status === 'live';
-  const standingsVisible = battle.requesterHasVoted || isCompleted;
+  // Standings visibility uses the server-computed gate, which is admin-elevated.
+  // Vote-button visibility uses the literal `requesterHasVoted` so admins viewing
+  // a fresh battle still see vote buttons (instead of "Vote locked in" copy).
+  const standingsVisible = battle.canSeeStandings || isCompleted;
 
   const isParticipant =
     !!user &&

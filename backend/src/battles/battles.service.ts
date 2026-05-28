@@ -462,13 +462,22 @@ export class BattlesService {
   /**
    * Per-user vote-percentage gate (decision C).
    *
-   * If `requesterHasVoted === true`, return full standings. Otherwise
-   * return a sanitized response — counts hidden, leader hidden.
+   * `requesterHasVoted` is LITERAL — true only when the caller has a vote
+   * row for this battle. `canSeeStandings` is what gates count visibility
+   * (admins / completed / cancelled battles always pass; non-admin voters
+   * unlock by casting their vote). The two are surfaced separately because
+   * the frontend uses them for different decisions — vote-button visibility
+   * vs. standings panel visibility. Conflating them caused admins viewing
+   * a fresh battle to see "Vote locked in" copy and no vote UI.
    */
-  toPublic(battle: Battle, requesterHasVoted: boolean) {
+  toPublic(
+    battle: Battle,
+    opts: { requesterHasVoted: boolean; canSeeStandings: boolean },
+  ) {
+    const { requesterHasVoted, canSeeStandings } = opts;
     const total = battle.voteCountA + battle.voteCountB;
     const showStandings =
-      requesterHasVoted ||
+      canSeeStandings ||
       battle.status === 'completed' ||
       battle.status === 'needs_decision' ||
       battle.status === 'cancelled';
@@ -487,6 +496,7 @@ export class BattlesService {
       createdAt: battle.createdAt,
       closedAt: battle.closedAt,
       requesterHasVoted,
+      canSeeStandings: showStandings,
     };
 
     if (!showStandings) {
