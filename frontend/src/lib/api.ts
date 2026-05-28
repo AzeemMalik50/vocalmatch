@@ -276,7 +276,14 @@ export interface BattleDto {
   percentB: number | null;
   currentLeader: 'A' | 'B' | 'tie' | null;
   totalVotes: number | null;
+  /** Literal — true only when the caller has actually cast a vote on this battle. */
   requesterHasVoted: boolean;
+  /**
+   * True when the caller is allowed to see vote counts and percentages.
+   * Admins and completed/cancelled battles always unlock this; non-admin
+   * voters unlock it by casting their vote.
+   */
+  canSeeStandings: boolean;
   createdAt: string;
   closedAt: string | null;
 }
