@@ -21,6 +21,14 @@ async function bootstrap() {
       if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin)) {
         return callback(null, true);
       }
+      // Allow any *.up.railway.app subdomain (Railway-hosted Swagger UI)
+      if (/^https:\/\/[a-z0-9-]+\.up\.railway\.app$/.test(origin)) {
+        return callback(null, true);
+      }
+      // Allow any localhost / 127.0.0.1 origin (dev + local Swagger UI)
+      if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        return callback(null, true);
+      }
       console.warn(`❌ CORS blocked: ${origin}`);
       callback(new Error(`Origin ${origin} not allowed by CORS`));
     },
@@ -60,12 +68,16 @@ async function bootstrap() {
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
   // Mount at the literal /api/docs (setGlobalPrefix isn't applied to
   // SwaggerModule.setup paths, so we include the api/ prefix here).
-  SwaggerModule.setup('api/docs', app, swaggerDocument, {
+  const docsPath = 'api/docs';
+  SwaggerModule.setup(docsPath, app, swaggerDocument, {
     swaggerOptions: { persistAuthorization: true },
   });
 
   const port = process.env.PORT ?? 4000;
   await app.listen(port, '0.0.0.0');
+  const publicUrl =
+    process.env.PUBLIC_URL?.replace(/\/$/, '') ?? `http://localhost:${port}`;
   console.log(`🎤 VocalMatch backend running on port ${port}`);
+  console.log(`📚 API docs: ${publicUrl}/${docsPath}`);
 }
 bootstrap();
