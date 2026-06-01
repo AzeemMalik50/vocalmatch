@@ -3,51 +3,60 @@
 @tailwind utilities;
 
 :root {
-  --font-display: 'Fraunces', 'Playfair Display', Georgia, serif;
+  /* Phase 3 typography stack — cinematic + premium.
+     - display: Bebas Neue (condensed sans, hero + section headlines)
+     - script:  Allura      (one-line script accents only)
+     - sans:    Inter       (body)
+     Track letter-spacing tight (`-0.01em`) on display to feel premium. */
+  --font-display: 'Bebas Neue', 'Impact', sans-serif;
+  --font-script: 'Allura', 'Brush Script MT', cursive;
   --font-sans: 'Inter', system-ui, sans-serif;
 
-  /* Stage (dark) — default */
-  --c-stage-950: 8 7 13;
-  --c-stage-900: 14 12 23;
-  --c-stage-800: 23 19 35;
-  --c-stage-700: 34 29 51;
-  --c-stage-600: 51 44 74;
-  --c-spotlight: 255 45 85;
-  --c-spotlight-dim: 204 36 68;
-  --c-gold: 245 196 81;
-  --c-haze: 168 157 199;
+  /* Battlefield (dark) — default. Warm near-black stage with cinematic
+     crimson + gold accents. Designed to feel emotionally explosive at
+     scale and premium at component scale. */
+  --c-stage-950: 6 4 6;
+  --c-stage-900: 13 9 11;
+  --c-stage-800: 22 15 18;
+  --c-stage-700: 38 26 30;
+  --c-stage-600: 58 40 46;
+  --c-spotlight: 217 30 42;        /* cinematic crimson — danger / heat */
+  --c-spotlight-dim: 165 18 28;    /* deeper crimson — hover / pressed */
+  --c-gold: 218 168 38;            /* rich warm gold — prestige */
+  --c-haze: 210 198 184;           /* warm off-white — body / secondary text */
 
-  --c-body-bg: 8 7 13;
-  --c-body-text: 240 238 247;
+  --c-body-bg: 6 4 6;
+  --c-body-text: 245 240 232;
   --c-vignette-edge: 0 0 0;
-  --c-vignette-alpha: 0.5;
-  --c-scrollbar-track: 8 7 13;
-  --c-scrollbar-thumb: 34 29 51;
-  --c-scrollbar-thumb-hover: 51 44 74;
-  --c-stage-tint-1: 0.08;
-  --c-stage-tint-2: 0.04;
+  --c-vignette-alpha: 0.55;
+  --c-scrollbar-track: 6 4 6;
+  --c-scrollbar-thumb: 38 26 30;
+  --c-scrollbar-thumb-hover: 58 40 46;
+  --c-stage-tint-1: 0.1;
+  --c-stage-tint-2: 0.05;
 }
 
 html.theme-light {
-  /* Studio (light) — paper-warm, dimmed glow */
-  --c-stage-950: 250 247 240;
-  --c-stage-900: 245 241 232;
-  --c-stage-800: 233 226 213;
-  --c-stage-700: 200 190 170;
-  --c-stage-600: 165 153 130;
-  --c-spotlight: 207 30 68;
-  --c-spotlight-dim: 165 22 52;
-  --c-gold: 184 130 24;
-  --c-haze: 95 86 70;
+  /* Stage Lights (light) — warm paper with darker crimson + bronze gold
+     for contrast. Same emotional palette, inverted luminance. */
+  --c-stage-950: 252 248 240;
+  --c-stage-900: 246 240 230;
+  --c-stage-800: 233 222 206;
+  --c-stage-700: 192 178 160;
+  --c-stage-600: 152 138 120;
+  --c-spotlight: 178 28 38;        /* darker crimson for contrast */
+  --c-spotlight-dim: 132 18 25;
+  --c-gold: 168 118 22;            /* darker bronze-gold */
+  --c-haze: 88 78 68;              /* warm dark — body text */
 
-  --c-body-bg: 250 247 240;
-  --c-body-text: 27 22 19;
-  --c-vignette-edge: 90 70 50;
-  --c-vignette-alpha: 0.12;
-  --c-scrollbar-track: 245 241 232;
-  --c-scrollbar-thumb: 200 190 170;
-  --c-scrollbar-thumb-hover: 165 153 130;
-  --c-stage-tint-1: 0.05;
+  --c-body-bg: 252 248 240;
+  --c-body-text: 24 18 16;
+  --c-vignette-edge: 90 60 40;
+  --c-vignette-alpha: 0.14;
+  --c-scrollbar-track: 246 240 230;
+  --c-scrollbar-thumb: 192 178 160;
+  --c-scrollbar-thumb-hover: 152 138 120;
+  --c-stage-tint-1: 0.06;
   --c-stage-tint-2: 0.03;
 }
 
@@ -61,14 +70,39 @@ html, body {
 
 .font-display {
   font-family: var(--font-display);
-  letter-spacing: -0.02em;
+  /* Bebas Neue likes a tiny tracking nudge — too tight feels cramped,
+     loose feels unfocused. -0.01em hits the cinematic sweet spot. */
+  letter-spacing: -0.01em;
 }
 
-/* Stage backdrop — radial gradient, subtle */
+.font-script {
+  font-family: var(--font-script);
+  /* Allura runs small at its natural size; bump line-height for breathing
+     room and slightly extend tracking so the connections read cleanly. */
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+}
+
+/* Stage backdrop — subtle radial gradient used as the body background.
+   The crimson radial top-left and gold radial mid-right echo the dual-
+   spotlight singer-vs-singer hero composition without competing with
+   foreground content. */
 .stage-bg {
   background:
-    radial-gradient(ellipse at 30% 0%, rgba(var(--c-spotlight) / var(--c-stage-tint-1)) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 30%, rgba(var(--c-gold) / var(--c-stage-tint-2)) 0%, transparent 50%),
+    radial-gradient(ellipse at 25% -10%, rgba(var(--c-spotlight) / var(--c-stage-tint-1)) 0%, transparent 55%),
+    radial-gradient(ellipse at 78% 28%, rgba(var(--c-gold) / var(--c-stage-tint-2)) 0%, transparent 55%),
+    rgb(var(--c-body-bg));
+}
+
+/* Battlefield backdrop — used on hero sections and live battles.
+   Twin spotlight cones from each side meet in a vignetted center, like
+   two singers facing off on stage. More intense than .stage-bg; reserve
+   for hero / featured-battle sections only. */
+.battlefield-bg {
+  background:
+    radial-gradient(ellipse at 0% 50%, rgba(var(--c-spotlight) / 0.18) 0%, transparent 45%),
+    radial-gradient(ellipse at 100% 50%, rgba(var(--c-spotlight) / 0.14) 0%, transparent 45%),
+    radial-gradient(ellipse at 50% 120%, rgba(var(--c-gold) / 0.06) 0%, transparent 60%),
     rgb(var(--c-body-bg));
 }
 
@@ -116,6 +150,95 @@ html, body {
 
 /* Number tabular */
 .tabular { font-variant-numeric: tabular-nums; }
+
+/* The cinematic homepage is an editorial surface — it should always feel
+   dark and dangerous regardless of whether the user has flipped to light
+   mode for the interior product. .vm-force-dark pins every stage / spotlight
+   / gold / haze variable back to the Battlefield palette inside the
+   wrapped subtree, so `bg-stage-950`, `text-spotlight`, etc. render dark
+   even when html.theme-light is set. */
+.vm-force-dark {
+  --c-stage-950: 6 4 6;
+  --c-stage-900: 13 9 11;
+  --c-stage-800: 22 15 18;
+  --c-stage-700: 38 26 30;
+  --c-stage-600: 58 40 46;
+  --c-spotlight: 217 30 42;
+  --c-spotlight-dim: 165 18 28;
+  --c-gold: 218 168 38;
+  --c-haze: 210 198 184;
+  --c-body-bg: 6 4 6;
+  --c-body-text: 245 240 232;
+  --c-vignette-edge: 0 0 0;
+  --c-vignette-alpha: 0.55;
+  --c-stage-tint-1: 0.1;
+  --c-stage-tint-2: 0.05;
+  /* Shadcn-style tokens used by the homepage sections ported from the
+     reference design. Sit on top of the same Battlefield palette so the
+     existing stage / spotlight / gold / haze utilities keep working. */
+  --c-background: 6 4 6;
+  --c-foreground: 245 240 232;
+  --c-card: 22 15 18;
+  --c-card-foreground: 245 240 232;
+  --c-muted: 40 28 32;
+  --c-muted-foreground: 168 156 144;
+  --c-border: 58 40 46;
+  background: rgb(var(--c-body-bg));
+  color: rgb(var(--c-body-text));
+}
+
+/* ─── Prestige + danger utility classes ───────────────────────────────
+   Phase 3 emotional layer. Use sparingly — these are loud effects.
+   crown-glow:   gold halo for champion identity (defending-champion card,
+                 winner banner, streak chips ≥ 5)
+   crimson-pulse: red breathing alert for live + critical states (Crown
+                 at Risk HIGH/CRITICAL, last-hour countdown)
+*/
+.crown-glow {
+  box-shadow:
+    0 0 0 1px rgba(var(--c-gold) / 0.45),
+    0 0 24px rgba(var(--c-gold) / 0.35),
+    0 0 60px rgba(var(--c-gold) / 0.15);
+}
+
+.crimson-pulse {
+  animation: crimsonPulse 1.8s ease-in-out infinite;
+}
+@keyframes crimsonPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 0 rgba(var(--c-spotlight) / 0.55),
+      0 0 12px rgba(var(--c-spotlight) / 0.2);
+  }
+  50% {
+    box-shadow:
+      0 0 0 14px rgba(var(--c-spotlight) / 0),
+      0 0 28px rgba(var(--c-spotlight) / 0.35);
+  }
+}
+
+/* Gold dust — fine particle overlay used on prestige-moment surfaces
+   (winner banners, DETHRONED cards). Lightweight CSS so we don't need
+   a particle library for the basic case. */
+.gold-dust {
+  position: relative;
+}
+.gold-dust::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle at 12% 18%, rgba(var(--c-gold) / 0.5) 0, transparent 1.5px),
+    radial-gradient(circle at 78% 32%, rgba(var(--c-gold) / 0.4) 0, transparent 1.5px),
+    radial-gradient(circle at 42% 68%, rgba(var(--c-gold) / 0.45) 0, transparent 1.5px),
+    radial-gradient(circle at 88% 82%, rgba(var(--c-gold) / 0.35) 0, transparent 1.5px),
+    radial-gradient(circle at 22% 88%, rgba(var(--c-gold) / 0.5) 0, transparent 1.5px);
+  background-size: 220px 180px;
+  background-repeat: repeat;
+  opacity: 0.6;
+  mix-blend-mode: screen;
+}
 
 /* Skeleton shimmer used for loading cards */
 .skeleton {
