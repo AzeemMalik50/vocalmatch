@@ -20,12 +20,12 @@
   --c-stage-800: 22 15 18;
   --c-stage-700: 38 26 30;
   --c-stage-600: 58 40 46;
-  --c-spotlight: 217 30 42;        /* cinematic crimson — danger / heat */
-  --c-spotlight-dim: 165 18 28;    /* deeper crimson — hover / pressed */
-  --c-gold: 218 168 38;            /* rich warm gold — prestige */
+  --c-spotlight: 239 68 68;        /* vibrant crimson — danger / heat (reference-matched) */
+  --c-spotlight-dim: 185 28 28;    /* deeper crimson — hover / pressed */
+  --c-gold: 250 204 21;            /* punchy stage gold — prestige (reference-matched) */
   --c-haze: 210 198 184;           /* warm off-white — body / secondary text */
 
-  --c-body-bg: 6 4 6;
+  --c-body-bg: 0 0 0;
   --c-body-text: 245 240 232;
   --c-vignette-edge: 0 0 0;
   --c-vignette-alpha: 0.55;
@@ -158,16 +158,16 @@ html, body {
    wrapped subtree, so `bg-stage-950`, `text-spotlight`, etc. render dark
    even when html.theme-light is set. */
 .vm-force-dark {
-  --c-stage-950: 6 4 6;
-  --c-stage-900: 13 9 11;
-  --c-stage-800: 22 15 18;
-  --c-stage-700: 38 26 30;
-  --c-stage-600: 58 40 46;
-  --c-spotlight: 217 30 42;
-  --c-spotlight-dim: 165 18 28;
-  --c-gold: 218 168 38;
+  --c-stage-950: 0 0 0;
+  --c-stage-900: 10 6 8;
+  --c-stage-800: 18 12 14;
+  --c-stage-700: 32 22 26;
+  --c-stage-600: 52 36 42;
+  --c-spotlight: 239 68 68;
+  --c-spotlight-dim: 185 28 28;
+  --c-gold: 250 204 21;
   --c-haze: 210 198 184;
-  --c-body-bg: 6 4 6;
+  --c-body-bg: 0 0 0;
   --c-body-text: 245 240 232;
   --c-vignette-edge: 0 0 0;
   --c-vignette-alpha: 0.55;
@@ -176,15 +176,36 @@ html, body {
   /* Shadcn-style tokens used by the homepage sections ported from the
      reference design. Sit on top of the same Battlefield palette so the
      existing stage / spotlight / gold / haze utilities keep working. */
-  --c-background: 6 4 6;
+  --c-background: 0 0 0;
   --c-foreground: 245 240 232;
-  --c-card: 22 15 18;
+  --c-card: 18 12 14;
   --c-card-foreground: 245 240 232;
   --c-muted: 40 28 32;
   --c-muted-foreground: 168 156 144;
-  --c-border: 58 40 46;
+  --c-border: 52 36 42;
   background: rgb(var(--c-body-bg));
   color: rgb(var(--c-body-text));
+}
+
+/* Gold-bordered panel wrapper — the signature framing language from the
+   reference design. Use as a wrapping container around major homepage
+   sections (Live Battle, Champion, Hero stats) so the page reads as a
+   set of premium gold-trimmed cards on pure black. */
+.gold-panel {
+  border: 1px solid rgba(var(--c-gold) / 0.35);
+  border-radius: 0.75rem;
+  box-shadow:
+    0 0 0 1px rgba(var(--c-gold) / 0.08),
+    0 12px 40px -12px rgba(var(--c-spotlight) / 0.15);
+}
+
+/* Stronger red glow halo for primary CTAs (WATCH & VOTE-style). The
+   reference shows a clear soft red bloom around the main red button. */
+.red-glow {
+  box-shadow:
+    0 0 0 1px rgba(var(--c-spotlight) / 0.4),
+    0 0 30px rgba(var(--c-spotlight) / 0.35),
+    0 0 60px rgba(var(--c-spotlight) / 0.18);
 }
 
 /* ─── Prestige + danger utility classes ───────────────────────────────
