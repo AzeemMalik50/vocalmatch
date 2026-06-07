@@ -430,6 +430,115 @@ export class BattlesService {
   }
 
   /**
+   * Recent dethronements — completed battles where the winner is NOT the
+   * same user as the previous completed battle's winner for that song
+   * (i.e. the crown changed hands). Enriched with song title, former
+   * champion + new champion usernames/avatars, and the winning margin
+   * so the homepage "Dethroned!" panel can render from a single fetch.
+   *
+   * Overfetches recent completed battles, groups by song, and walks the
+   * adjacent pairs in code — cleaner than the equivalent self-join SQL
+   * and fast enough for the homepage volume.
+   */
+  async findRecentDethronements(limit: number) {
+    const recent = await this.battles.find({
+      where: { status: 'completed' },
+      order: { closedAt: 'DESC' },
+      take: 200,
+    });
+
+    const bySong = new Map<string, Battle[]>();
+    for (const b of recent) {
+      const arr = bySong.get(b.songId) ?? [];
+      arr.push(b);
+      bySong.set(b.songId, arr);
+    }
+
+    const transitions: Array<{ current: Battle; previous: Battle }> = [];
+    for (const battles of bySong.values()) {
+      for (let i = 0; i < battles.length - 1; i++) {
+        const current = battles[i];
+        const previous = battles[i + 1];
+        if (
+          current.winnerUserId &&
+          previous.winnerUserId &&
+          current.winnerUserId !== previous.winnerUserId
+        ) {
+          transitions.push({ current, previous });
+        }
+      }
+    }
+    transitions.sort(
+      (a, b) =>
+        (b.current.closedAt?.getTime() ?? 0) -
+        (a.current.closedAt?.getTime() ?? 0),
+    );
+    const top = transitions.slice(0, limit);
+
+    if (top.length === 0) return [];
+
+    const userIds = new Set<string>();
+    const songIds = new Set<string>();
+    for (const t of top) {
+      if (t.current.winnerUserId) userIds.add(t.current.winnerUserId);
+      if (t.previous.winnerUserId) userIds.add(t.previous.winnerUserId);
+      songIds.add(t.current.songId);
+    }
+
+    const [users, songs] = await Promise.all([
+      this.users.find({ where: { id: In([...userIds]) } }),
+      Promise.all(
+        [...songIds].map((id) =>
+          this.songs.findOne(id).catch(() => null),
+        ),
+      ),
+    ]);
+    const userMap = new Map(users.map((u) => [u.id, u]));
+    const songMap = new Map(
+      songs.filter((s): s is NonNullable<typeof s> => !!s).map((s) => [s.id, s]),
+    );
+
+    return top.map(({ current, previous }) => {
+      const total = current.voteCountA + current.voteCountB;
+      const winnerVotes =
+        current.winnerPerformanceId === current.performanceAId
+          ? current.voteCountA
+          : current.voteCountB;
+      const marginPercent =
+        total === 0 ? 0 : Math.round((winnerVotes / total) * 100);
+      const newChamp = current.winnerUserId
+        ? userMap.get(current.winnerUserId)
+        : undefined;
+      const formerChamp = previous.winnerUserId
+        ? userMap.get(previous.winnerUserId)
+        : undefined;
+      const song = songMap.get(current.songId);
+      return {
+        battleId: current.id,
+        songId: current.songId,
+        songTitle: song?.title ?? null,
+        songArtist: song?.artist ?? null,
+        dethronedAt: current.closedAt,
+        winnerVotePercent: marginPercent,
+        newChampion: newChamp
+          ? {
+              userId: newChamp.id,
+              username: newChamp.username,
+              avatarUrl: newChamp.avatarUrl,
+            }
+          : null,
+        formerChampion: formerChamp
+          ? {
+              userId: formerChamp.id,
+              username: formerChamp.username,
+              avatarUrl: formerChamp.avatarUrl,
+            }
+          : null,
+      };
+    });
+  }
+
+  /**
    * Find the most recent battle a video is part of, regardless of status.
    * Used by the videos controller to add battle context to /videos/:id —
    * the frontend uses this to redirect /v/:id → /battle/:battleId when the

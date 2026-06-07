@@ -61,11 +61,28 @@ export class SongsController {
     };
   }
 
+  @Get('featured/risk')
+  @ApiOperation({
+    summary: 'Featured song + crown-at-risk snapshot',
+    description:
+      'The marquee song for the homepage — picked by longest current champion streak. Bundles the song, the defending champion user, derived title-defenses count, and the risk model (survival chance + LOW/MODERATE/HIGH/CRITICAL band). Returns null when no active song has a current champion.',
+  })
+  async getFeaturedRisk() {
+    const featured = await this.songs.getFeatured();
+    if (!featured) return null;
+    return {
+      song: this.songs.toPublic(featured.song),
+      champion: featured.champion,
+      titleDefenses: featured.titleDefenses,
+      risk: featured.risk,
+    };
+  }
+
   @Get(':id')
   @ApiOperation({
     summary: 'Get a Centerstage Song by id',
     description:
-      'Returns title, artist, status, and the current champion fields (`currentChampionUserId`, `currentChampionPerformanceId`, `currentChampionStreak`).',
+      'Returns title, artist, status, and the current champion fields (`currentChampionUserId`, `currentChampionPerformanceId`, `currentChampionStreak`, `currentChampionTitleDefenses`).',
   })
   async getOne(@Param('id') id: string) {
     const song = await this.songs.findOne(id);

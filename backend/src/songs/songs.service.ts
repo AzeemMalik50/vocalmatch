@@ -3,11 +3,32 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Song, SongStatus } from './song.entity';
 import { CreateSongDto, UpdateSongDto } from './songs.dto';
+import { Battle } from '../battles/battle.entity';
+import {
+  ChallengeStatus,
+  ChallengeSubmission,
+} from '../battles/challenge-submission.entity';
+import { User } from '../users/user.entity';
+import { Video } from '../videos/video.entity';
+
+export type RiskLevel = 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
+
+export interface SongRisk {
+  survivalChance: number;
+  riskLevel: RiskLevel;
+  pendingChallengers: number;
+  lastBattleMarginPercent: number | null;
+}
 
 @Injectable()
 export class SongsService {
   constructor(
     @InjectRepository(Song) private readonly songs: Repository<Song>,
+    @InjectRepository(Battle) private readonly battles: Repository<Battle>,
+    @InjectRepository(ChallengeSubmission)
+    private readonly challenges: Repository<ChallengeSubmission>,
+    @InjectRepository(User) private readonly users: Repository<User>,
+    @InjectRepository(Video) private readonly videos: Repository<Video>,
   ) {}
 
   async create(dto: CreateSongDto, adminId: string) {
@@ -84,6 +105,93 @@ export class SongsService {
     return this.songs.save(song);
   }
 
+  /**
+   * Risk model — how at-risk is this song's defending champion?
+   *
+   * survivalChance starts at 100 and is decremented by:
+   *   - 10 points per PENDING challenge submission (more challengers = more pressure)
+   *   - 15 points if the most recent completed battle was won by < 10% margin
+   *     (the audience nearly flipped the crown last round)
+   *
+   * Clamped to [5, 100]. Risk level bands:
+   *   71-100 LOW   |  41-70 MODERATE  |  21-40 HIGH  |  0-20 CRITICAL
+   *
+   * Returns null fields when there isn't enough data (no prior battle).
+   */
+  async computeRisk(songId: string): Promise<SongRisk> {
+    const [pendingChallengers, lastBattle] = await Promise.all([
+      this.challenges.count({
+        where: { songId, status: 'pending' as ChallengeStatus },
+      }),
+      this.battles.findOne({
+        where: { songId, status: 'completed' },
+        order: { closedAt: 'DESC' },
+      }),
+    ]);
+
+    let survival = 100;
+    survival -= Math.min(pendingChallengers * 10, 60);
+
+    let lastMargin: number | null = null;
+    if (lastBattle) {
+      const total = lastBattle.voteCountA + lastBattle.voteCountB;
+      if (total > 0) {
+        const diff = Math.abs(lastBattle.voteCountA - lastBattle.voteCountB);
+        lastMargin = Math.round((diff / total) * 100);
+        if (lastMargin < 10) survival -= 15;
+      }
+    }
+
+    survival = Math.max(5, Math.min(100, survival));
+    const level: RiskLevel =
+      survival <= 20 ? 'CRITICAL' : survival <= 40 ? 'HIGH' : survival <= 70 ? 'MODERATE' : 'LOW';
+
+    return {
+      survivalChance: survival,
+      riskLevel: level,
+      pendingChallengers,
+      lastBattleMarginPercent: lastMargin,
+    };
+  }
+
+  /**
+   * The "marquee" song for the homepage — the song whose defending champion
+   * has the longest active streak. Returns null when no active song has a
+   * current champion (early-state platforms). Bundles champion user info +
+   * risk score so the homepage CrownAtRiskPanel + ChampionSection can render
+   * from a single request.
+   */
+  async getFeatured(): Promise<{
+    song: Song;
+    champion: { username: string; avatarUrl: string | null } | null;
+    titleDefenses: number;
+    risk: SongRisk;
+  } | null> {
+    const song = await this.songs
+      .createQueryBuilder('s')
+      .where('s.status = :status', { status: 'active' })
+      .andWhere('s.currentChampionUserId IS NOT NULL')
+      .andWhere('s.currentChampionStreak >= 1')
+      .orderBy('s.currentChampionStreak', 'DESC')
+      .getOne();
+    if (!song) return null;
+
+    let champion: { username: string; avatarUrl: string | null } | null = null;
+    if (song.currentChampionUserId) {
+      const user = await this.users.findOne({
+        where: { id: song.currentChampionUserId },
+      });
+      if (user) {
+        champion = { username: user.username, avatarUrl: user.avatarUrl };
+      }
+    }
+
+    const risk = await this.computeRisk(song.id);
+    const titleDefenses = Math.max(0, song.currentChampionStreak - 1);
+
+    return { song, champion, titleDefenses, risk };
+  }
+
   toPublic(song: Song) {
     return {
       id: song.id,
@@ -95,6 +203,8 @@ export class SongsService {
       currentChampionUserId: song.currentChampionUserId,
       currentChampionPerformanceId: song.currentChampionPerformanceId,
       currentChampionStreak: song.currentChampionStreak,
+      // Derived: defenses = streak - 1 (the initial coronation isn't a defense)
+      currentChampionTitleDefenses: Math.max(0, song.currentChampionStreak - 1),
       createdAt: song.createdAt,
     };
   }

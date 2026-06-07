@@ -12,6 +12,7 @@ import { BattlesModule } from './battles/battles.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AdminModule } from './admin/admin.module';
 import { RealtimeModule } from './realtime/realtime.module';
+import { StatsModule } from './stats/stats.module';
 
 // ─── Entities (registered with TypeORM at the root) ───────────────
 import { User } from './users/user.entity';
@@ -69,6 +70,7 @@ const entities = [
     BattlesModule,
     NotificationsModule,
     RealtimeModule,
+    StatsModule,
   ],
 })
 export class AppModule {}
