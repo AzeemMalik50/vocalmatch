@@ -3,10 +3,40 @@ import type { Metadata } from 'next';
 import { AuthProvider } from '@/lib/auth-context';
 import { ThemeProvider } from '@/lib/theme-context';
 
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, '') ||
+  'https://vocalmatch.app';
+
 export const metadata: Metadata = {
-  title: 'VocalMatch — One Song. Two Voices. One Crown.',
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: 'VocalMatch — One Song. Two Voices. One Crown.',
+    template: '%s · VocalMatch',
+  },
   description:
     'A continuous competition for vocal performance. Watch, vote, challenge — claim the crown.',
+  openGraph: {
+    type: 'website',
+    siteName: 'VocalMatch',
+    title: 'VocalMatch — One Song. Two Voices. One Crown.',
+    description:
+      'Two singers, same song. The audience decides who owns it. The winner becomes the Official Voice... until someone takes the crown.',
+    images: [
+      {
+        url: '/hero/main-hero.jpg',
+        width: 1024,
+        height: 1024,
+        alt: 'Official Voice and Challenger facing off, fire and crowd between them',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'VocalMatch — One Song. Two Voices. One Crown.',
+    description:
+      'Two singers, same song. The audience decides who owns it.',
+    images: ['/hero/main-hero.jpg'],
+  },
 };
 
 // Runs before React hydrates to set the right theme class on <html>.
