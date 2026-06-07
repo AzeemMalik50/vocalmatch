@@ -1,20 +1,25 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
+  AlertTriangle,
   ChevronLeft,
   ChevronRight,
   Crown,
   Download,
   Eye,
+  Flame,
   Headphones,
   Mic,
   Music,
   Play,
+  Shield,
   Upload,
   Users,
+  Vote,
   Zap,
 } from 'lucide-react';
 import Nav from '@/components/Nav';
@@ -22,8 +27,10 @@ import Footer from '@/components/Footer';
 import {
   api,
   BattleDto,
+  DethronementDto,
+  FeaturedSongRiskDto,
   GENRE_OPTIONS,
-  SongDto,
+  RiskLevel,
   SORT_LABELS,
   VideoDto,
   VideoSort,
@@ -31,6 +38,15 @@ import {
   VoiceType,
 } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import {
+  HERO_MAIN,
+  HERO_LIVE_BATTLE,
+  HERO_CHAMPION_PORTRAIT,
+  HERO_CROWN_AT_RISK,
+  HERO_RED_PHONE,
+  HERO_DETHRONED,
+  HERO_SHARE_POSTER,
+} from '@/lib/hero-assets';
 
 /**
  * Phase 3 — Cinematic homepage.
@@ -62,11 +78,14 @@ export default function HomePage() {
       {user && user.profileCompleted === false && <ProfileNudge />}
       <Hero user={user} />
       <LiveBattle />
+      <CrownAtRiskPanel />
       <ChallengeFlow user={user} />
       <ChampionSection />
+      <DethronedPanel />
       <HowItWorks />
       <StageCarousel />
       <WinnersCarousel />
+      <ShareCardsRow />
       <CTAFooter user={user} />
       <Footer />
     </div>
@@ -118,21 +137,16 @@ function Hero({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
     let cancelled = false;
     (async () => {
       try {
-        const [battlesResp, videosResp] = await Promise.all([
-          api.listBattles({ limit: 1 }),
-          api.listVideos({ limit: 1 }),
-        ]);
+        const s = await api.getStats();
         if (cancelled) return;
-        const b = Math.max(battlesResp.items.length, 1);
-        const v = Math.max(videosResp.items.length, 1);
         setStats({
-          votes: formatStat(b * 138 + v * 4),
-          battles: formatStat(b + 12),
-          challengers: formatStat(Math.floor(v * 0.6) + 6),
-          voicesRaised: formatStat(v * 18 + 240),
+          votes: formatStat(s.totalVotes),
+          battles: formatStat(s.totalBattles),
+          challengers: formatStat(s.totalChallengers),
+          voicesRaised: formatStat(s.voicesRaised),
         });
       } catch {
-        // Non-fatal — em-dashes stay if anything goes wrong.
+        // Non-fatal — em-dashes stay if the stats request fails.
       }
     })();
     return () => {
@@ -141,13 +155,13 @@ function Hero({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
   }, []);
 
   return (
-    <section className="relative min-h-screen pt-20 bg-gradient-to-b from-background via-background to-background overflow-hidden">
-      <div className="absolute inset-0 opacity-20">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-red-600 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-red-900 rounded-full blur-3xl" />
+    <section className="relative min-h-screen pt-20 bg-black overflow-hidden">
+      <div className="absolute inset-0 opacity-30 pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-[32rem] h-[32rem] bg-red-600 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-[32rem] h-[32rem] bg-red-900 rounded-full blur-3xl" />
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center min-h-[calc(100vh-5rem)]">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center min-h-[calc(100vh-12rem)] py-12">
         <div className="space-y-6">
           <div>
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-black text-white leading-tight">
@@ -160,14 +174,18 @@ function Hero({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
               ONE CROWN.
             </h1>
           </div>
-          <p className="text-lg text-gray-300 max-w-md">
-            Two singers. Same song. The audience decides who owns it. The
-            winner becomes the Official Voice... until someone beats them.
+          <p className="text-sm md:text-base font-bold uppercase tracking-[0.2em] text-yellow-400">
+            The voice can be taken at any time.
+          </p>
+          <p className="text-lg text-gray-300 max-w-md leading-relaxed">
+            Two singers perform the same song. The audience decides who owns
+            it. The winner becomes the Official Voice... until someone takes
+            the crown.
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
             <Link
               href="#live-battle"
-              className="inline-flex items-center justify-center bg-red-600 hover:bg-red-700 text-white text-base py-4 px-8 rounded-lg font-bold uppercase tracking-widest transition"
+              className="red-glow inline-flex items-center justify-center bg-red-600 hover:bg-red-700 text-white text-base py-4 px-8 rounded-lg font-bold uppercase tracking-widest transition"
             >
               <Play className="w-5 h-5 mr-2" />
               Watch &amp; Vote
@@ -182,25 +200,61 @@ function Hero({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
           </div>
         </div>
 
-        <div className="relative h-96 lg:h-full flex items-center justify-center">
-          <div className="absolute inset-0 bg-gradient-to-br from-red-600/20 to-red-900/20 rounded-2xl blur-2xl" />
-          <div className="relative grid grid-cols-2 gap-6 w-full max-w-sm">
-            <StatCard value={stats.votes} label="Votes" />
-            <StatCard value={stats.battles} label="Battles" />
-            <StatCard value={stats.challengers} label="Challengers" />
-            <StatCard value={stats.voicesRaised} label="Voices Raised" />
-          </div>
+        <HeroComposite />
+      </div>
+
+      <div className="relative z-10 max-w-7xl mx-auto px-4 pb-12">
+        <div className="gold-panel grid grid-cols-2 md:grid-cols-4 gap-px bg-yellow-500/20 overflow-hidden">
+          <HeroStat value={stats.votes} label="Votes Cast" />
+          <HeroStat value={stats.battles} label="Battles" />
+          <HeroStat value={stats.challengers} label="Challengers" />
+          <HeroStat value={stats.voicesRaised} label="Voices Raised" />
         </div>
       </div>
     </section>
   );
 }
 
-function StatCard({ value, label }: { value: string; label: string }) {
+function HeroComposite() {
   return (
-    <div className="bg-card/50 backdrop-blur border border-red-600/30 rounded-xl p-6 text-center">
-      <div className="text-3xl font-bold text-red-600 tabular">{value}</div>
-      <div className="text-sm text-gray-400 mt-2 uppercase tracking-widest">
+    <div className="relative aspect-square w-full max-w-[34rem] mx-auto rounded-2xl overflow-hidden">
+      <div className="absolute inset-0 -m-6 bg-gradient-to-br from-red-600/30 to-amber-500/10 rounded-3xl blur-2xl pointer-events-none" />
+
+      <Image
+        src={HERO_MAIN.src}
+        alt={HERO_MAIN.alt}
+        fill
+        priority
+        sizes="(max-width: 1024px) 100vw, 600px"
+        className="object-cover relative z-10"
+      />
+
+      <div className="absolute inset-0 z-20 pointer-events-none bg-gradient-to-b from-black/40 via-transparent to-black/40" />
+
+      <div className="absolute top-4 left-4 z-30 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur border border-amber-400/40">
+        <Crown className="w-4 h-4 text-amber-400" />
+        <span className="text-[11px] font-bold uppercase tracking-widest text-amber-400">
+          Official Voice
+        </span>
+      </div>
+
+      <div className="absolute top-4 right-4 z-30 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur border border-red-500/40">
+        <Zap className="w-4 h-4 text-red-500" />
+        <span className="text-[11px] font-bold uppercase tracking-widest text-red-500">
+          Challenger
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function HeroStat({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="bg-black/70 backdrop-blur p-4 md:p-5 text-center">
+      <div className="text-2xl md:text-3xl font-bold text-red-600 tabular-nums">
+        {value}
+      </div>
+      <div className="text-[10px] md:text-xs text-gray-400 mt-1 uppercase tracking-widest">
         {label}
       </div>
     </div>
@@ -265,17 +319,32 @@ function LiveBattle() {
   return (
     <section id="live-battle" className="bg-background py-20">
       <div className="max-w-7xl mx-auto px-4">
-        <div className="mb-12">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-3 h-3 bg-red-600 rounded-full animate-pulse" />
-            <h2 className="text-2xl font-bold text-white tracking-widest">
-              LIVE BATTLE
-            </h2>
+        <div className="relative w-full h-56 md:h-72 lg:h-80 rounded-2xl overflow-hidden mb-12">
+          <Image
+            src={HERO_LIVE_BATTLE.src}
+            alt={HERO_LIVE_BATTLE.alt}
+            fill
+            sizes="(max-width: 1280px) 100vw, 1280px"
+            className="object-cover object-[center_30%]"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/30 to-black/80" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 p-6 md:p-8">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-3 h-3 bg-red-600 rounded-full animate-pulse" />
+              <h2 className="text-2xl md:text-3xl font-bold text-white tracking-widest">
+                LIVE BATTLE
+              </h2>
+            </div>
+            <p className="text-sm md:text-base text-gray-300 max-w-xl">
+              Official Voice vs Challenger. Two singers, same song — vote
+              before the clock runs out.
+            </p>
           </div>
         </div>
 
         {!battle || !a || !b ? (
-          <div className="text-center py-16 bg-card/50 backdrop-blur border border-border rounded-2xl">
+          <div className="gold-panel text-center py-16 bg-card/50 backdrop-blur">
             <p className="text-2xl font-bold text-white mb-2">
               No live battle right now.
             </p>
@@ -288,7 +357,7 @@ function LiveBattle() {
             <BattleSideCard
               performance={a}
               side="A"
-              label="The Underdog"
+              label="Current Official Voice"
               tone="red"
             />
 
@@ -313,13 +382,40 @@ function LiveBattle() {
             <BattleSideCard
               performance={b}
               side="B"
-              label="The Powerhouse"
+              label="Challenger"
               tone="blue"
             />
           </div>
         )}
+
+        <BattlePillarsRow />
       </div>
     </section>
+  );
+}
+
+function BattlePillarsRow() {
+  const pillars = [
+    { icon: Users, label: 'Anyone Can Challenge' },
+    { icon: Vote, label: 'The Audience Decides' },
+    { icon: Crown, label: 'The Voice Can Be Taken at Any Time' },
+    { icon: Flame, label: 'Gain Fame · Go Viral' },
+    { icon: Shield, label: 'Defend Your Crown' },
+  ];
+  return (
+    <div className="mt-10 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+      {pillars.map(({ icon: Icon, label }) => (
+        <div
+          key={label}
+          className="flex flex-col items-center text-center gap-2 bg-black/60 border border-yellow-500/30 rounded-xl p-4"
+        >
+          <Icon className="w-6 h-6 text-yellow-400" />
+          <div className="text-[11px] md:text-xs font-bold uppercase tracking-widest text-white leading-snug">
+            {label}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -413,29 +509,60 @@ function ChallengeFlow({
   return (
     <section className="bg-background py-20">
       <div className="max-w-7xl mx-auto px-4">
-        <h2 className="text-4xl font-black text-white mb-12 text-center">
-          THINK YOU CAN TAKE THE CROWN?
-        </h2>
+        <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-10 lg:gap-16 items-center mb-12">
+          <div className="relative w-full max-w-xs mx-auto lg:mx-0 aspect-square rounded-2xl overflow-hidden">
+            <div className="absolute inset-0 -m-4 bg-red-600/30 rounded-3xl blur-2xl pointer-events-none" />
+            <Image
+              src={HERO_RED_PHONE.src}
+              alt={HERO_RED_PHONE.alt}
+              fill
+              sizes="(max-width: 1024px) 90vw, 320px"
+              className="object-cover relative z-10"
+            />
+          </div>
+          <div className="text-center lg:text-left">
+            <p className="text-red-500 font-bold text-xs uppercase tracking-[0.3em] mb-2">
+              Red Phone Challenge
+            </p>
+            <h2 className="text-4xl md:text-5xl font-black text-white mb-3">
+              THINK YOU CAN TAKE THE CROWN?
+            </h2>
+            <p className="text-gray-300 text-lg max-w-xl mx-auto lg:mx-0">
+              Pick up the red phone. Record your version. The next Official
+              Voice could be you.
+            </p>
+          </div>
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-center mb-12">
-          <FlowStep Icon={Download} title="DOWNLOAD" sub="the track" />
+        {/* 4 steps + 3 arrows = 7 lg children. Use an explicit
+            [1fr_auto_1fr_auto_1fr_auto_1fr] track so the row fits without
+            wrapping; collapses to a single column on mobile where the
+            arrows hide. role=list/listitem keeps it accessible without
+            forcing <ol>/<li> children that would clash with the arrows. */}
+        <div
+          role="list"
+          aria-label="Challenge submission steps"
+          className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] gap-5 lg:gap-3 items-stretch mb-12"
+        >
+          <FlowStep number={1} Icon={Download} title="DOWNLOAD" sub="the track" />
           <FlowArrow />
-          <FlowStep Icon={Mic} title="RECORD" sub="your version" />
+          <FlowStep number={2} Icon={Mic} title="RECORD" sub="your version" />
           <FlowArrow />
-          <FlowStep Icon={Upload} title="UPLOAD" sub="your challenge" />
+          <FlowStep number={3} Icon={Upload} title="UPLOAD" sub="your challenge" />
           <FlowArrow />
           <FlowStep
+            number={4}
             Icon={Crown}
             title="IF SELECTED"
             sub="face the champion"
-            gold
+            reward
           />
         </div>
 
         <div className="text-center">
           <Link
             href={href}
-            className="inline-flex items-center bg-red-600 hover:bg-red-700 text-white font-bold text-lg py-6 px-12 rounded-lg uppercase tracking-widest transition"
+            className="red-glow inline-flex items-center bg-red-600 hover:bg-red-700 text-white font-bold text-lg py-6 px-12 rounded-lg uppercase tracking-widest transition"
           >
             Challenge Now →
           </Link>
@@ -447,27 +574,54 @@ function ChallengeFlow({
 
 function FlowStep({
   Icon,
+  number,
   title,
   sub,
-  gold,
+  reward,
 }: {
   Icon: typeof Download;
+  number: number;
   title: string;
   sub: string;
-  gold?: boolean;
+  /** The final reward step (Crown / IF SELECTED) — gold treatment + halo. */
+  reward?: boolean;
 }) {
+  const ring = reward ? 'border-yellow-400' : 'border-red-500';
+  const ringBg = reward
+    ? 'bg-yellow-500/15 group-hover:bg-yellow-500/25 group-focus-visible:bg-yellow-500/25'
+    : 'bg-red-600/15 group-hover:bg-red-600/25 group-focus-visible:bg-red-600/25';
+  const ringGlow = reward
+    ? 'crown-glow'
+    : 'group-hover:shadow-[0_0_24px_rgba(239,68,68,0.45)] group-focus-visible:shadow-[0_0_24px_rgba(239,68,68,0.45)]';
+  const iconColor = reward ? 'text-yellow-400' : 'text-red-500';
+  const numberColor = reward ? 'text-yellow-400/80' : 'text-red-500/80';
+  const titleColor = reward ? 'text-yellow-400' : 'text-white';
+  const focusRing = reward ? 'focus-visible:ring-yellow-400' : 'focus-visible:ring-red-500';
+
   return (
-    <div className="flex flex-col items-center text-center">
-      <div
-        className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 relative z-10 ${
-          gold
-            ? 'bg-yellow-500/20 border border-yellow-500'
-            : 'bg-red-600/20 border border-red-600'
-        }`}
+    <div
+      role="listitem"
+      tabIndex={0}
+      aria-label={`Step ${number}: ${title} — ${sub}`}
+      className={`group relative flex flex-col items-center text-center p-4 rounded-2xl outline-none transition focus-visible:ring-2 ${focusRing} focus-visible:ring-offset-2 focus-visible:ring-offset-black ${
+        reward ? 'focus-visible:bg-yellow-500/5' : 'focus-visible:bg-red-500/5'
+      }`}
+    >
+      <span
+        aria-hidden="true"
+        className={`absolute top-2 right-3 font-display text-base tabular-nums tracking-widest ${numberColor}`}
       >
-        <Icon className={`w-8 h-8 ${gold ? 'text-yellow-500' : 'text-red-600'}`} />
+        {String(number).padStart(2, '0')}
+      </span>
+      <div
+        className={`relative w-20 h-20 rounded-full flex items-center justify-center mb-4 border-2 transition motion-reduce:transition-none ${ring} ${ringBg} ${ringGlow}`}
+      >
+        <Icon
+          aria-hidden="true"
+          className={`w-9 h-9 transition motion-reduce:transition-none group-hover:scale-110 group-focus-visible:scale-110 motion-reduce:group-hover:scale-100 ${iconColor}`}
+        />
       </div>
-      <h3 className="font-bold text-white mb-2 uppercase tracking-widest text-sm">
+      <h3 className={`font-bold uppercase tracking-widest text-sm mb-1 ${titleColor}`}>
         {title}
       </h3>
       <p className="text-sm text-gray-400">{sub}</p>
@@ -477,8 +631,11 @@ function FlowStep({
 
 function FlowArrow() {
   return (
-    <div className="hidden lg:flex justify-center">
-      <div className="text-red-600 text-2xl">&gt;</div>
+    <div
+      aria-hidden="true"
+      className="hidden lg:flex items-center justify-center text-red-500/60"
+    >
+      <ChevronRight className="w-6 h-6" />
     </div>
   );
 }
@@ -486,35 +643,14 @@ function FlowArrow() {
 // ─── 4. Champion Section ─────────────────────────────────────────────
 
 function ChampionSection() {
-  const [song, setSong] = useState<SongDto | null>(null);
-  const [champion, setChampion] = useState<{
-    username: string;
-    avatarUrl: string | null;
-  } | null>(null);
+  const [featured, setFeatured] = useState<FeaturedSongRiskDto | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const resp = await api.listSongs('active');
-        if (cancelled) return;
-        const withChamp = resp.items
-          .filter((s) => s.currentChampionUserId && s.currentChampionStreak >= 1)
-          .sort(
-            (x, y) =>
-              (y.currentChampionStreak ?? 0) - (x.currentChampionStreak ?? 0),
-          );
-        if (withChamp.length === 0) return;
-        const top = withChamp[0];
-        setSong(top);
-        if (top.currentChampionPerformanceId) {
-          const perf = await api.getVideo(top.currentChampionPerformanceId);
-          if (cancelled || !perf.uploader) return;
-          setChampion({
-            username: perf.uploader.username,
-            avatarUrl: perf.uploader.avatarUrl,
-          });
-        }
+        const f = await api.getFeaturedRisk();
+        if (!cancelled) setFeatured(f);
       } catch {
         // Non-fatal
       }
@@ -524,11 +660,11 @@ function ChampionSection() {
     };
   }, []);
 
-  if (!song?.currentChampionUserId) return null;
-
+  if (!featured) return null;
+  const { song, champion, titleDefenses } = featured;
+  const streak = song.currentChampionStreak;
   // Streak bar caps visually at 10 wins so a long streak doesn't blow out
   // the meter; the real count is still shown in the label.
-  const streak = song.currentChampionStreak;
   const barPercent = Math.min((streak / 10) * 100, 100);
 
   return (
@@ -536,17 +672,22 @@ function ChampionSection() {
       <div className="max-w-7xl mx-auto px-4">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/20 to-yellow-900/20 rounded-2xl blur-2xl" />
-            <div className="relative aspect-square bg-gradient-to-br from-yellow-500/30 to-yellow-900/30 rounded-2xl border border-yellow-500/30 flex items-center justify-center overflow-hidden">
-              {champion?.avatarUrl ? (
-                <img
-                  src={champion.avatarUrl}
-                  alt={champion.username}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <Crown className="w-32 h-32 text-yellow-500/50" />
-              )}
+            <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/30 to-yellow-900/20 rounded-2xl blur-2xl" />
+            <div className="relative aspect-square rounded-2xl border border-yellow-500/30 overflow-hidden">
+              <Image
+                src={HERO_CHAMPION_PORTRAIT.src}
+                alt={HERO_CHAMPION_PORTRAIT.alt}
+                fill
+                sizes="(max-width: 1024px) 100vw, 600px"
+                className="object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+              <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur border border-yellow-500/40">
+                <Crown className="w-4 h-4 text-yellow-500" />
+                <span className="text-[11px] font-bold uppercase tracking-widest text-yellow-500">
+                  The Crown
+                </span>
+              </div>
             </div>
           </div>
 
@@ -555,9 +696,20 @@ function ChampionSection() {
               <p className="text-yellow-500 font-bold text-sm mb-2 uppercase tracking-widest">
                 Defending Champion
               </p>
-              <h2 className="text-5xl font-black text-white mb-2">
-                {champion ? `@${champion.username}` : 'The Reigning Voice'}
-              </h2>
+              <div className="flex items-center gap-4 mb-2">
+                {champion?.avatarUrl && (
+                  <Image
+                    src={champion.avatarUrl}
+                    alt={champion.username}
+                    width={56}
+                    height={56}
+                    className="w-14 h-14 rounded-full object-cover border-2 border-yellow-500/60"
+                  />
+                )}
+                <h2 className="text-5xl font-black text-white">
+                  {champion ? `@${champion.username}` : 'The Reigning Voice'}
+                </h2>
+              </div>
               <div className="flex items-center gap-2">
                 <Crown className="w-5 h-5 text-yellow-500" />
                 <p className="text-yellow-500 font-bold uppercase tracking-widest">
@@ -570,9 +722,28 @@ function ChampionSection() {
               The champion owns the song... until someone takes it.
             </p>
 
+            <div className="gold-panel grid grid-cols-2 gap-px bg-yellow-500/20 overflow-hidden">
+              <div className="bg-black/70 p-5 text-center">
+                <div className="text-3xl font-black text-yellow-400 tabular-nums">
+                  {streak}
+                </div>
+                <div className="text-[10px] md:text-xs text-gray-400 mt-1 uppercase tracking-widest">
+                  Win Streak
+                </div>
+              </div>
+              <div className="bg-black/70 p-5 text-center">
+                <div className="text-3xl font-black text-yellow-400 tabular-nums">
+                  {titleDefenses}
+                </div>
+                <div className="text-[10px] md:text-xs text-gray-400 mt-1 uppercase tracking-widest">
+                  Title Defenses
+                </div>
+              </div>
+            </div>
+
             <div className="bg-card/50 backdrop-blur border border-yellow-500/30 rounded-xl p-6">
               <p className="text-gray-400 text-sm mb-2 uppercase tracking-widest">
-                {streak} {streak === 1 ? 'Win' : 'Wins'} in a Row
+                Streak Meter
               </p>
               <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                 <div
@@ -1054,6 +1225,466 @@ function CTAFooter({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
         </div>
       </div>
     </section>
+  );
+}
+
+// ─── 9. Crown At Risk panel ─────────────────────────────────────────
+
+function CrownAtRiskPanel() {
+  const [data, setData] = useState<FeaturedSongRiskDto | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const f = await api.getFeaturedRisk();
+        if (!cancelled) setData(f);
+      } catch {
+        // Non-fatal
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!data) return null;
+  const { risk, song } = data;
+  const survival = risk.survivalChance;
+  // SVG progress ring math (r=42 inside a 100x100 viewport)
+  const r = 42;
+  const circumference = 2 * Math.PI * r;
+  const dashOffset = circumference * (1 - survival / 100);
+
+  const tone = riskTone(risk.riskLevel);
+
+  return (
+    <section className="bg-background py-20">
+      <div className="max-w-7xl mx-auto px-4">
+        <div className={`gold-panel relative overflow-hidden p-8 md:p-10`}>
+          <Image
+            src={HERO_CROWN_AT_RISK.src}
+            alt=""
+            fill
+            sizes="(max-width: 1280px) 100vw, 1280px"
+            className="object-cover opacity-50"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-black/85" />
+          <div className="relative grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-8 items-center">
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className={`w-5 h-5 ${tone.text}`} />
+                <h2 className={`text-2xl md:text-3xl font-black ${tone.text} tracking-widest uppercase`}>
+                  Crown at Risk
+                </h2>
+                <AlertTriangle className={`w-5 h-5 ${tone.text}`} />
+              </div>
+              <p className="text-gray-400 text-sm uppercase tracking-widest mb-6">
+                The crown on <span className="text-white">{song.title}</span> is under attack
+              </p>
+              <div className="flex items-center gap-6 mb-4">
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">
+                    Crown Risk
+                  </p>
+                  <p className={`text-4xl font-black ${tone.text}`}>
+                    {risk.riskLevel}
+                  </p>
+                </div>
+                <div className="text-gray-500 text-3xl">·</div>
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">
+                    Pending Challengers
+                  </p>
+                  <p className="text-4xl font-black text-white tabular-nums">
+                    {risk.pendingChallengers}
+                  </p>
+                </div>
+                {risk.lastBattleMarginPercent !== null && (
+                  <>
+                    <div className="text-gray-500 text-3xl">·</div>
+                    <div>
+                      <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">
+                        Last Margin
+                      </p>
+                      <p className="text-4xl font-black text-white tabular-nums">
+                        {risk.lastBattleMarginPercent}%
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="w-full h-2 bg-muted rounded-full overflow-hidden mb-2">
+                <div
+                  className={`h-full ${tone.bar} transition-all`}
+                  style={{ width: `${100 - survival}%` }}
+                />
+              </div>
+              <p className="text-xs text-gray-500 uppercase tracking-widest">
+                Challengers are {survival < 50 ? 'closing in' : 'circling'} ·
+                Champion survival chance{' '}
+                <span className={tone.text}>{survival}%</span>
+              </p>
+            </div>
+            <div className="relative w-44 h-44">
+              <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                <circle
+                  cx="50"
+                  cy="50"
+                  r={r}
+                  fill="none"
+                  stroke="rgba(255,255,255,0.08)"
+                  strokeWidth="8"
+                />
+                <circle
+                  cx="50"
+                  cy="50"
+                  r={r}
+                  fill="none"
+                  stroke={tone.ring}
+                  strokeWidth="8"
+                  strokeLinecap="round"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={dashOffset}
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className={`text-4xl font-black ${tone.text} tabular-nums`}>
+                  {survival}%
+                </span>
+                <span className="text-[10px] text-gray-400 uppercase tracking-widest mt-1">
+                  Survival
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function riskTone(level: RiskLevel) {
+  switch (level) {
+    case 'CRITICAL':
+      return {
+        text: 'text-red-500',
+        bar: 'bg-red-500',
+        ring: 'rgb(239,68,68)',
+      };
+    case 'HIGH':
+      return {
+        text: 'text-red-400',
+        bar: 'bg-red-400',
+        ring: 'rgb(248,113,113)',
+      };
+    case 'MODERATE':
+      return {
+        text: 'text-yellow-400',
+        bar: 'bg-yellow-400',
+        ring: 'rgb(250,204,21)',
+      };
+    case 'LOW':
+    default:
+      return {
+        text: 'text-green-400',
+        bar: 'bg-green-400',
+        ring: 'rgb(74,222,128)',
+      };
+  }
+}
+
+// ─── 10. Dethroned moment panel ─────────────────────────────────────
+
+function DethronedPanel() {
+  const [latest, setLatest] = useState<DethronementDto | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await api.getRecentDethronements(1);
+        if (!cancelled && list.length > 0) setLatest(list[0]);
+      } catch {
+        // Non-fatal
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!latest) return null;
+
+  return (
+    <section className="bg-background py-20">
+      <div className="max-w-7xl mx-auto px-4">
+        <div className="gold-panel relative bg-card/40 backdrop-blur overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 via-transparent to-red-600/10 pointer-events-none" />
+          <div className="relative grid grid-cols-1 md:grid-cols-[1fr_auto] gap-8 items-center p-8 md:p-10">
+            <div>
+              <p className="text-yellow-400 font-bold text-xs uppercase tracking-[0.3em] mb-2">
+                Dethroned!
+              </p>
+              <h2 className="text-3xl md:text-4xl font-black text-white mb-2">
+                A new Official Voice has been crowned
+              </h2>
+              {latest.songTitle && (
+                <p className="text-gray-300 mb-6">
+                  <span className="text-yellow-400 font-bold">
+                    {latest.songTitle}
+                  </span>
+                  {latest.songArtist && (
+                    <span className="text-gray-500"> · {latest.songArtist}</span>
+                  )}
+                </p>
+              )}
+              <div className="flex items-center gap-4 mb-6">
+                {latest.formerChampion && (
+                  <div className="flex items-center gap-2">
+                    {latest.formerChampion.avatarUrl && (
+                      <Image
+                        src={latest.formerChampion.avatarUrl}
+                        alt={latest.formerChampion.username}
+                        width={40}
+                        height={40}
+                        className="w-10 h-10 rounded-full object-cover opacity-50 grayscale border-2 border-gray-700"
+                      />
+                    )}
+                    <div>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-widest">
+                        Former
+                      </p>
+                      <p className="text-sm text-gray-400 line-through">
+                        @{latest.formerChampion.username}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                <div className="text-gray-600 text-xl">→</div>
+                {latest.newChampion && (
+                  <div className="flex items-center gap-2">
+                    {latest.newChampion.avatarUrl && (
+                      <Image
+                        src={latest.newChampion.avatarUrl}
+                        alt={latest.newChampion.username}
+                        width={48}
+                        height={48}
+                        className="w-12 h-12 rounded-full object-cover border-2 border-yellow-500"
+                      />
+                    )}
+                    <div>
+                      <p className="text-[10px] text-yellow-400 uppercase tracking-widest">
+                        New Crown
+                      </p>
+                      <p className="text-base font-bold text-white">
+                        @{latest.newChampion.username}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <Link
+                href={`/battle/${latest.battleId}`}
+                className="inline-flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-3 px-6 rounded-lg uppercase tracking-widest text-sm transition"
+              >
+                <Play className="w-4 h-4" />
+                Watch the Moment
+              </Link>
+            </div>
+            <div className="relative w-40 h-40 md:w-56 md:h-56 rounded-2xl overflow-hidden border border-yellow-500/40">
+              <div className="absolute inset-0 -m-4 bg-yellow-500/30 rounded-3xl blur-2xl pointer-events-none" />
+              <Image
+                src={HERO_DETHRONED.src}
+                alt={HERO_DETHRONED.alt}
+                fill
+                sizes="(max-width: 768px) 160px, 224px"
+                className="object-cover relative z-10"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── 11. Share cards row ─────────────────────────────────────────────
+
+function ShareCardsRow() {
+  const cards = [
+    {
+      title: 'Vote Now',
+      sub: 'Who deserves the song?',
+      icon: Vote,
+      tone: 'red' as const,
+      href: '#live-battle',
+    },
+    {
+      title: 'Challenge the Voice',
+      sub: 'Can you take the crown?',
+      icon: Mic,
+      tone: 'red' as const,
+      href: '/upload',
+    },
+    {
+      title: 'New Crown Moments',
+      sub: 'See the latest dethronement.',
+      icon: Crown,
+      tone: 'gold' as const,
+      href: '#',
+    },
+    {
+      title: 'The Crown Is Always at Risk',
+      sub: 'Defend it. Or take it.',
+      icon: Shield,
+      tone: 'gold' as const,
+      href: '#',
+    },
+  ];
+
+  const shareUrl =
+    typeof window !== 'undefined' ? window.location.origin : 'https://vocalmatch.app';
+  const shareText = 'VOCALMATCH — One song. Two voices. One crown.';
+
+  const tiktokUrl = 'https://www.tiktok.com/';
+  const instagramUrl = 'https://www.instagram.com/';
+  const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+    shareUrl,
+  )}`;
+
+  return (
+    <section className="bg-background py-20">
+      <div className="max-w-7xl mx-auto px-4">
+        <div className="relative w-full aspect-[21/9] md:aspect-[21/7] rounded-2xl overflow-hidden mb-10">
+          <Image
+            src={HERO_SHARE_POSTER.src}
+            alt={HERO_SHARE_POSTER.alt}
+            fill
+            sizes="(max-width: 1280px) 100vw, 1280px"
+            className="object-cover object-[center_30%]"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 p-6 md:p-10 text-center">
+            <p className="text-yellow-400 text-xs font-bold uppercase tracking-[0.3em] mb-2">
+              Share the moment
+            </p>
+            <h2 className="text-3xl md:text-5xl font-black text-white">
+              Take VOCALMATCH everywhere.
+            </h2>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {cards.map((c) => (
+            <ShareCard
+              key={c.title}
+              title={c.title}
+              sub={c.sub}
+              Icon={c.icon}
+              tone={c.tone}
+              href={c.href}
+              tiktokUrl={tiktokUrl}
+              instagramUrl={instagramUrl}
+              facebookUrl={facebookUrl}
+              shareText={shareText}
+              shareUrl={shareUrl}
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ShareCard({
+  title,
+  sub,
+  Icon,
+  tone,
+  href,
+  tiktokUrl,
+  instagramUrl,
+  facebookUrl,
+  shareText,
+  shareUrl,
+}: {
+  title: string;
+  sub: string;
+  Icon: typeof Crown;
+  tone: 'red' | 'gold';
+  href: string;
+  tiktokUrl: string;
+  instagramUrl: string;
+  facebookUrl: string;
+  shareText: string;
+  shareUrl: string;
+}) {
+  const accent = tone === 'red' ? 'text-red-500' : 'text-yellow-400';
+  const ring = tone === 'red' ? 'border-red-500/40' : 'border-yellow-400/40';
+
+  const copyShare = () => {
+    if (typeof navigator === 'undefined') return;
+    void navigator.clipboard.writeText(`${shareText} ${shareUrl}`).catch(() => {});
+  };
+
+  return (
+    <div className={`gold-panel bg-black/60 backdrop-blur p-5 flex flex-col`}>
+      <Link href={href} className="block flex-1">
+        <div className={`w-14 h-14 rounded-full border ${ring} flex items-center justify-center mb-4`}>
+          <Icon className={`w-7 h-7 ${accent}`} />
+        </div>
+        <h3 className="text-base font-black text-white mb-1 uppercase tracking-widest">
+          {title}
+        </h3>
+        <p className="text-sm text-gray-400 mb-4">{sub}</p>
+      </Link>
+      <div className="grid grid-cols-4 gap-2 pt-3 border-t border-yellow-500/20">
+        <a
+          href={tiktokUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Share on TikTok"
+          onClick={copyShare}
+          className="flex items-center justify-center py-2 rounded-md bg-white/5 hover:bg-white/10 transition"
+        >
+          <span className="text-[10px] font-bold text-white uppercase tracking-widest">
+            TikTok
+          </span>
+        </a>
+        <a
+          href={instagramUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Share on Instagram"
+          onClick={copyShare}
+          className="flex items-center justify-center py-2 rounded-md bg-white/5 hover:bg-white/10 transition"
+        >
+          <span className="text-[10px] font-bold text-white uppercase tracking-widest">
+            IG
+          </span>
+        </a>
+        <a
+          href={facebookUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Share on Facebook"
+          className="flex items-center justify-center py-2 rounded-md bg-white/5 hover:bg-white/10 transition"
+        >
+          <span className="text-[10px] font-bold text-white uppercase tracking-widest">
+            FB
+          </span>
+        </a>
+        <button
+          type="button"
+          onClick={copyShare}
+          aria-label="Copy share link"
+          className="flex items-center justify-center py-2 rounded-md bg-white/5 hover:bg-white/10 transition"
+        >
+          <Download className="w-3 h-3 text-white" />
+        </button>
+      </div>
+    </div>
   );
 }
 

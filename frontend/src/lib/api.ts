@@ -238,7 +238,43 @@ export interface SongDto {
   currentChampionUserId: string | null;
   currentChampionPerformanceId: string | null;
   currentChampionStreak: number;
+  currentChampionTitleDefenses: number;
   createdAt: string;
+}
+
+export type RiskLevel = 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
+
+export interface SongRisk {
+  survivalChance: number;
+  riskLevel: RiskLevel;
+  pendingChallengers: number;
+  lastBattleMarginPercent: number | null;
+}
+
+export interface FeaturedSongRiskDto {
+  song: SongDto;
+  champion: { username: string; avatarUrl: string | null } | null;
+  titleDefenses: number;
+  risk: SongRisk;
+}
+
+export interface DethronementDto {
+  battleId: string;
+  songId: string;
+  songTitle: string | null;
+  songArtist: string | null;
+  dethronedAt: string | null;
+  winnerVotePercent: number;
+  newChampion: {
+    userId: string;
+    username: string;
+    avatarUrl: string | null;
+  } | null;
+  formerChampion: {
+    userId: string;
+    username: string;
+    avatarUrl: string | null;
+  } | null;
 }
 
 export type BattleStatus =
@@ -400,6 +436,13 @@ export interface AuthResponse {
   user: AuthUser;
 }
 
+export interface PublicStats {
+  totalVotes: number;
+  totalBattles: number;
+  totalChallengers: number;
+  voicesRaised: number;
+}
+
 export interface VideoListParams {
   category?: string;
   uploaderId?: string;
@@ -415,6 +458,8 @@ export interface VideoListParams {
 // ─── API ────────────────────────────────────────────────────────────
 
 export const api = {
+  getStats: () => request<PublicStats>('/stats'),
+
   signup: (body: { email: string; username: string; password: string }) =>
     request<AuthResponse>('/auth/signup', {
       method: 'POST',
@@ -533,6 +578,10 @@ export const api = {
     }>(`/songs${suffix}`);
   },
   getSong: (id: string) => request<SongDto>(`/songs/${id}`),
+  getFeaturedRisk: () =>
+    request<FeaturedSongRiskDto | null>('/songs/featured/risk'),
+  getRecentDethronements: (limit = 5) =>
+    request<DethronementDto[]>(`/battles/dethronements/recent?limit=${limit}`),
   createSong: (body: Pick<SongDto, 'title' | 'artist'> & { trackUrl?: string; coverArtUrl?: string }) =>
     request<SongDto>('/songs', { method: 'POST', body: JSON.stringify(body) }),
   updateSong: (
