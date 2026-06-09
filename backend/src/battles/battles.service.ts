@@ -440,7 +440,10 @@ export class BattlesService {
    * adjacent pairs in code — cleaner than the equivalent self-join SQL
    * and fast enough for the homepage volume.
    */
-  async findRecentDethronements(limit: number) {
+  async findRecentDethronements(
+    limit: number,
+    predicate?: (t: { current: Battle; previous: Battle }) => boolean,
+  ) {
     const recent = await this.battles.find({
       where: { status: 'completed' },
       order: { closedAt: 'DESC' },
@@ -468,12 +471,16 @@ export class BattlesService {
         }
       }
     }
-    transitions.sort(
+
+    // Personalization predicate (optional). Marquee path passes none.
+    const filtered = predicate ? transitions.filter(predicate) : transitions;
+
+    filtered.sort(
       (a, b) =>
         (b.current.closedAt?.getTime() ?? 0) -
         (a.current.closedAt?.getTime() ?? 0),
     );
-    const top = transitions.slice(0, limit);
+    const top = filtered.slice(0, limit);
 
     if (top.length === 0) return [];
 
@@ -520,6 +527,11 @@ export class BattlesService {
         songArtist: song?.artist ?? null,
         dethronedAt: current.closedAt,
         winnerVotePercent: marginPercent,
+        winnerPerformanceId: current.winnerPerformanceId,
+        loserPerformanceId:
+          current.winnerPerformanceId === current.performanceAId
+            ? current.performanceBId
+            : current.performanceAId,
         newChampion: newChamp
           ? {
               userId: newChamp.id,
