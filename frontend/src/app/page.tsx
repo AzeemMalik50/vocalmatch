@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   AlertTriangle,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Crown,
@@ -26,11 +27,15 @@ import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import {
   api,
+  AtRiskCrownDto,
   BattleDto,
   DethronementDto,
   FeaturedSongRiskDto,
   GENRE_OPTIONS,
+  PersonalDethronementDto,
   RiskLevel,
+  SongDto,
+  SongRisk,
   SORT_LABELS,
   VideoDto,
   VideoSort,
@@ -77,16 +82,16 @@ export default function HomePage() {
       <Nav />
       {user && user.profileCompleted === false && <ProfileNudge />}
       <Hero user={user} />
-      <LiveBattle />
-      <CrownAtRiskPanel />
-      <ChallengeFlow user={user} />
-      <ChampionSection />
-      <DethronedPanel />
-      <HowItWorks />
-      <StageCarousel />
-      <WinnersCarousel />
-      <ShareCardsRow />
-      <CTAFooter user={user} />
+      <Reveal><LiveBattle /></Reveal>
+      <Reveal><CrownAtRiskPanel /></Reveal>
+      <Reveal><ChallengeFlow user={user} /></Reveal>
+      <Reveal><ChampionSection /></Reveal>
+      <Reveal><DethronedPanel /></Reveal>
+      <Reveal><HowItWorks /></Reveal>
+      <Reveal><StageCarousel /></Reveal>
+      <Reveal><WinnersCarousel /></Reveal>
+      <Reveal><ShareCardsRow /></Reveal>
+      <Reveal><CTAFooter user={user} /></Reveal>
       <Footer />
     </div>
   );
@@ -164,14 +169,14 @@ function Hero({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
       <div className="relative z-10 max-w-7xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center min-h-[calc(100vh-12rem)] py-12">
         <div className="space-y-6">
           <div>
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-black text-white leading-tight">
-              ONE SONG.
+            <h1 className="font-display text-6xl md:text-7xl lg:text-8xl text-white leading-[0.95]">
+              One Song.
             </h1>
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-black text-white leading-tight">
-              TWO VOICES.
+            <h1 className="font-display text-6xl md:text-7xl lg:text-8xl text-white leading-[0.95]">
+              Two Voices.
             </h1>
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-black text-red-600 leading-tight">
-              ONE CROWN.
+            <h1 className="font-display text-6xl md:text-7xl lg:text-8xl text-red-600 leading-[0.95]">
+              One Crown.
             </h1>
           </div>
           <p className="text-sm md:text-base font-bold uppercase tracking-[0.2em] text-yellow-400">
@@ -209,6 +214,22 @@ function Hero({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
           <HeroStat value={stats.battles} label="Battles" />
           <HeroStat value={stats.challengers} label="Challengers" />
           <HeroStat value={stats.voicesRaised} label="Voices Raised" />
+        </div>
+
+        <div className="mt-8 flex justify-center">
+          <Link
+            href="#live-battle"
+            aria-label="Scroll to the live battle"
+            className="group inline-flex flex-col items-center gap-1 text-yellow-400/70 hover:text-yellow-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black rounded-full p-2 transition"
+          >
+            <span className="text-[10px] font-bold uppercase tracking-[0.4em]">
+              See the Battle
+            </span>
+            <ChevronDown
+              aria-hidden="true"
+              className="w-5 h-5 transition group-hover:translate-y-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-y-0"
+            />
+          </Link>
         </div>
       </div>
     </section>
@@ -317,7 +338,7 @@ function LiveBattle() {
   }, [battle?.votingClosesAt]);
 
   return (
-    <section id="live-battle" className="bg-background py-20">
+    <section id="live-battle" className="bg-background py-12 md:py-20">
       <div className="max-w-7xl mx-auto px-4">
         <div className="relative w-full h-56 md:h-72 lg:h-80 rounded-2xl overflow-hidden mb-12">
           <Image
@@ -466,10 +487,12 @@ function BattleSideCard({
           className={`aspect-square bg-gradient-to-br ${gradientFrom} rounded-xl mb-4 flex items-center justify-center overflow-hidden relative`}
         >
           {performance.thumbnailUrl ? (
-            <img
+            <Image
               src={performance.thumbnailUrl}
               alt={performance.title}
-              className="w-full h-full object-cover"
+              fill
+              sizes="(max-width: 1024px) 100vw, 400px"
+              className="object-cover"
             />
           ) : (
             <div
@@ -507,7 +530,7 @@ function ChallengeFlow({
     : '/signup?next=/upload?challenge=1';
 
   return (
-    <section className="bg-background py-20">
+    <section className="bg-background py-12 md:py-20">
       <div className="max-w-7xl mx-auto px-4">
         <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-10 lg:gap-16 items-center mb-12">
           <div className="relative w-full max-w-xs mx-auto lg:mx-0 aspect-square rounded-2xl overflow-hidden">
@@ -668,7 +691,7 @@ function ChampionSection() {
   const barPercent = Math.min((streak / 10) * 100, 100);
 
   return (
-    <section className="bg-background py-20">
+    <section className="bg-background py-12 md:py-20">
       <div className="max-w-7xl mx-auto px-4">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div className="relative">
@@ -799,11 +822,13 @@ function HowItWorks() {
   ];
 
   return (
-    <section className="bg-background py-20">
+    <section className="bg-background py-12 md:py-20">
       <div className="max-w-7xl mx-auto px-4">
-        <h2 className="text-4xl font-black text-white mb-16 text-center">
-          HOW IT WORKS
-        </h2>
+        <SectionHeader
+          eyebrow="The Loop"
+          title="How It Works"
+          subtitle="Four steps. One crown. Repeat forever."
+        />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
           {steps.map((step, index) => {
@@ -888,16 +913,14 @@ function StageCarousel() {
   };
 
   return (
-    <section className="bg-background py-20">
+    <section className="bg-background py-12 md:py-20">
       <div className="max-w-7xl mx-auto px-4">
-        <div className="flex items-center justify-between mb-12">
-          <div>
-            <h2 className="text-4xl font-black text-white mb-2">THE STAGE</h2>
-            <p className="text-gray-400">
-              New performances. New challengers. New legends.
-            </p>
-          </div>
-        </div>
+        <SectionHeader
+          eyebrow="Spotlight"
+          title="The Stage"
+          subtitle="New performances. New challengers. New legends."
+          align="left"
+        />
 
         <div className="bg-card/50 backdrop-blur border border-border rounded-xl p-6 mb-8">
           <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center">
@@ -1007,10 +1030,12 @@ function StageCard({ video }: { video: VideoDto }) {
       <div className="relative bg-card/50 backdrop-blur border border-border rounded-xl overflow-hidden hover:border-red-600 transition">
         <div className="aspect-video bg-gradient-to-br from-red-600/30 to-red-900/30 relative flex items-center justify-center overflow-hidden">
           {video.thumbnailUrl && (
-            <img
+            <Image
               src={video.thumbnailUrl}
               alt={video.title}
-              className="absolute inset-0 w-full h-full object-cover"
+              fill
+              sizes="(max-width: 768px) 100vw, 320px"
+              className="object-cover"
             />
           )}
           <div className="absolute inset-0 bg-black/20 group-hover/card:bg-black/40 transition" />
@@ -1034,13 +1059,15 @@ function StageCard({ video }: { video: VideoDto }) {
             {video.songTitle ??
               (video.uploader ? `@${video.uploader.username}` : '')}
           </p>
-          <div className="flex items-center justify-between text-xs text-gray-500">
+          <div className="flex items-center justify-between text-xs text-gray-400">
             <div className="flex items-center gap-1 tabular">
-              <Eye className="w-4 h-4" />
-              <span>{formatStat(video.viewCount)}</span>
+              <Eye className="w-4 h-4" aria-hidden="true" />
+              <span aria-label={`${formatStat(video.viewCount)} views`}>
+                {formatStat(video.viewCount)}
+              </span>
             </div>
             {video.uploader && (
-              <p className="text-xs text-gray-500 truncate">
+              <p className="text-xs text-gray-400 truncate">
                 @{video.uploader.username}
               </p>
             )}
@@ -1116,11 +1143,13 @@ function WinnersCarousel() {
   if (!loading && winners.length === 0) return null;
 
   return (
-    <section className="bg-background py-20">
+    <section className="bg-background py-12 md:py-20">
       <div className="max-w-7xl mx-auto px-4">
-        <h2 className="text-4xl font-black text-white mb-12 text-center">
-          RECENT WINNERS
-        </h2>
+        <SectionHeader
+          eyebrow="Crowned"
+          title="Recent Winners"
+          subtitle="The latest voices to take a song."
+        />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {loading
@@ -1231,37 +1260,105 @@ function CTAFooter({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
 // ─── 9. Crown At Risk panel ─────────────────────────────────────────
 
 function CrownAtRiskPanel() {
-  const [data, setData] = useState<FeaturedSongRiskDto | null>(null);
+  const { user } = useAuth();
+  const [marquee, setMarquee] = useState<FeaturedSongRiskDto | null>(null);
+  const [personal, setPersonal] = useState<AtRiskCrownDto | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // 3-state lookup: authed → try personal → fall back to marquee.
       try {
+        if (user) {
+          const mine = await api.getMyAtRiskCrowns();
+          if (!cancelled && mine.length > 0) {
+            setPersonal(mine[0]);
+            return;
+          }
+        }
         const f = await api.getFeaturedRisk();
-        if (!cancelled) setData(f);
+        if (!cancelled) setMarquee(f);
       } catch {
-        // Non-fatal
+        try {
+          const f = await api.getFeaturedRisk();
+          if (!cancelled) setMarquee(f);
+        } catch {
+          /* both failed → panel renders nothing */
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [user?.id]);
 
-  if (!data) return null;
-  const { risk, song } = data;
+  if (personal) {
+    return (
+      <CrownAtRiskPanelView
+        eyebrow="Your Crown at Risk"
+        subtitle={
+          personal.mode === 'champion' ? (
+            <>
+              You currently champion{' '}
+              <span className="text-white">{personal.song.title}</span> · defend it
+            </>
+          ) : (
+            <>
+              The crown on{' '}
+              <span className="text-white">{personal.song.title}</span> (your vote) is under attack
+            </>
+          )
+        }
+        song={personal.song}
+        risk={personal.risk}
+        personalised
+      />
+    );
+  }
+
+  if (!marquee) return null;
+  return (
+    <CrownAtRiskPanelView
+      eyebrow="Crown at Risk"
+      subtitle={
+        <>
+          The crown on{' '}
+          <span className="text-white">{marquee.song.title}</span> is under attack
+        </>
+      }
+      song={marquee.song}
+      risk={marquee.risk}
+      personalised={false}
+    />
+  );
+}
+
+function CrownAtRiskPanelView({
+  eyebrow,
+  subtitle,
+  song: _song,
+  risk,
+  personalised,
+}: {
+  eyebrow: string;
+  subtitle: React.ReactNode;
+  song: SongDto;
+  risk: SongRisk;
+  personalised: boolean;
+}) {
   const survival = risk.survivalChance;
   // SVG progress ring math (r=42 inside a 100x100 viewport)
   const r = 42;
   const circumference = 2 * Math.PI * r;
   const dashOffset = circumference * (1 - survival / 100);
-
   const tone = riskTone(risk.riskLevel);
 
   return (
-    <section className="bg-background py-20">
+    <section className="bg-background py-12 md:py-20">
       <div className="max-w-7xl mx-auto px-4">
-        <div className={`gold-panel relative overflow-hidden p-8 md:p-10`}>
+        <div
+          className={`gold-panel ${personalised ? 'personal-stake' : ''} relative overflow-hidden p-8 md:p-10`}
+        >
           <Image
             src={HERO_CROWN_AT_RISK.src}
             alt=""
@@ -1274,13 +1371,15 @@ function CrownAtRiskPanel() {
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <AlertTriangle className={`w-5 h-5 ${tone.text}`} />
-                <h2 className={`text-2xl md:text-3xl font-black ${tone.text} tracking-widest uppercase`}>
-                  Crown at Risk
+                <h2
+                  className={`text-2xl md:text-3xl font-black ${tone.text} tracking-widest uppercase`}
+                >
+                  {eyebrow}
                 </h2>
                 <AlertTriangle className={`w-5 h-5 ${tone.text}`} />
               </div>
               <p className="text-gray-400 text-sm uppercase tracking-widest mb-6">
-                The crown on <span className="text-white">{song.title}</span> is under attack
+                {subtitle}
               </p>
               <div className="flex items-center gap-6 mb-4">
                 <div>
@@ -1291,7 +1390,7 @@ function CrownAtRiskPanel() {
                     {risk.riskLevel}
                   </p>
                 </div>
-                <div className="text-gray-500 text-3xl">·</div>
+                <div className="text-gray-500 text-3xl" aria-hidden="true">·</div>
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">
                     Pending Challengers
@@ -1302,7 +1401,7 @@ function CrownAtRiskPanel() {
                 </div>
                 {risk.lastBattleMarginPercent !== null && (
                   <>
-                    <div className="text-gray-500 text-3xl">·</div>
+                    <div className="text-gray-500 text-3xl" aria-hidden="true">·</div>
                     <div>
                       <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">
                         Last Margin
@@ -1320,7 +1419,7 @@ function CrownAtRiskPanel() {
                   style={{ width: `${100 - survival}%` }}
                 />
               </div>
-              <p className="text-xs text-gray-500 uppercase tracking-widest">
+              <p className="text-xs text-gray-400 uppercase tracking-widest">
                 Challengers are {survival < 50 ? 'closing in' : 'circling'} ·
                 Champion survival chance{' '}
                 <span className={tone.text}>{survival}%</span>
@@ -1399,32 +1498,75 @@ function riskTone(level: RiskLevel) {
 function DethronedPanel() {
   const [latest, setLatest] = useState<DethronementDto | null>(null);
 
+  const { user } = useAuth();
+  const [personal, setPersonal] = useState<PersonalDethronementDto | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
+        if (user) {
+          const mine = await api.getMyRecentDethronements();
+          if (!cancelled && mine.length > 0) {
+            setPersonal(mine[0]);
+            return;
+          }
+        }
         const list = await api.getRecentDethronements(1);
         if (!cancelled && list.length > 0) setLatest(list[0]);
       } catch {
-        // Non-fatal
+        try {
+          const list = await api.getRecentDethronements(1);
+          if (!cancelled && list.length > 0) setLatest(list[0]);
+        } catch {
+          /* both failed → panel renders nothing */
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [user?.id]);
 
+  if (personal) {
+    const eyebrow =
+      personal.yourRole === 'former-champion'
+        ? 'You Just Lost the Crown'
+        : 'Your Pick Got Dethroned';
+    return (
+      <DethronedPanelView latest={personal} eyebrow={eyebrow} personalised />
+    );
+  }
   if (!latest) return null;
-
   return (
-    <section className="bg-background py-20">
+    <DethronedPanelView
+      latest={latest}
+      eyebrow="Dethroned!"
+      personalised={false}
+    />
+  );
+}
+
+function DethronedPanelView({
+  latest,
+  eyebrow,
+  personalised,
+}: {
+  latest: DethronementDto;
+  eyebrow: string;
+  personalised: boolean;
+}) {
+  return (
+    <section className="bg-background py-12 md:py-20">
       <div className="max-w-7xl mx-auto px-4">
-        <div className="gold-panel relative bg-card/40 backdrop-blur overflow-hidden">
+        <div
+          className={`gold-panel ${personalised ? 'personal-stake' : ''} relative bg-card/40 backdrop-blur overflow-hidden`}
+        >
           <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 via-transparent to-red-600/10 pointer-events-none" />
           <div className="relative grid grid-cols-1 md:grid-cols-[1fr_auto] gap-8 items-center p-8 md:p-10">
             <div>
               <p className="text-yellow-400 font-bold text-xs uppercase tracking-[0.3em] mb-2">
-                Dethroned!
+                {eyebrow}
               </p>
               <h2 className="text-3xl md:text-4xl font-black text-white mb-2">
                 A new Official Voice has been crowned
@@ -1435,7 +1577,7 @@ function DethronedPanel() {
                     {latest.songTitle}
                   </span>
                   {latest.songArtist && (
-                    <span className="text-gray-500"> · {latest.songArtist}</span>
+                    <span className="text-gray-400"> · {latest.songArtist}</span>
                   )}
                 </p>
               )}
@@ -1452,7 +1594,7 @@ function DethronedPanel() {
                       />
                     )}
                     <div>
-                      <p className="text-[10px] text-gray-500 uppercase tracking-widest">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-widest">
                         Former
                       </p>
                       <p className="text-sm text-gray-400 line-through">
@@ -1461,7 +1603,7 @@ function DethronedPanel() {
                     </div>
                   </div>
                 )}
-                <div className="text-gray-600 text-xl">→</div>
+                <div className="text-gray-500 text-xl" aria-hidden="true">→</div>
                 {latest.newChampion && (
                   <div className="flex items-center gap-2">
                     {latest.newChampion.avatarUrl && (
@@ -1489,7 +1631,7 @@ function DethronedPanel() {
                 className="inline-flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-3 px-6 rounded-lg uppercase tracking-widest text-sm transition"
               >
                 <Play className="w-4 h-4" />
-                Watch the Moment
+                {personalised ? 'Watch What Happened' : 'Watch the Moment'}
               </Link>
             </div>
             <div className="relative w-40 h-40 md:w-56 md:h-56 rounded-2xl overflow-hidden border border-yellow-500/40">
@@ -1554,7 +1696,7 @@ function ShareCardsRow() {
   )}`;
 
   return (
-    <section className="bg-background py-20">
+    <section className="bg-background py-12 md:py-20">
       <div className="max-w-7xl mx-auto px-4">
         <div className="relative w-full aspect-[21/9] md:aspect-[21/7] rounded-2xl overflow-hidden mb-10">
           <Image
@@ -1684,6 +1826,97 @@ function ShareCard({
           <Download className="w-3 h-3 text-white" />
         </button>
       </div>
+    </div>
+  );
+}
+
+// ─── Shared section header ──────────────────────────────────────────
+
+/**
+ * Unified eyebrow + headline pattern. Use across "standard" sections
+ * (How It Works, The Stage, Recent Winners…) so the page reads as
+ * one editorial system rather than ten separately-styled blocks.
+ *
+ * Sections that have a distinct in-panel header treatment (Hero,
+ * Live Battle banner, Crown at Risk, Dethroned, Share Cards) keep
+ * their own — those are deliberately differentiated by composition.
+ */
+function SectionHeader({
+  eyebrow,
+  title,
+  subtitle,
+  align = 'center',
+}: {
+  eyebrow?: string;
+  title: string;
+  subtitle?: string;
+  align?: 'center' | 'left';
+}) {
+  const alignClass = align === 'center' ? 'text-center mx-auto' : 'text-left';
+  return (
+    <div className={`mb-12 max-w-3xl ${alignClass}`}>
+      {eyebrow && (
+        <p className="text-yellow-400 font-bold text-xs uppercase tracking-[0.3em] mb-3">
+          {eyebrow}
+        </p>
+      )}
+      <h2 className="text-3xl md:text-4xl lg:text-5xl font-black text-white tracking-tight uppercase">
+        {title}
+      </h2>
+      {subtitle && (
+        <p className="mt-3 text-gray-400 text-base md:text-lg">{subtitle}</p>
+      )}
+    </div>
+  );
+}
+
+// ─── Scroll reveal ──────────────────────────────────────────────────
+
+/**
+ * Fade + slide-up wrapper that triggers once when the element enters the
+ * viewport. Respects prefers-reduced-motion: skips the animation entirely
+ * and renders the content in its final state. Threshold + rootMargin are
+ * tuned so the reveal starts slightly before the section is fully on
+ * screen — feels organic, not abrupt.
+ */
+function Reveal({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useState(false);
+
+  useEffect(() => {
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+      setShown(true);
+      return;
+    }
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            setShown(true);
+            io.disconnect();
+            break;
+          }
+        }
+      },
+      { threshold: 0.12, rootMargin: '0px 0px -8% 0px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      className={`transition-all duration-700 ease-out motion-reduce:transition-none ${
+        shown ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+      }`}
+    >
+      {children}
     </div>
   );
 }

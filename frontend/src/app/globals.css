@@ -208,6 +208,33 @@ html, body {
     0 0 60px rgba(var(--c-spotlight) / 0.18);
 }
 
+/* Personalized-stake panel framing. Layered on top of .gold-panel for
+   surfaces showing the signed-in user's own crown / dethronement —
+   visually louder so the user can tell it's about them, not the marquee.
+   The ::before pseudo-element is the "FOR YOU" pill in the corner. */
+.personal-stake {
+  box-shadow:
+    0 0 0 1px rgba(var(--c-gold) / 0.6),
+    0 0 28px rgba(var(--c-spotlight) / 0.35),
+    0 0 70px rgba(var(--c-spotlight) / 0.15);
+}
+.personal-stake::before {
+  content: 'FOR YOU';
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 40;
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.3em;
+  color: rgb(var(--c-gold));
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(var(--c-gold) / 0.5);
+  border-radius: 9999px;
+  padding: 0.25rem 0.625rem;
+  pointer-events: none;
+}
+
 /* ─── Prestige + danger utility classes ───────────────────────────────
    Phase 3 emotional layer. Use sparingly — these are loud effects.
    crown-glow:   gold halo for champion identity (defending-champion card,
@@ -259,6 +286,28 @@ html, body {
   background-repeat: repeat;
   opacity: 0.6;
   mix-blend-mode: screen;
+}
+
+/* Respect user motion preference. Neutralizes all keyframe-driven
+   effects (crimson pulse, spotlight sweep, crown pulse, skeleton
+   shimmer) and clamps any property-based transition to a near-zero
+   duration so layouts settle instantly without the cinematic flair. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .crimson-pulse,
+  .skeleton,
+  .animate-pulse-glow,
+  .animate-spotlight-sweep,
+  .animate-crown-pulse {
+    animation: none !important;
+  }
 }
 
 /* Skeleton shimmer used for loading cards */
