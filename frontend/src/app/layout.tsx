@@ -39,25 +39,19 @@ export const metadata: Metadata = {
   },
 };
 
-// Runs before React hydrates to set the right theme class on <html>.
-// Prevents a flash of the wrong palette on first paint.
-const themeBootstrap = `
-(function(){try{
-  var s=localStorage.getItem('vm_theme');
-  var t = s==='light'||s==='dark' ? s
-    : (window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
-  if(t==='light') document.documentElement.classList.add('theme-light');
-  document.documentElement.style.colorScheme = t;
-}catch(e){}})();
-`;
-
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    // VOCALMATCH is a cinematic dark-only brand surface. Pin the dark
+    // palette globally — colorScheme on <html> tells the browser to use
+    // dark chrome (form inputs, scrollbars, native autofill); .vm-force-dark
+    // on <body> pins our design tokens to the Battlefield palette for the
+    // entire tree. ThemeProvider stays for now in case a downstream
+    // component needs `useTheme`; the toggle UI has been removed.
+    <html lang="en" style={{ colorScheme: 'dark' }}>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
@@ -69,9 +63,8 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Allura&family=Inter:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
-        <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
       </head>
-      <body className="stage-bg vignette min-h-screen">
+      <body className="vm-force-dark stage-bg vignette min-h-screen">
         <ThemeProvider>
           <AuthProvider>{children}</AuthProvider>
         </ThemeProvider>
