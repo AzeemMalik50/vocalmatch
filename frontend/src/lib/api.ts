@@ -265,6 +265,8 @@ export interface DethronementDto {
   songArtist: string | null;
   dethronedAt: string | null;
   winnerVotePercent: number;
+  winnerPerformanceId: string;
+  loserPerformanceId: string;
   newChampion: {
     userId: string;
     username: string;
@@ -275,6 +277,19 @@ export interface DethronementDto {
     username: string;
     avatarUrl: string | null;
   } | null;
+}
+
+export interface AtRiskCrownDto {
+  mode: 'champion' | 'voter';
+  song: SongDto;
+  champion: { username: string; avatarUrl: string | null } | null;
+  titleDefenses: number;
+  risk: SongRisk;
+}
+
+export interface PersonalDethronementDto extends DethronementDto {
+  mode: 'champion' | 'voter';
+  yourRole: 'former-champion' | 'voted-for-loser';
 }
 
 export type BattleStatus =
@@ -582,6 +597,10 @@ export const api = {
     request<FeaturedSongRiskDto | null>('/songs/featured/risk'),
   getRecentDethronements: (limit = 5) =>
     request<DethronementDto[]>(`/battles/dethronements/recent?limit=${limit}`),
+  getMyAtRiskCrowns: () =>
+    request<AtRiskCrownDto[]>('/users/me/at-risk-crowns'),
+  getMyRecentDethronements: () =>
+    request<PersonalDethronementDto[]>('/users/me/recent-dethronements'),
   createSong: (body: Pick<SongDto, 'title' | 'artist'> & { trackUrl?: string; coverArtUrl?: string }) =>
     request<SongDto>('/songs', { method: 'POST', body: JSON.stringify(body) }),
   updateSong: (
