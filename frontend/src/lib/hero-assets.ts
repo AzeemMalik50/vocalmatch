@@ -58,7 +58,7 @@ export const HERO_SHARE_POSTER = {
 };
 
 export const BRAND_LOGO = {
-  src: '/hero/vocalmatch-logo1.png',
+  src: '/hero/vocalmatch-logo.png',
   alt: 'VOCALMATCH',
   width: 1024,
   height: 1024,
