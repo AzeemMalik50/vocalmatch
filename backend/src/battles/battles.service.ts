@@ -125,7 +125,40 @@ export class BattlesService {
       status: 'live',
       createdByAdminId: adminId,
     });
-    return this.battles.save(battle);
+    const saved = await this.battles.save(battle);
+
+    // Bug #22 — `createBattleFromChallenge` already notifies both
+    // performers, but a plain admin-created battle (outside the Red
+    // Phone flow) never told either uploader their battle was now live.
+    // Fire-and-forget battle_starting notifications to both, with
+    // distinct copy so they read as "you're up" vs "you're being
+    // challenged" only when one side is actually the defending champion.
+    const battleHref = `/battle/${saved.id}`;
+    const song = await this.songs.findOne(saved.songId).catch(() => null);
+    const songLabel = song?.title ?? 'a Centerstage Song';
+    const championUserId = song?.currentChampionUserId ?? null;
+    for (const performer of [a, b]) {
+      const isChampion = championUserId === performer.uploaderId;
+      this.notifications
+        .create({
+          userId: performer.uploaderId,
+          kind: 'battle_starting',
+          title: isChampion
+            ? 'Your crown is being contested.'
+            : 'Your battle just went live.',
+          body: isChampion
+            ? `A challenger is taking you on for ${songLabel}. Voting is open now.`
+            : `You're going head-to-head on ${songLabel}. Share the link and rally your voters.`,
+          href: battleHref,
+        })
+        .catch((err) =>
+          this.logger.error(
+            `Failed to notify performer ${performer.uploaderId} of new battle: ${err}`,
+          ),
+        );
+    }
+
+    return saved;
   }
 
   // ─── Reads ──────────────────────────────────────────────────────
@@ -316,6 +349,10 @@ export class BattlesService {
 
   /**
    * Admin cancels a battle. Stat changes are NOT applied. Idempotent.
+   * Bug #17 — previously there was no realtime publish on cancel, so
+   * anyone holding the homepage or battle page open kept seeing the
+   * battle as "live" until they hit refresh. Push the status event so
+   * subscribers can react immediately.
    */
   async cancel(id: string) {
     const battle = await this.findOne(id);
@@ -324,7 +361,19 @@ export class BattlesService {
     }
     battle.status = 'cancelled';
     battle.closedAt = new Date();
-    return this.battles.save(battle);
+    const saved = await this.battles.save(battle);
+
+    this.realtime.publish(
+      RealtimeService.battleChannel(saved.id),
+      'status',
+      {
+        ...this.buildLiveCountsPayload(saved),
+        status: 'cancelled',
+        closedAt: saved.closedAt,
+      },
+    );
+
+    return saved;
   }
 
   /**
@@ -412,6 +461,39 @@ export class BattlesService {
           closedAt: battle.closedAt,
         },
       );
+
+      // Bug #4 / #22 — neither side was being notified that the battle
+      // closed. Fire a `battle_result` notification at the winner and
+      // (if distinct) the loser so the bell + email pipeline can pick
+      // it up. Fire-and-forget so a notification failure doesn't roll
+      // back the transaction.
+      const battleHref = `/battle/${battle.id}`;
+      if (winnerUser) {
+        this.notifications
+          .create({
+            userId: winnerUser.id,
+            kind: 'battle_result',
+            title: 'You took the crown.',
+            body: 'Your battle closed and the votes named you the Official Voice. Share the moment.',
+            href: battleHref,
+          })
+          .catch((err) =>
+            this.logger.error(`Failed to notify winner of battle_result: ${err}`),
+          );
+      }
+      if (loserUser && loserUser.id !== winnerUser?.id) {
+        this.notifications
+          .create({
+            userId: loserUser.id,
+            kind: 'battle_result',
+            title: 'Battle closed.',
+            body: 'You didn\'t take the crown this time. Watch the vote breakdown and plan the next challenge.',
+            href: battleHref,
+          })
+          .catch((err) =>
+            this.logger.error(`Failed to notify loser of battle_result: ${err}`),
+          );
+      }
 
       return battle;
     });

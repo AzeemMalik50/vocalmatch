@@ -81,14 +81,17 @@ export class VideosService {
       .skip(offset);
 
     // Visibility rules:
-    //   - own profile feed (uploaderId === viewerId): public + unlisted
-    //   - everywhere else: public only (private/unlisted are excluded)
+    //   - own profile feed (uploaderId === viewerId): public + unlisted + private
+    //   - everywhere else: public only (unlisted needs the direct URL,
+    //     private is owner-only)
+    // Bug #7 — the owner branch was missing 'private', so videos marked
+    // "Only You" disappeared even from the uploader's own profile.
     if (
       query.uploaderId &&
       query.viewerId &&
       query.uploaderId === query.viewerId
     ) {
-      qb.andWhere("v.visibility IN ('public', 'unlisted')");
+      qb.andWhere("v.visibility IN ('public', 'unlisted', 'private')");
     } else {
       qb.andWhere("v.visibility = 'public'");
     }
@@ -128,21 +131,14 @@ export class VideosService {
         qb.orderBy('v.viewCount', 'DESC').addOrderBy('v.createdAt', 'DESC');
         break;
       case 'trending':
-        // views per hour since upload, integer math (works on sqlite + postgres)
-        // Cast to float, hoist into an alias for ordering
-        qb.addSelect(
-          // (viewCount + 1) / (hours_since_creation + 2)
-          // Use julianday on sqlite, EXTRACT(EPOCH ...) on postgres — simple-array
-          // doesn't help here. We'll use SQL-portable createdAt epoch math via
-          // strftime('%s', ...) on sqlite and EXTRACT on postgres. To keep the
-          // query portable, we approximate using "viewCount * 1.0 / (julianday('now') - julianday(v.createdAt) + 0.05)"
-          // when on sqlite, otherwise EXTRACT. Simpler: rank by viewCount, then
-          // newer first as tiebreaker — practical until we add a tracked stat.
-          'v.viewCount',
-          'trending_score',
-        )
-          .orderBy('v.viewCount', 'DESC')
-          .addOrderBy('v.createdAt', 'DESC');
+        // Bug #23 — the previous implementation called `addSelect` with a
+        // duplicate column alias which, combined with the leftJoinAndSelect
+        // for uploader + the `.skip()` pagination, broke TypeORM's
+        // entity-hydration step and crashed the request. We don't actually
+        // need the alias: the ORDER BY references the real column directly.
+        // Practical "trending" ranking until we wire a tracked stat: most
+        // views, newer first as tiebreaker.
+        qb.orderBy('v.viewCount', 'DESC').addOrderBy('v.createdAt', 'DESC');
         break;
       case 'newest':
       default:
