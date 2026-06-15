@@ -44,26 +44,35 @@ export default function Nav() {
           {loading ? null : user ? (
             <>
               <NotificationBell />
+              {/* Bug #40 (new) — Admin link was `hidden md:inline-flex`
+                  so it disappeared on iPhone portrait. It now renders in
+                  every orientation; padding tightens on narrow widths
+                  so the row still fits. */}
               {user.isAdmin && (
                 <Link
                   href="/admin"
-                  className="hidden md:inline-flex items-center px-3 py-2 text-spotlight font-bold hover:opacity-90 transition-opacity uppercase tracking-widest text-xs whitespace-nowrap"
+                  className="inline-flex items-center px-2 sm:px-3 py-2 text-spotlight font-bold hover:opacity-90 transition-opacity uppercase tracking-widest text-xs whitespace-nowrap"
                   title="Admin dashboard"
                 >
                   Admin
                 </Link>
               )}
               {/* Upload is a singer action — admins don't have a singer surface,
-                  so we hide the prominent CTA for them. */}
+                  so we hide the prominent CTA for them.
+                  Bug #31 — previously the whole button was hidden on
+                  portrait iPhone (`hidden sm:inline-flex`). It now stays
+                  visible everywhere; the "Upload" label collapses to
+                  an icon-only button below the sm breakpoint. */}
               {!user.isAdmin && (
                 <Link
                   href="/upload"
-                  className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 bg-spotlight text-white font-bold hover:bg-spotlight-dim transition-colors rounded-md shadow-lg shadow-spotlight/20 whitespace-nowrap"
+                  aria-label="Upload performance"
+                  className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-spotlight text-white font-bold hover:bg-spotlight-dim transition-colors rounded-md shadow-lg shadow-spotlight/20 whitespace-nowrap"
                 >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                     <path d="M7 1v12M1 7h12" stroke="white" strokeWidth="2" />
                   </svg>
-                  Upload
+                  <span className="hidden sm:inline">Upload</span>
                 </Link>
               )}
 
@@ -140,15 +149,9 @@ export default function Nav() {
                         Upload performance
                       </Link>
                     )}
-                    {user.isAdmin && (
-                      <Link
-                        href="/admin"
-                        onClick={() => setMenuOpen(false)}
-                        className="md:hidden block px-4 py-3 text-sm font-semibold text-spotlight hover:bg-stage-800 transition-colors"
-                      >
-                        Admin dashboard
-                      </Link>
-                    )}
+                    {/* Admin link removed from the dropdown — the top-bar
+                        Admin link is now always visible (bug #40), so this
+                        duplicate would just be clutter. */}
                     <Link
                       href="/settings"
                       onClick={() => setMenuOpen(false)}

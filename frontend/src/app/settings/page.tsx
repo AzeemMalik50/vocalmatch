@@ -630,13 +630,17 @@ function DeleteAccountSection({ onDeleted }: { onDeleted: () => void }) {
     }
   };
 
+  // Bug #2 — the Delete Account section used red-300/red-200 text on a
+  // very-low-opacity red wash, which on the dark theme fell below the
+  // 4.5:1 contrast minimum. Bumped to red-100 / red-100/85 text and
+  // strengthened the background + border so the section is unmistakable.
   return (
-    <section className="bg-red-950/20 border border-red-900/40 rounded-2xl p-6 md:p-8">
+    <section className="bg-red-950/40 border border-red-700/60 rounded-2xl p-6 md:p-8">
       <div className="mb-5">
-        <h2 className="font-display text-xl font-bold text-red-300">
+        <h2 className="font-display text-xl font-bold text-red-100">
           Delete account
         </h2>
-        <p className="text-sm text-red-200/70 mt-1">
+        <p className="text-sm text-red-100/85 mt-1 leading-relaxed">
           Permanently remove your profile and all uploaded performances. This
           cannot be undone.
         </p>
@@ -646,7 +650,7 @@ function DeleteAccountSection({ onDeleted }: { onDeleted: () => void }) {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="px-5 py-3 text-sm font-bold border border-red-900/60 text-red-300 hover:bg-red-950/40 rounded-md transition-colors"
+          className="px-5 py-3 text-sm font-bold border border-red-500/70 text-red-100 hover:bg-red-900/40 rounded-md transition-colors"
         >
           I want to delete my account
         </button>
