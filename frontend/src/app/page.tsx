@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Copy,
   Crown,
   Download,
   Eye,
@@ -17,6 +18,7 @@ import {
   Mic,
   Music,
   Play,
+  Share2,
   Shield,
   Upload,
   Users,
@@ -169,13 +171,13 @@ function Hero({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
       <div className="relative z-10 max-w-7xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center min-h-[calc(100vh-12rem)] py-12">
         <div className="space-y-6">
           <div>
-            <h1 className="font-display text-6xl md:text-7xl lg:text-8xl text-white leading-[0.95]">
+            <h1 className="font-display text-5xl sm:text-6xl md:text-7xl lg:text-8xl text-white leading-[0.95]">
               One Song.
             </h1>
-            <h1 className="font-display text-6xl md:text-7xl lg:text-8xl text-white leading-[0.95]">
+            <h1 className="font-display text-5xl sm:text-6xl md:text-7xl lg:text-8xl text-white leading-[0.95]">
               Two Voices.
             </h1>
-            <h1 className="font-display text-6xl md:text-7xl lg:text-8xl text-red-600 leading-[0.95]">
+            <h1 className="font-display text-5xl sm:text-6xl md:text-7xl lg:text-8xl text-red-600 leading-[0.95]">
               One Crown.
             </h1>
           </div>
@@ -238,32 +240,82 @@ function Hero({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
 
 function HeroComposite() {
   return (
-    <div className="relative aspect-square w-full max-w-[34rem] mx-auto rounded-2xl overflow-hidden">
-      <div className="absolute inset-0 -m-6 bg-gradient-to-br from-red-600/30 to-amber-500/10 rounded-3xl blur-2xl pointer-events-none" />
-
-      <Image
-        src={HERO_MAIN.src}
-        alt={HERO_MAIN.alt}
-        fill
-        priority
-        sizes="(max-width: 1024px) 100vw, 600px"
-        className="object-cover relative z-10"
-      />
-
-      <div className="absolute inset-0 z-20 pointer-events-none bg-gradient-to-b from-black/40 via-transparent to-black/40" />
-
-      <div className="absolute top-4 left-4 z-30 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur border border-amber-400/40">
-        <Crown className="w-4 h-4 text-amber-400" />
-        <span className="text-[11px] font-bold uppercase tracking-widest text-amber-400">
-          Official Voice
-        </span>
+    <div className="relative aspect-square w-full max-w-[34rem] mx-auto">
+      {/* Twin halo cones — crimson left + gold right, meeting at the
+          fire spine in the artwork. Replaces the single radial blur so
+          the chrome echoes the dual-portrait composition. */}
+      <div aria-hidden="true" className="absolute -inset-10 pointer-events-none">
+        <div className="hero-cone-crimson absolute -left-[8%] top-[12%] h-[80%] w-[55%] rounded-full bg-red-600/40 blur-3xl" />
+        <div className="hero-cone-gold absolute -right-[8%] top-[12%] h-[80%] w-[55%] rounded-full bg-amber-400/25 blur-3xl" />
       </div>
 
-      <div className="absolute top-4 right-4 z-30 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur border border-red-500/40">
-        <Zap className="w-4 h-4 text-red-500" />
-        <span className="text-[11px] font-bold uppercase tracking-widest text-red-500">
-          Challenger
-        </span>
+      <div className="hero-frame hero-enter relative aspect-square w-full overflow-hidden rounded-2xl">
+        <Image
+          src={HERO_MAIN.src}
+          alt={HERO_MAIN.alt}
+          fill
+          priority
+          sizes="(max-width: 1024px) 100vw, 600px"
+          className="hero-kenburns relative z-0 object-cover"
+        />
+
+        {/* Letterbox bands — film-still framing. */}
+        <div aria-hidden="true" className="absolute inset-x-0 top-0 z-20 h-[5%] bg-black/85" />
+        <div aria-hidden="true" className="absolute inset-x-0 bottom-0 z-20 h-[5%] bg-black/85" />
+
+        {/* Cinematic vignette — keeps focus on the singers + fire spine. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-20 bg-[radial-gradient(ellipse_at_center,transparent_45%,rgba(0,0,0,0.6)_100%)]"
+        />
+
+        {/* Fine film grain — editorial polish. */}
+        <div
+          aria-hidden="true"
+          className="hero-grain pointer-events-none absolute inset-0 z-30 opacity-30 mix-blend-overlay"
+        />
+
+        {/* Slow diagonal light sweep — cinema rake. */}
+        <div
+          aria-hidden="true"
+          className="hero-sweep pointer-events-none absolute inset-0 z-30"
+        />
+
+        {/* Badges — alternating gold + crimson pulses out of phase. */}
+        <div className="animate-hero-badge-gold hero-enter hero-enter-delay-2 absolute left-4 top-[8%] z-40 inline-flex items-center gap-2 rounded-full border border-amber-400/50 bg-black/70 px-3 py-1.5 backdrop-blur">
+          <Crown className="h-4 w-4 text-amber-400" />
+          <span className="text-[11px] font-bold uppercase tracking-widest text-amber-400">
+            Official Voice
+          </span>
+        </div>
+
+        <div className="animate-hero-badge-crimson hero-enter hero-enter-delay-2 absolute right-4 top-[8%] z-40 inline-flex items-center gap-2 rounded-full border border-red-500/50 bg-black/70 px-3 py-1.5 backdrop-blur">
+          <Zap className="h-4 w-4 text-red-500" />
+          <span className="text-[11px] font-bold uppercase tracking-widest text-red-500">
+            Challenger
+          </span>
+        </div>
+
+        {/* Bottom-center "Tonight's Battle" chip — anchors the scene
+            as live + present. */}
+        <div className="hero-enter hero-enter-delay-3 absolute bottom-[8%] left-1/2 z-40 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-yellow-500/40 bg-black/75 px-4 py-1.5 backdrop-blur">
+          <span
+            aria-hidden="true"
+            className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500"
+          />
+          <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-gray-200">
+            Tonight&apos;s Battle
+          </span>
+        </div>
+      </div>
+
+      {/* Crown emblem — literalizes "One Crown" from the headline,
+          hangs off the top rim of the frame like a medallion. */}
+      <div
+        aria-hidden="true"
+        className="hero-enter hero-enter-delay-1 crown-glow absolute left-1/2 top-0 z-50 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-yellow-400/60 bg-black"
+      >
+        <Crown className="h-6 w-6 text-yellow-400" />
       </div>
     </div>
   );
@@ -288,6 +340,11 @@ function LiveBattle() {
   const [battle, setBattle] = useState<BattleDto | null>(null);
   const [a, setA] = useState<VideoDto | null>(null);
   const [b, setB] = useState<VideoDto | null>(null);
+  // Separate loading flag so the "no live battle" empty state only
+  // renders AFTER we've heard back from the server. Previously the
+  // empty state flashed during initial fetch because `!battle || !a || !b`
+  // is true on first render too.
+  const [loading, setLoading] = useState(true);
   const [remaining, setRemaining] = useState({
     days: 0,
     hours: 0,
@@ -313,6 +370,8 @@ function LiveBattle() {
         setB(perfB);
       } catch {
         // Non-fatal — section degrades to empty state.
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => {
@@ -364,7 +423,9 @@ function LiveBattle() {
           </div>
         </div>
 
-        {!battle || !a || !b ? (
+        {loading ? (
+          <LiveBattleSkeleton />
+        ) : !battle || !a || !b ? (
           <div className="gold-panel text-center py-16 bg-card/50 backdrop-blur">
             <p className="text-2xl font-bold text-white mb-2">
               No live battle right now.
@@ -412,6 +473,44 @@ function LiveBattle() {
         <BattlePillarsRow />
       </div>
     </section>
+  );
+}
+
+function LiveBattleSkeleton() {
+  // Mirrors the loaded 3-column layout (side card | VS + countdown | side
+  // card) so the section doesn't reflow when the data arrives. Uses the
+  // existing `.skeleton` shimmer class from globals.css.
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8" aria-busy="true" aria-label="Loading live battle">
+      <div className="bg-card/50 backdrop-blur border border-border rounded-2xl p-6">
+        <div className="aspect-square rounded-xl skeleton mb-4" />
+        <div className="h-9 w-9 rounded-full skeleton mb-3" />
+        <div className="h-4 w-24 skeleton mb-2 rounded" />
+        <div className="h-3 w-32 skeleton rounded" />
+      </div>
+
+      <div className="flex flex-col items-center justify-center gap-6">
+        <div className="text-6xl font-black text-white/30">VS</div>
+        <div className="bg-card/50 backdrop-blur border border-border rounded-2xl p-8 w-full">
+          <div className="grid grid-cols-4 gap-4 text-center">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i}>
+                <div className="h-8 w-full skeleton rounded mb-2" />
+                <div className="h-3 w-10 skeleton rounded mx-auto" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="h-12 w-full skeleton rounded-lg" />
+      </div>
+
+      <div className="bg-card/50 backdrop-blur border border-border rounded-2xl p-6">
+        <div className="aspect-square rounded-xl skeleton mb-4" />
+        <div className="h-9 w-9 rounded-full skeleton mb-3" />
+        <div className="h-4 w-24 skeleton mb-2 rounded" />
+        <div className="h-3 w-32 skeleton rounded" />
+      </div>
+    </div>
   );
 }
 
@@ -486,6 +585,12 @@ function BattleSideCard({
         <div
           className={`aspect-square bg-gradient-to-br ${gradientFrom} rounded-xl mb-4 flex items-center justify-center overflow-hidden relative`}
         >
+          {/* Visual fallback chain:
+              1. Performance thumbnail (best — actually shows the take)
+              2. Singer's profile photo (next best — at least the person)
+              3. Big username initial (we always have a username)
+              The previous empty red square gave no signal about who's
+              singing; the avatar/initial fallback fixes that. */}
           {performance.thumbnailUrl ? (
             <Image
               src={performance.thumbnailUrl}
@@ -494,6 +599,38 @@ function BattleSideCard({
               sizes="(max-width: 1024px) 100vw, 400px"
               className="object-cover"
             />
+          ) : performance.uploader?.avatarUrl ? (
+            <>
+              <Image
+                src={performance.uploader.avatarUrl}
+                alt={performance.uploader.username}
+                fill
+                sizes="(max-width: 1024px) 100vw, 400px"
+                className="object-cover"
+              />
+              {/* Soft scrim so the play badge still reads against
+                  brightly-lit avatar photos. */}
+              <div
+                aria-hidden="true"
+                className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"
+              />
+              <div
+                className={`relative w-14 h-14 ${playBg} backdrop-blur-sm rounded-full flex items-center justify-center border border-white/20 shadow-lg`}
+              >
+                <Play className={`w-7 h-7 ${accentColor} fill-current`} />
+              </div>
+            </>
+          ) : performance.uploader ? (
+            <div className="relative flex flex-col items-center justify-center w-full h-full">
+              <span className="font-display text-6xl md:text-7xl font-black text-white/85 leading-none">
+                {performance.uploader.username[0]?.toUpperCase()}
+              </span>
+              <div
+                className={`mt-4 w-14 h-14 ${playBg} backdrop-blur-sm rounded-full flex items-center justify-center border border-white/20`}
+              >
+                <Play className={`w-7 h-7 ${accentColor} fill-current`} />
+              </div>
+            </div>
           ) : (
             <div
               className={`w-16 h-16 ${playBg} rounded-full flex items-center justify-center`}
@@ -502,17 +639,44 @@ function BattleSideCard({
             </div>
           )}
         </div>
-        <h3 className="text-xl font-bold text-white mb-1">{side}</h3>
+        {/* Bug #14 — the live battle card never rendered the
+            performer's avatar even when uploaded. Show it next to the
+            username, with the existing initial-fallback for users
+            without a photo. */}
+        {performance.uploader && (
+          <div className="flex items-center gap-2 mb-2">
+            <div
+              className={`relative h-9 w-9 shrink-0 overflow-hidden rounded-full border ${borderColor} bg-stage-800`}
+            >
+              {performance.uploader.avatarUrl ? (
+                <Image
+                  src={performance.uploader.avatarUrl}
+                  alt={performance.uploader.username}
+                  fill
+                  sizes="36px"
+                  className="object-cover"
+                />
+              ) : (
+                <span className="flex h-full w-full items-center justify-center text-xs font-bold text-haze">
+                  {performance.uploader.username[0]?.toUpperCase()}
+                </span>
+              )}
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-base font-bold text-white truncate">
+                @{performance.uploader.username}
+              </h3>
+              <p className={`text-[10px] ${accentColor} font-bold uppercase tracking-widest`}>
+                Side {side}
+              </p>
+            </div>
+          </div>
+        )}
         <p
           className={`text-sm ${accentColor} font-bold uppercase tracking-widest`}
         >
           {label}
         </p>
-        {performance.uploader && (
-          <p className="text-xs text-gray-400 mt-1">
-            @{performance.uploader.username}
-          </p>
-        )}
       </div>
     </Link>
   );
@@ -530,62 +694,113 @@ function ChallengeFlow({
     : '/signup?next=/upload?challenge=1';
 
   return (
-    <section className="bg-background py-12 md:py-20">
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-10 lg:gap-16 items-center mb-12">
-          <div className="relative w-full max-w-xs mx-auto lg:mx-0 aspect-square rounded-2xl overflow-hidden">
-            <div className="absolute inset-0 -m-4 bg-red-600/30 rounded-3xl blur-2xl pointer-events-none" />
-            <Image
-              src={HERO_RED_PHONE.src}
-              alt={HERO_RED_PHONE.alt}
-              fill
-              sizes="(max-width: 1024px) 90vw, 320px"
-              className="object-cover relative z-10"
-            />
+    <section className="relative bg-background py-12 md:py-20 overflow-hidden">
+      {/* Section spotlight — soft crimson backdrop so the section
+          doesn't sit on bare black after the hero. */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-40">
+        <div className="absolute left-1/2 top-[55%] h-[40rem] w-[60rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-600/15 blur-3xl" />
+      </div>
+
+      <div className="relative max-w-7xl mx-auto px-4">
+        {/* First column is a definite 20rem on desktop. Using `auto`
+            collapses to 0 because percentage widths inside an `auto`
+            grid track contribute 0 to max-content, so `w-full max-w-xs`
+            on the phone box can't expand the column. A fixed track
+            removes the ambiguity in every browser. */}
+        <div className="grid grid-cols-1 lg:grid-cols-[20rem_1fr] gap-10 lg:gap-16 items-center mb-12">
+          <div className="relative w-full max-w-xs mx-auto lg:mx-0 aspect-square">
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 -m-4 rounded-3xl bg-red-600/30 blur-2xl" />
+            {/* crimson-pulse wrapper — looks like the phone is ringing.
+                Must be absolute inset-0 (not h-full/w-full) so it fills
+                the aspect-ratio-sized parent in every browser;
+                percentage heights don't resolve against an
+                aspect-ratio-computed height. */}
+            <div className="crimson-pulse absolute inset-0 overflow-hidden rounded-2xl border border-red-500/40">
+              <Image
+                src={HERO_RED_PHONE.src}
+                alt={HERO_RED_PHONE.alt}
+                fill
+                sizes="(max-width: 1024px) 90vw, 320px"
+                className="object-cover"
+              />
+            </div>
           </div>
           <div className="text-center lg:text-left">
-            <p className="text-red-500 font-bold text-xs uppercase tracking-[0.3em] mb-2">
+            <p className="mb-2 inline-flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-[0.3em] text-red-500 lg:justify-start">
+              <span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
               Red Phone Challenge
             </p>
-            <h2 className="text-4xl md:text-5xl font-black text-white mb-3">
+            <h2 className="mb-3 text-4xl font-black text-white md:text-5xl">
               THINK YOU CAN TAKE THE CROWN?
             </h2>
-            <p className="text-gray-300 text-lg max-w-xl mx-auto lg:mx-0">
+            <p className="mx-auto max-w-xl text-balance text-lg text-gray-300 lg:mx-0">
               Pick up the red phone. Record your version. The next Official
               Voice could be you.
             </p>
           </div>
         </div>
 
-        {/* 4 steps + 3 arrows = 7 lg children. Use an explicit
-            [1fr_auto_1fr_auto_1fr_auto_1fr] track so the row fits without
-            wrapping; collapses to a single column on mobile where the
-            arrows hide. role=list/listitem keeps it accessible without
-            forcing <ol>/<li> children that would clash with the arrows. */}
-        <div
-          role="list"
-          aria-label="Challenge submission steps"
-          className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] gap-5 lg:gap-3 items-stretch mb-12"
-        >
-          <FlowStep number={1} Icon={Download} title="DOWNLOAD" sub="the track" />
-          <FlowArrow />
-          <FlowStep number={2} Icon={Mic} title="RECORD" sub="your version" />
-          <FlowArrow />
-          <FlowStep number={3} Icon={Upload} title="UPLOAD" sub="your challenge" />
-          <FlowArrow />
-          <FlowStep
-            number={4}
-            Icon={Crown}
-            title="IF SELECTED"
-            sub="face the champion"
-            reward
-          />
+        {/* Steps row — the cord SVG sits behind the 4 step circles and
+            connects them visually. role=list/listitem keeps it
+            accessible without forcing <ol>/<li>. */}
+        <div className="relative mb-12">
+          <svg
+            aria-hidden="true"
+            preserveAspectRatio="none"
+            viewBox="0 0 100 8"
+            className="pointer-events-none absolute left-0 right-0 top-[42%] hidden h-16 w-full lg:block"
+          >
+            <defs>
+              <linearGradient id="cord-gradient" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="rgb(239,68,68)" stopOpacity="0.9" />
+                <stop offset="60%" stopColor="rgb(239,68,68)" stopOpacity="0.85" />
+                <stop offset="80%" stopColor="rgb(250,204,21)" stopOpacity="0.95" />
+                <stop offset="100%" stopColor="rgb(250,204,21)" stopOpacity="1" />
+              </linearGradient>
+            </defs>
+            {/* Soft glow under-layer */}
+            <path
+              d="M 12.5 4 Q 25 1, 37.5 4 T 62.5 4 T 87.5 4"
+              fill="none"
+              stroke="url(#cord-gradient)"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              opacity="0.35"
+            />
+            {/* Dashed cord — "current" flows from step 1 to step 4 */}
+            <path
+              d="M 12.5 4 Q 25 1, 37.5 4 T 62.5 4 T 87.5 4"
+              fill="none"
+              stroke="url(#cord-gradient)"
+              strokeWidth="0.6"
+              strokeLinecap="round"
+              strokeDasharray="0.25 0.9"
+              className="cord-flow"
+            />
+          </svg>
+
+          <div
+            role="list"
+            aria-label="Challenge submission steps"
+            className="relative z-10 grid grid-cols-1 items-stretch gap-5 lg:grid-cols-4"
+          >
+            <FlowStep number={1} Icon={Download} title="DOWNLOAD" sub="the track" />
+            <FlowStep number={2} Icon={Mic} title="RECORD" sub="your version" />
+            <FlowStep number={3} Icon={Upload} title="UPLOAD" sub="your challenge" />
+            <FlowStep
+              number={4}
+              Icon={Crown}
+              title="IF SELECTED"
+              sub="face the champion"
+              reward
+            />
+          </div>
         </div>
 
-        <div className="text-center">
+        <div className="relative text-center">
           <Link
             href={href}
-            className="red-glow inline-flex items-center bg-red-600 hover:bg-red-700 text-white font-bold text-lg py-6 px-12 rounded-lg uppercase tracking-widest transition"
+            className="red-glow inline-flex items-center rounded-lg bg-red-600 px-12 py-6 text-lg font-bold uppercase tracking-widest text-white transition hover:bg-red-700"
           >
             Challenge Now →
           </Link>
@@ -617,9 +832,12 @@ function FlowStep({
     ? 'crown-glow'
     : 'group-hover:shadow-[0_0_24px_rgba(239,68,68,0.45)] group-focus-visible:shadow-[0_0_24px_rgba(239,68,68,0.45)]';
   const iconColor = reward ? 'text-yellow-400' : 'text-red-500';
-  const numberColor = reward ? 'text-yellow-400/80' : 'text-red-500/80';
+  const stepLabelColor = reward ? 'text-yellow-400' : 'text-red-400';
   const titleColor = reward ? 'text-yellow-400' : 'text-white';
   const focusRing = reward ? 'focus-visible:ring-yellow-400' : 'focus-visible:ring-red-500';
+  // Crimson breathing pulse on non-reward steps, staggered so the row
+  // feels alive. The reward step keeps its crown-glow only.
+  const pulse = reward ? '' : `step-pulse step-pulse-${number}`;
 
   return (
     <div
@@ -630,35 +848,23 @@ function FlowStep({
         reward ? 'focus-visible:bg-yellow-500/5' : 'focus-visible:bg-red-500/5'
       }`}
     >
-      <span
-        aria-hidden="true"
-        className={`absolute top-2 right-3 font-display text-base tabular-nums tracking-widest ${numberColor}`}
-      >
-        {String(number).padStart(2, '0')}
-      </span>
+      <div className={`mb-3 text-[10px] font-bold uppercase tracking-[0.3em] ${stepLabelColor}`}>
+        Step {String(number).padStart(2, '0')}
+      </div>
+      {/* Solid black background on the circle so the cord doesn't
+          show through behind the icon. */}
       <div
-        className={`relative w-20 h-20 rounded-full flex items-center justify-center mb-4 border-2 transition motion-reduce:transition-none ${ring} ${ringBg} ${ringGlow}`}
+        className={`relative mb-4 flex h-24 w-24 items-center justify-center rounded-full border-2 bg-black transition motion-reduce:transition-none ${ring} ${ringBg} ${ringGlow} ${pulse}`}
       >
         <Icon
           aria-hidden="true"
-          className={`w-9 h-9 transition motion-reduce:transition-none group-hover:scale-110 group-focus-visible:scale-110 motion-reduce:group-hover:scale-100 ${iconColor}`}
+          className={`h-10 w-10 transition motion-reduce:transition-none group-hover:scale-110 group-focus-visible:scale-110 motion-reduce:group-hover:scale-100 ${iconColor}`}
         />
       </div>
-      <h3 className={`font-bold uppercase tracking-widest text-sm mb-1 ${titleColor}`}>
+      <h3 className={`mb-1 text-sm font-bold uppercase tracking-widest ${titleColor}`}>
         {title}
       </h3>
       <p className="text-sm text-gray-400">{sub}</p>
-    </div>
-  );
-}
-
-function FlowArrow() {
-  return (
-    <div
-      aria-hidden="true"
-      className="hidden lg:flex items-center justify-center text-red-500/60"
-    >
-      <ChevronRight className="w-6 h-6" />
     </div>
   );
 }
@@ -1166,12 +1372,25 @@ function WinnersCarousel() {
                   <div className="relative bg-card/50 backdrop-blur border border-yellow-500/30 rounded-2xl overflow-hidden p-6">
                     <div className="flex items-start justify-between mb-6">
                       <div className="flex-1 min-w-0">
+                        {/* New item #39 — when the winner's user/video has
+                            since been deleted, fall back to "Deleted User"
+                            instead of the previous "Anonymous" or "Crowned"
+                            label, which made it look like a system error.
+                            The winner identity is preserved even when the
+                            media goes away. */}
                         <h3 className="text-2xl font-black text-white mb-1 truncate">
-                          {w.winnerUsername ? `@${w.winnerUsername}` : 'Anonymous'}
+                          {w.winnerUsername
+                            ? `@${w.winnerUsername}`
+                            : 'Deleted User'}
                         </h3>
-                        <p className="text-sm text-gray-400 truncate">
+                        {/* Bug #13 — the song title sat at text-gray-400 over a
+                            translucent card, which fell below readable contrast.
+                            Bumped to gray-200 so the song line is legible. */}
+                        <p className="text-sm text-gray-200 truncate">
                           {w.songTitle}
-                          {w.songArtist && ` · ${w.songArtist}`}
+                          {w.songArtist && (
+                            <span className="text-gray-400"> · {w.songArtist}</span>
+                          )}
                         </p>
                       </div>
                       <Crown className="w-6 h-6 text-yellow-500 flex-shrink-0 ml-3" />
@@ -1218,10 +1437,10 @@ function CTAFooter({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
         <div className="space-y-6">
-          <h2 className="text-5xl md:text-6xl font-black text-white leading-tight">
+          <h2 className="text-4xl sm:text-5xl md:text-6xl font-black text-white leading-tight">
             WIN THE SONG.
           </h2>
-          <h2 className="text-5xl md:text-6xl font-black text-red-600 leading-tight">
+          <h2 className="text-4xl sm:text-5xl md:text-6xl font-black text-red-600 leading-tight">
             OR GET REPLACED.
           </h2>
           <p className="text-lg text-gray-300 max-w-md">
@@ -1354,7 +1573,7 @@ function CrownAtRiskPanelView({
   const tone = riskTone(risk.riskLevel);
 
   return (
-    <section className="bg-background py-12 md:py-20">
+    <section id="crown-at-risk" className="bg-background py-12 md:py-20">
       <div className="max-w-7xl mx-auto px-4">
         <div
           className={`gold-panel ${personalised ? 'personal-stake' : ''} relative overflow-hidden p-8 md:p-10`}
@@ -1529,12 +1748,20 @@ function DethronedPanel() {
   }, [user?.id]);
 
   if (personal) {
-    const eyebrow =
-      personal.yourRole === 'former-champion'
-        ? 'You Just Lost the Crown'
-        : 'Your Pick Got Dethroned';
+    const isFormerChamp = personal.yourRole === 'former-champion';
+    const eyebrow = isFormerChamp
+      ? 'You Just Lost the Crown'
+      : 'Your Pick Got Dethroned';
+    const subtitle = isFormerChamp
+      ? 'Your reign just ended.'
+      : 'The voice you backed lost the song.';
     return (
-      <DethronedPanelView latest={personal} eyebrow={eyebrow} personalised />
+      <DethronedPanelView
+        latest={personal}
+        eyebrow={eyebrow}
+        subtitle={subtitle}
+        personalised
+      />
     );
   }
   if (!latest) return null;
@@ -1542,6 +1769,7 @@ function DethronedPanel() {
     <DethronedPanelView
       latest={latest}
       eyebrow="Dethroned!"
+      subtitle="A new Official Voice has been crowned."
       personalised={false}
     />
   );
@@ -1550,26 +1778,70 @@ function DethronedPanel() {
 function DethronedPanelView({
   latest,
   eyebrow,
+  subtitle,
   personalised,
 }: {
   latest: DethronementDto;
   eyebrow: string;
+  subtitle: string;
   personalised: boolean;
 }) {
+  const when = formatRelativeTime(latest.dethronedAt);
+  const margin = Math.round(latest.winnerVotePercent);
+  const shareUrl =
+    typeof window !== 'undefined'
+      ? `${window.location.origin}/battle/${latest.battleId}`
+      : `/battle/${latest.battleId}`;
+  const shareText = latest.newChampion
+    ? `@${latest.newChampion.username} just took ${latest.songTitle ?? 'the song'} on VOCALMATCH — ${margin}% of the vote.`
+    : `New Official Voice on VOCALMATCH${latest.songTitle ? ` for ${latest.songTitle}` : ''}.`;
+
+  const handleShare = async () => {
+    if (typeof navigator === 'undefined') return;
+    const data = { title: 'VOCALMATCH — Dethroned', text: shareText, url: shareUrl };
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share(data);
+        return;
+      } catch {
+        // user cancelled or share unsupported — fall through to clipboard
+      }
+    }
+    try {
+      await navigator.clipboard?.writeText(`${shareText} ${shareUrl}`);
+    } catch {
+      /* swallow — nothing we can do */
+    }
+  };
+
   return (
-    <section className="bg-background py-12 md:py-20">
+    <section id="dethroned" className="bg-background py-12 md:py-20">
       <div className="max-w-7xl mx-auto px-4">
         <div
-          className={`gold-panel ${personalised ? 'personal-stake' : ''} relative bg-card/40 backdrop-blur overflow-hidden`}
+          className={`gold-panel gold-dust ${personalised ? 'personal-stake' : ''} relative bg-card/40 backdrop-blur overflow-hidden`}
         >
-          <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 via-transparent to-red-600/10 pointer-events-none" />
-          <div className="relative grid grid-cols-1 md:grid-cols-[1fr_auto] gap-8 items-center p-8 md:p-10">
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 via-transparent to-red-600/10 pointer-events-none"
+          />
+          <div className="relative grid grid-cols-1 md:grid-cols-[1fr_auto] gap-8 items-center p-6 sm:p-8 md:p-10">
             <div>
-              <p className="text-yellow-400 font-bold text-xs uppercase tracking-[0.3em] mb-2">
-                {eyebrow}
-              </p>
-              <h2 className="text-3xl md:text-4xl font-black text-white mb-2">
-                A new Official Voice has been crowned
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-yellow-400/40 bg-black/60 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.3em] text-yellow-400">
+                  <Crown className="h-3 w-3" />
+                  {eyebrow}
+                </span>
+                {when && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.3em] text-gray-300">
+                    {when}
+                  </span>
+                )}
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-yellow-400/40 bg-black/60 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.3em] text-yellow-400 tabular-nums">
+                  Won {margin}%
+                </span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-2 text-balance">
+                {subtitle}
               </h2>
               {latest.songTitle && (
                 <p className="text-gray-300 mb-6">
@@ -1581,7 +1853,10 @@ function DethronedPanelView({
                   )}
                 </p>
               )}
-              <div className="flex items-center gap-4 mb-6">
+              {/* Former → new transition. Stacks vertically on narrow,
+                  horizontal from sm up. The fallen avatar is greyscaled
+                  + struck through to read "previous reign over". */}
+              <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                 {latest.formerChampion && (
                   <div className="flex items-center gap-2">
                     {latest.formerChampion.avatarUrl && (
@@ -1590,11 +1865,11 @@ function DethronedPanelView({
                         alt={latest.formerChampion.username}
                         width={40}
                         height={40}
-                        className="w-10 h-10 rounded-full object-cover opacity-50 grayscale border-2 border-gray-700"
+                        className="h-10 w-10 rounded-full border-2 border-gray-700 object-cover opacity-50 grayscale"
                       />
                     )}
                     <div>
-                      <p className="text-[10px] text-gray-400 uppercase tracking-widest">
+                      <p className="text-[10px] uppercase tracking-widest text-gray-400">
                         Former
                       </p>
                       <p className="text-sm text-gray-400 line-through">
@@ -1603,7 +1878,12 @@ function DethronedPanelView({
                     </div>
                   </div>
                 )}
-                <div className="text-gray-500 text-xl" aria-hidden="true">→</div>
+                <div
+                  aria-hidden="true"
+                  className="hidden text-xl text-gray-500 sm:block"
+                >
+                  →
+                </div>
                 {latest.newChampion && (
                   <div className="flex items-center gap-2">
                     {latest.newChampion.avatarUrl && (
@@ -1612,11 +1892,11 @@ function DethronedPanelView({
                         alt={latest.newChampion.username}
                         width={48}
                         height={48}
-                        className="w-12 h-12 rounded-full object-cover border-2 border-yellow-500"
+                        className="h-12 w-12 rounded-full border-2 border-yellow-500 object-cover"
                       />
                     )}
                     <div>
-                      <p className="text-[10px] text-yellow-400 uppercase tracking-widest">
+                      <p className="text-[10px] uppercase tracking-widest text-yellow-400">
                         New Crown
                       </p>
                       <p className="text-base font-bold text-white">
@@ -1626,22 +1906,35 @@ function DethronedPanelView({
                   </div>
                 )}
               </div>
-              <Link
-                href={`/battle/${latest.battleId}`}
-                className="inline-flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-3 px-6 rounded-lg uppercase tracking-widest text-sm transition"
-              >
-                <Play className="w-4 h-4" />
-                {personalised ? 'Watch What Happened' : 'Watch the Moment'}
-              </Link>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href={`/battle/${latest.battleId}`}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-yellow-500 px-6 py-3 text-sm font-bold uppercase tracking-widest text-black transition hover:bg-yellow-600"
+                >
+                  <Play className="h-4 w-4" />
+                  {personalised ? 'Watch What Happened' : 'Watch the Moment'}
+                </Link>
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-yellow-400/40 bg-black/40 px-6 py-3 text-sm font-bold uppercase tracking-widest text-yellow-400 transition hover:border-yellow-400/70 hover:bg-black/60"
+                >
+                  <Share2 className="h-4 w-4" />
+                  Share this Moment
+                </button>
+              </div>
             </div>
-            <div className="relative w-40 h-40 md:w-56 md:h-56 rounded-2xl overflow-hidden border border-yellow-500/40">
-              <div className="absolute inset-0 -m-4 bg-yellow-500/30 rounded-3xl blur-2xl pointer-events-none" />
+            <div className="relative mx-auto h-40 w-40 overflow-hidden rounded-2xl border border-yellow-500/40 md:h-56 md:w-56">
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 -m-4 rounded-3xl bg-yellow-500/30 blur-2xl"
+              />
               <Image
                 src={HERO_DETHRONED.src}
                 alt={HERO_DETHRONED.alt}
                 fill
                 sizes="(max-width: 768px) 160px, 224px"
-                className="object-cover relative z-10"
+                className="relative z-10 object-cover"
               />
             </div>
           </div>
@@ -1654,46 +1947,47 @@ function DethronedPanelView({
 // ─── 11. Share cards row ─────────────────────────────────────────────
 
 function ShareCardsRow() {
-  const cards = [
+  const cards: Array<{
+    title: string;
+    sub: string;
+    icon: typeof Vote;
+    tone: 'red' | 'gold';
+    href: string;
+    intent: string;
+  }> = [
     {
       title: 'Vote Now',
       sub: 'Who deserves the song?',
       icon: Vote,
-      tone: 'red' as const,
+      tone: 'red',
       href: '#live-battle',
+      intent: 'Tonight’s live battle is open on VOCALMATCH — vote before the clock runs out.',
     },
     {
       title: 'Challenge the Voice',
       sub: 'Can you take the crown?',
       icon: Mic,
-      tone: 'red' as const,
+      tone: 'red',
       href: '/upload',
+      intent: 'Pick up the red phone on VOCALMATCH. Same song, your voice — the crown is up for grabs.',
     },
     {
       title: 'New Crown Moments',
       sub: 'See the latest dethronement.',
       icon: Crown,
-      tone: 'gold' as const,
-      href: '#',
+      tone: 'gold',
+      href: '#dethroned',
+      intent: 'A new Official Voice was just crowned on VOCALMATCH.',
     },
     {
       title: 'The Crown Is Always at Risk',
       sub: 'Defend it. Or take it.',
       icon: Shield,
-      tone: 'gold' as const,
-      href: '#',
+      tone: 'gold',
+      href: '#crown-at-risk',
+      intent: 'The crown is never safe on VOCALMATCH. One song. Two voices. One crown.',
     },
   ];
-
-  const shareUrl =
-    typeof window !== 'undefined' ? window.location.origin : 'https://vocalmatch.app';
-  const shareText = 'VOCALMATCH — One song. Two voices. One crown.';
-
-  const tiktokUrl = 'https://www.tiktok.com/';
-  const instagramUrl = 'https://www.instagram.com/';
-  const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
-    shareUrl,
-  )}`;
 
   return (
     <section className="bg-background py-12 md:py-20">
@@ -1706,12 +2000,12 @@ function ShareCardsRow() {
             sizes="(max-width: 1280px) 100vw, 1280px"
             className="object-cover object-[center_30%]"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
           <div className="absolute inset-x-0 bottom-0 p-6 md:p-10 text-center">
             <p className="text-yellow-400 text-xs font-bold uppercase tracking-[0.3em] mb-2">
               Share the moment
             </p>
-            <h2 className="text-3xl md:text-5xl font-black text-white">
+            <h2 className="text-2xl sm:text-3xl md:text-5xl font-black text-white text-balance">
               Take VOCALMATCH everywhere.
             </h2>
           </div>
@@ -1726,11 +2020,7 @@ function ShareCardsRow() {
               Icon={c.icon}
               tone={c.tone}
               href={c.href}
-              tiktokUrl={tiktokUrl}
-              instagramUrl={instagramUrl}
-              facebookUrl={facebookUrl}
-              shareText={shareText}
-              shareUrl={shareUrl}
+              intent={c.intent}
             />
           ))}
         </div>
@@ -1745,86 +2035,150 @@ function ShareCard({
   Icon,
   tone,
   href,
-  tiktokUrl,
-  instagramUrl,
-  facebookUrl,
-  shareText,
-  shareUrl,
+  intent,
 }: {
   title: string;
   sub: string;
   Icon: typeof Crown;
   tone: 'red' | 'gold';
   href: string;
-  tiktokUrl: string;
-  instagramUrl: string;
-  facebookUrl: string;
-  shareText: string;
-  shareUrl: string;
+  /** Pre-written, per-card share copy that gets posted into the
+   *  selected channel. Lets each card carry its own voice. */
+  intent: string;
 }) {
   const accent = tone === 'red' ? 'text-red-500' : 'text-yellow-400';
   const ring = tone === 'red' ? 'border-red-500/40' : 'border-yellow-400/40';
+  const wash =
+    tone === 'red'
+      ? 'from-red-600/10 via-transparent to-red-600/0'
+      : 'from-yellow-500/10 via-transparent to-yellow-500/0';
 
-  const copyShare = () => {
-    if (typeof navigator === 'undefined') return;
-    void navigator.clipboard.writeText(`${shareText} ${shareUrl}`).catch(() => {});
+  // Stable origin reference. Falls back to the production URL so SSR /
+  // first-paint shares are still meaningful before hydration runs.
+  const origin =
+    typeof window !== 'undefined' ? window.location.origin : 'https://vocalmatch.app';
+  const shareUrl = `${origin}${href.startsWith('/') ? href : ''}`;
+  const shareText = intent;
+
+  // Web Share API → native sheet on iOS/Android/macOS. On unsupported
+  // platforms or user-cancellation, we fall through to the explicit
+  // per-channel buttons below.
+  const nativeShare = async () => {
+    if (typeof navigator === 'undefined' || typeof navigator.share !== 'function') return false;
+    try {
+      await navigator.share({ title, text: shareText, url: shareUrl });
+      return true;
+    } catch {
+      return false;
+    }
   };
 
+  const copyToClipboard = async () => {
+    if (typeof navigator === 'undefined' || !navigator.clipboard) return;
+    try {
+      await navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
+    } catch {
+      /* swallow */
+    }
+  };
+
+  // Real, working share intents. Twitter / Facebook have stable URL
+  // schemes; TikTok and Instagram don't expose web share endpoints, so
+  // for those we copy the post to the clipboard first, then open the
+  // platform so the user can paste straight in. Mobile users get the
+  // native share sheet via the top "Share" button instead.
+  const facebookHref = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+    shareUrl,
+  )}&quote=${encodeURIComponent(shareText)}`;
+  const xHref = `https://twitter.com/intent/tweet?text=${encodeURIComponent(
+    shareText,
+  )}&url=${encodeURIComponent(shareUrl)}`;
+  const instagramHref = 'https://www.instagram.com/';
+  const tiktokHref = 'https://www.tiktok.com/';
+
   return (
-    <div className={`gold-panel bg-black/60 backdrop-blur p-5 flex flex-col`}>
-      <Link href={href} className="block flex-1">
-        <div className={`w-14 h-14 rounded-full border ${ring} flex items-center justify-center mb-4`}>
-          <Icon className={`w-7 h-7 ${accent}`} />
+    <div className="gold-panel relative flex flex-col bg-black/60 p-5 backdrop-blur overflow-hidden">
+      <div
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${wash}`}
+      />
+      <div className="relative flex flex-1 flex-col">
+        <Link href={href} className="block flex-1">
+          <div className={`mb-4 flex h-14 w-14 items-center justify-center rounded-full border ${ring} bg-black/60`}>
+            <Icon className={`h-7 w-7 ${accent}`} />
+          </div>
+          <h3 className="mb-1 text-base font-black uppercase tracking-widest text-white">
+            {title}
+          </h3>
+          <p className="mb-4 text-sm text-gray-400">{sub}</p>
+        </Link>
+
+        <div className="mt-auto space-y-2">
+          <button
+            type="button"
+            onClick={async () => {
+              const ok = await nativeShare();
+              if (!ok) await copyToClipboard();
+            }}
+            className={`inline-flex w-full items-center justify-center gap-2 rounded-md border ${ring} bg-black/40 py-2 text-[11px] font-bold uppercase tracking-widest text-white transition hover:bg-black/70`}
+          >
+            <Share2 className="h-3.5 w-3.5" />
+            Share
+          </button>
+
+          <div
+            role="group"
+            aria-label="Share to a platform"
+            className="grid grid-cols-5 gap-1.5 border-t border-yellow-500/15 pt-3"
+          >
+            <a
+              href={tiktokHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Copy and open TikTok"
+              onClick={copyToClipboard}
+              className="flex items-center justify-center rounded-md bg-white/5 py-2 text-white transition hover:bg-white/10"
+            >
+              <TikTokGlyph className="h-3.5 w-3.5" />
+            </a>
+            <a
+              href={instagramHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Copy and open Instagram"
+              onClick={copyToClipboard}
+              className="flex items-center justify-center rounded-md bg-white/5 py-2 text-white transition hover:bg-white/10"
+            >
+              <InstagramGlyph className="h-3.5 w-3.5" />
+            </a>
+            <a
+              href={xHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Share on X"
+              className="flex items-center justify-center rounded-md bg-white/5 py-2 text-white transition hover:bg-white/10"
+            >
+              <XGlyph className="h-3.5 w-3.5" />
+            </a>
+            <a
+              href={facebookHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Share on Facebook"
+              className="flex items-center justify-center rounded-md bg-white/5 py-2 text-white transition hover:bg-white/10"
+            >
+              <FacebookGlyph className="h-3.5 w-3.5" />
+            </a>
+            <button
+              type="button"
+              onClick={copyToClipboard}
+              aria-label="Copy share link"
+              className="flex items-center justify-center rounded-md bg-white/5 py-2 text-white transition hover:bg-white/10"
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
-        <h3 className="text-base font-black text-white mb-1 uppercase tracking-widest">
-          {title}
-        </h3>
-        <p className="text-sm text-gray-400 mb-4">{sub}</p>
-      </Link>
-      <div className="grid grid-cols-4 gap-2 pt-3 border-t border-yellow-500/20">
-        <a
-          href={tiktokUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Share on TikTok"
-          onClick={copyShare}
-          className="flex items-center justify-center py-2 rounded-md bg-white/5 hover:bg-white/10 transition"
-        >
-          <span className="text-[10px] font-bold text-white uppercase tracking-widest">
-            TikTok
-          </span>
-        </a>
-        <a
-          href={instagramUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Share on Instagram"
-          onClick={copyShare}
-          className="flex items-center justify-center py-2 rounded-md bg-white/5 hover:bg-white/10 transition"
-        >
-          <span className="text-[10px] font-bold text-white uppercase tracking-widest">
-            IG
-          </span>
-        </a>
-        <a
-          href={facebookUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Share on Facebook"
-          className="flex items-center justify-center py-2 rounded-md bg-white/5 hover:bg-white/10 transition"
-        >
-          <span className="text-[10px] font-bold text-white uppercase tracking-widest">
-            FB
-          </span>
-        </a>
-        <button
-          type="button"
-          onClick={copyShare}
-          aria-label="Copy share link"
-          className="flex items-center justify-center py-2 rounded-md bg-white/5 hover:bg-white/10 transition"
-        >
-          <Download className="w-3 h-3 text-white" />
-        </button>
       </div>
     </div>
   );
@@ -1935,4 +2289,85 @@ function formatRuntime(seconds: number | null | undefined): string {
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
   return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function formatRelativeTime(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return null;
+  const diff = Math.max(0, Date.now() - t);
+  const m = Math.floor(diff / 60_000);
+  if (m < 1) return 'Moments ago';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d ago`;
+  return new Date(iso).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+// ─── Brand glyph SVGs ──────────────────────────────────────────────
+// lucide-react v1 doesn't ship brand icons, so we inline the four we
+// need for the share row. Each accepts the same `className` API as
+// lucide for drop-in sizing/colour.
+
+function InstagramGlyph({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function FacebookGlyph({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+    >
+      <path d="M13.5 21v-7.5h2.6l.4-3H13.5V8.6c0-.9.3-1.5 1.6-1.5h1.6V4.3a23 23 0 0 0-2.4-.1c-2.4 0-4 1.4-4 4v2.3H8v3h2.3V21h3.2Z" />
+    </svg>
+  );
+}
+
+function XGlyph({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+    >
+      <path d="M17.5 3H21l-7.4 8.5L22 21h-6.6l-5.1-6.5L4.5 21H1l7.9-9.1L1.4 3H8l4.6 5.9L17.5 3Zm-1.2 16h1.9L7.7 5H5.7l10.6 14Z" />
+    </svg>
+  );
+}
+
+function TikTokGlyph({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+    >
+      <path d="M16.5 3a5.7 5.7 0 0 0 4.5 4.5v3.1a8.7 8.7 0 0 1-4.5-1.3v6.8a5.9 5.9 0 1 1-5.9-5.9c.3 0 .6 0 .9.1V13a3 3 0 1 0 2.1 2.9V3h2.9Z" />
+    </svg>
+  );
 }

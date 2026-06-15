@@ -11,8 +11,8 @@
 export const HERO_MAIN = {
   src: '/hero/main-hero.jpg',
   alt: 'Official Voice and Challenger facing off, fire and crowd between them',
-  width: 1024,
-  height: 1024,
+  width: 1536,
+  height: 1536,
 };
 
 export const HERO_LIVE_BATTLE = {
