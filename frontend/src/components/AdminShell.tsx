@@ -62,10 +62,11 @@ export default function AdminShell({ children }: Props) {
     <>
       <Nav />
       <div className="border-b border-stage-700/60 bg-stage-900/40">
+        {/* Bug #33 — the Nav already shows an "Admin" link for admin
+            users on desktop, so rendering a second "Admin" eyebrow here
+            doubled up the label. The tab strip below is self-evidently
+            the admin surface. */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-          <span className="text-xs uppercase tracking-widest font-bold text-spotlight">
-            Admin
-          </span>
           <nav className="flex flex-wrap items-center gap-1 text-sm">
             {TABS.map((tab) => {
               const active =

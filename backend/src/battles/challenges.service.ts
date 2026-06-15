@@ -151,7 +151,7 @@ export class ChallengesService {
 
   async listForAdmin(opts: {
     songId?: string;
-    status?: ChallengeStatus | 'open'; // 'open' = pending|selected
+    status?: ChallengeStatus | 'open' | 'all'; // 'open' = pending only (actionable); 'all' = no status filter
     limit?: number;
     offset?: number;
   }) {
@@ -163,11 +163,21 @@ export class ChallengesService {
       .take(limit + 1)
       .skip(offset);
     if (opts.songId) qb.andWhere('c.songId = :songId', { songId: opts.songId });
+    // Bug #10 — the previous semantics were:
+    //   - 'open'  → pending + selected   (this overlapped with the dedicated
+    //                                     Pending and Selected tabs, so the
+    //                                     Open tab effectively repeated them)
+    //   - missing → defaulted to 'open' (handled by controller)
+    //   - 'all'   → was unhandled → fell into the explicit-status branch and
+    //               filtered `status = 'all'`, returning zero rows (which
+    //               is why the "All" tab excluded Rejected).
+    // New semantics — each tab is its own slice:
+    //   - 'open' → pending only (actionable queue, no overlap with Selected)
+    //   - 'all'  → no status filter (truly returns pending + selected + rejected)
+    //   - explicit pending/selected/rejected → exact filter
     if (opts.status === 'open') {
-      qb.andWhere('c.status IN (:...statuses)', {
-        statuses: ['pending', 'selected'],
-      });
-    } else if (opts.status) {
+      qb.andWhere('c.status = :status', { status: 'pending' });
+    } else if (opts.status && opts.status !== 'all') {
       qb.andWhere('c.status = :status', { status: opts.status });
     }
     const rows = await qb.getMany();
@@ -212,6 +222,24 @@ export class ChallengesService {
       .catch((err) =>
         this.logger.error(`Failed to notify challenger: ${err}`),
       );
+
+    // Bug #12 — only the challenger was being notified. The defending
+    // champion deserves an early heads-up that their crown is about to
+    // be contested, so they can rehearse / share / rally voters. Same
+    // event, different copy + href to the song's recent activity.
+    if (song?.currentChampionUserId) {
+      this.notifications
+        .create({
+          userId: song.currentChampionUserId,
+          kind: 'challenger_selected',
+          title: 'A challenger is coming for your crown.',
+          body: `Admin just picked a challenger for ${songLabel}. The battle goes live as soon as it's promoted.`,
+          href: `/u/me`,
+        })
+        .catch((err) =>
+          this.logger.error(`Failed to notify champion of selection: ${err}`),
+        );
+    }
 
     return row;
   }
@@ -294,6 +322,21 @@ export class ChallengesService {
       ).toISOString();
     }
 
+    // Bug #16 — when admin promoted a challenge without supplying a title,
+    // the battle showed as "Untitled Battle" in the admin list. Auto-generate
+    // a sensible default from the song + challenger so the row reads cleanly
+    // in every list view; admins can still override via `opts.title`.
+    let autoTitle: string | null = opts.title?.trim() || null;
+    if (!autoTitle) {
+      const challenger = await this.users
+        .findOne({ where: { id: sub.userId } })
+        .catch(() => null);
+      const challengerHandle = challenger?.username
+        ? `@${challenger.username}`
+        : 'Challenger';
+      autoTitle = `${song.title} — ${challengerHandle} vs the Crown`;
+    }
+
     // Delegate to the existing battle creation, which enforces the
     // same-song / different-uploader / one-live-per-song invariants.
     const battle = await this.battlesService.create(
@@ -302,7 +345,7 @@ export class ChallengesService {
         performanceAId: song.currentChampionPerformanceId,
         performanceBId: sub.videoId,
         votingClosesAt,
-        title: opts.title?.trim() || null,
+        title: autoTitle,
       },
       adminId,
     );

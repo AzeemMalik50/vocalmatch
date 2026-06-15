@@ -1,5 +1,6 @@
 import {
   Body,
+  ConflictException,
   Controller,
   Delete,
   Get,
@@ -17,13 +18,14 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { IsOptional, IsUUID } from 'class-validator';
-import { IsNull, Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from './admin.guard';
 import { Video } from '../videos/video.entity';
 import { User } from '../users/user.entity';
 import { Song } from '../songs/song.entity';
 import { Vote } from '../battles/vote.entity';
+import { Battle } from '../battles/battle.entity';
 
 class AssignSongDto {
   @IsOptional() @IsUUID()
@@ -45,6 +47,7 @@ export class AdminPerformancesController {
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(Song) private readonly songs: Repository<Song>,
     @InjectRepository(Vote) private readonly votes: Repository<Vote>,
+    @InjectRepository(Battle) private readonly battles: Repository<Battle>,
   ) {}
 
   @Get()
@@ -77,7 +80,14 @@ export class AdminPerformancesController {
       .take(limit + 1)
       .skip(offset);
 
-    if (includeDeleted !== 'true' && includeDeleted !== '1') {
+    // Bug #45 — previously `includeDeleted=true` returned BOTH active and
+    // soft-deleted rows, which made the "Show Deleted" checkbox act like
+    // a "include deleted on top of active" toggle. The clearer semantic
+    // matching the checkbox label is "Show Deleted = show only the
+    // deleted ones"; the default still hides them.
+    if (includeDeleted === 'true' || includeDeleted === '1') {
+      qb.andWhere('v.deletedAt IS NOT NULL');
+    } else {
       qb.andWhere('v.deletedAt IS NULL');
     }
     if (missingSong === 'true' || missingSong === '1') {
@@ -171,6 +181,22 @@ export class AdminPerformancesController {
   async assignSong(@Param('id') id: string, @Body() dto: AssignSongDto) {
     const video = await this.videos.findOne({ where: { id } });
     if (!video) throw new NotFoundException('Performance not found');
+
+    // Bug #29 — block editing the Centerstage Song link of a performance
+    // that is currently participating in a live or tie-pending battle.
+    // Allowing it broke the battle's same-song invariant and let admin
+    // accidentally invalidate an ongoing competition.
+    const activeBattle = await this.battles.findOne({
+      where: [
+        { performanceAId: id, status: In(['live', 'needs_decision']) },
+        { performanceBId: id, status: In(['live', 'needs_decision']) },
+      ],
+    });
+    if (activeBattle) {
+      throw new ConflictException(
+        `This performance is in an active battle (${activeBattle.id}). Resolve or cancel that battle before changing the song link.`,
+      );
+    }
 
     // Allow explicit null to clear a stale link, or a uuid to assign.
     if (dto.songId === null) {

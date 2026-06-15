@@ -13,3 +13,7 @@ database.sqlite
 .turbo
 .env
 db.json
+.claude/
+**/.claude/
+__pycache__/
+*.pyc

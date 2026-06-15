@@ -142,7 +142,12 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 max-w-[calc(100vw-2rem)] bg-stage-900 border border-stage-700 rounded-xl shadow-2xl overflow-hidden">
+        // Bug #30 — on iPhone the dropdown extended past the bottom of
+        // the viewport because the inner list was the only thing capped
+        // (max-h-96). Constrain the whole popover to the available
+        // viewport height (accounting for the sticky header) so the
+        // header + list together always fit and the list scrolls inside.
+        <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-6rem)] bg-stage-900 border border-stage-700 rounded-xl shadow-2xl overflow-hidden flex flex-col">
           <div className="flex items-center justify-between px-4 py-3 border-b border-stage-700/60">
             <p className="text-xs uppercase tracking-widest font-bold text-haze">
               Notifications
@@ -157,7 +162,7 @@ export default function NotificationBell() {
               </button>
             )}
           </div>
-          <ul className="max-h-96 overflow-auto">
+          <ul className="flex-1 overflow-auto">
             {items.length === 0 ? (
               <li className="px-4 py-8 text-center text-sm text-haze/60">
                 No notifications yet.

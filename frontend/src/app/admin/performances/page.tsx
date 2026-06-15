@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { Music } from 'lucide-react';
 import AdminShell from '@/components/AdminShell';
 import { TableRowsSkeleton } from '@/components/Loaders';
 import {
@@ -43,27 +44,37 @@ export default function AdminPerformancesPage() {
       .catch(() => setSongs([]));
   }, []);
 
+  // Bug #32 — "Load more" appeared dead because `load` was memoized
+  // with stale `items` and `offset` closures (they weren't in the
+  // dependency list). Switched to functional setItems + read the
+  // current offset from React state directly so each "Load more" click
+  // truly advances pagination.
   const load = useCallback(
     async (reset: boolean) => {
       setLoading(true);
       try {
-        const nextOffset = reset ? 0 : offset;
+        const currentOffset = reset ? 0 : offset;
         const resp = await api.adminListPerformances({
           search: debouncedSearch || undefined,
           missingSong: missingSong || undefined,
           includeDeleted: includeDeleted || undefined,
           limit: PAGE_SIZE,
-          offset: nextOffset,
+          offset: currentOffset,
         });
-        setItems(reset ? resp.items : [...items, ...resp.items]);
+        setItems((prev) =>
+          reset ? resp.items : [...prev, ...resp.items],
+        );
         setHasMore(resp.hasMore);
-        setOffset((resp.nextOffset ?? nextOffset + PAGE_SIZE));
+        setOffset(resp.nextOffset ?? currentOffset + PAGE_SIZE);
       } finally {
         setLoading(false);
       }
     },
+    // `offset` intentionally in deps so "Load more" sees the latest
+    // pagination cursor; `items` uses the functional updater so we
+    // don't need it as a dep (avoiding a refetch on every render).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [debouncedSearch, missingSong, includeDeleted],
+    [debouncedSearch, missingSong, includeDeleted, offset],
   );
 
   useEffect(() => {
@@ -226,15 +237,14 @@ function PerformanceRow({
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 mb-1 flex-wrap">
-          <p className="font-bold">{perf.title}</p>
+          <p className="font-bold text-white">{perf.title}</p>
+          {/* Deleted status stays in the title row since it changes the
+              meaning of every other field; the "No song" badge moved
+              into the dedicated song pill below, which is more informative
+              than a status chip on its own. */}
           {perf.deletedAt && (
-            <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-red-500/15 text-red-300 border border-red-500/30">
+            <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 rounded bg-red-500/25 text-red-50 border border-red-400/70 font-bold">
               Deleted
-            </span>
-          )}
-          {!perf.songId && (
-            <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-300 border border-yellow-500/30">
-              No song
             </span>
           )}
         </div>
@@ -264,21 +274,50 @@ function PerformanceRow({
             {perf.viewCount} {perf.viewCount === 1 ? 'view' : 'views'}
           </span>
         </p>
-        <p className="text-xs text-haze/70 mt-1">
+        {/* Song pill — every performance row now shows the linked song
+            (or absence of one) as a clearly visible chip with a music
+            icon, so admins can scan-read the song-to-performance mapping
+            at a glance. Three states: linked, unlinked legacy text,
+            no song. */}
+        <div className="mt-2">
           {perf.song ? (
-            <>
-              Linked to{' '}
-              <span className="text-white font-semibold">{perf.song.title}</span>{' '}
-              · {perf.song.artist}
-            </>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-spotlight/10 border border-spotlight/40 max-w-full">
+              <Music
+                aria-hidden="true"
+                className="w-3.5 h-3.5 text-spotlight shrink-0"
+              />
+              <span className="text-sm font-semibold text-white truncate">
+                {perf.song.title}
+              </span>
+              <span className="text-xs text-haze/85 truncate">
+                · {perf.song.artist}
+              </span>
+            </span>
           ) : perf.songTitle ? (
-            <>
-              Unlinked songTitle: <span className="italic">{perf.songTitle}</span>
-            </>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-yellow-500/15 border border-yellow-300/60 max-w-full">
+              <Music
+                aria-hidden="true"
+                className="w-3.5 h-3.5 text-yellow-100 shrink-0"
+              />
+              <span className="text-sm font-semibold text-yellow-50 truncate">
+                {perf.songTitle}
+              </span>
+              <span className="text-[10px] uppercase tracking-widest text-yellow-100/90 font-bold">
+                · Unlinked
+              </span>
+            </span>
           ) : (
-            <span className="italic">No song linked</span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-500/15 border border-red-400/60">
+              <Music
+                aria-hidden="true"
+                className="w-3.5 h-3.5 text-red-100 shrink-0"
+              />
+              <span className="text-sm font-semibold text-red-50">
+                No song linked
+              </span>
+            </span>
           )}
-        </p>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -331,12 +370,16 @@ function SongPicker({
   onCancel: () => void;
 }) {
   const [val, setVal] = useState(currentId ?? '');
+  // Bug #39 — the previous `flex` row overflowed the parent container
+  // on narrow widths, pushing the Cancel button off the right edge.
+  // `flex-wrap` + `min-w-0` on the select lets the row reflow onto a
+  // second line so all three controls stay fully visible.
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <select
         value={val}
         onChange={(e) => setVal(e.target.value)}
-        className="px-3 py-1.5 text-xs bg-stage-900 border border-stage-700 rounded-md focus:outline-none focus:border-spotlight"
+        className="min-w-0 flex-1 max-w-full px-3 py-1.5 text-xs bg-stage-900 border border-stage-700 rounded-md focus:outline-none focus:border-spotlight"
       >
         <option value="">(clear song link)</option>
         {songs.map((s) => (
@@ -348,14 +391,14 @@ function SongPicker({
       <button
         type="button"
         onClick={() => onPick(val || null)}
-        className="px-3 py-1.5 text-xs font-bold rounded-md bg-spotlight text-white"
+        className="shrink-0 px-3 py-1.5 text-xs font-bold rounded-md bg-spotlight text-white"
       >
         Save
       </button>
       <button
         type="button"
         onClick={onCancel}
-        className="px-3 py-1.5 text-xs font-bold rounded-md bg-stage-800 border border-stage-700 text-haze"
+        className="shrink-0 px-3 py-1.5 text-xs font-bold rounded-md bg-stage-800 border border-stage-700 text-haze"
       >
         Cancel
       </button>

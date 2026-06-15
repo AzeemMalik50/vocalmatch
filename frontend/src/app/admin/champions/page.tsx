@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { Music } from 'lucide-react';
 import AdminShell from '@/components/AdminShell';
 import { TableRowsSkeleton } from '@/components/Loaders';
 import { PublicUser, SongDto, api } from '@/lib/api';
@@ -117,9 +118,19 @@ export default function AdminChampionsPage() {
                     key={song.id}
                     className="bg-stage-900 border border-stage-700/60 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3"
                   >
-                    <div className="min-w-0">
-                      <p className="font-display font-bold text-lg">{song.title}</p>
-                      <p className="text-sm text-haze">{song.artist}</p>
+                    <div className="min-w-0 flex items-center gap-3">
+                      <Music
+                        aria-hidden="true"
+                        className="w-5 h-5 text-spotlight shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <p className="font-display font-bold text-lg text-white truncate">
+                          {song.title}
+                        </p>
+                        <p className="text-sm text-haze truncate">
+                          {song.artist}
+                        </p>
+                      </div>
                     </div>
                     <Link
                       href={`/admin/battles/new?songId=${song.id}`}
@@ -145,23 +156,31 @@ function ChampionRow({
   song: SongDto;
   champion: PublicUser | null;
 }) {
-  const streak = song.currentChampionStreak ?? 0;
+  // Bug #24 — previously this row showed the per-song streak
+  // (`song.currentChampionStreak`), which routinely diverged from the
+  // user's overall career streak shown on the User Details page and
+  // confused admins. We now show the user's authoritative streak from
+  // the User entity (same source as User Details). The per-song streak
+  // is reported alongside in parentheses so we don't lose that signal.
+  const careerStreak = champion?.currentStreak ?? 0;
+  const songStreak = song.currentChampionStreak ?? 0;
+  const streak = careerStreak;
   return (
-    <li className="bg-stage-900 border border-gold/30 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
-      <div className="flex items-center gap-3 min-w-0">
+    <li className="bg-stage-900 border border-gold/30 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
+      <div className="flex items-center gap-3 min-w-0 flex-1">
         {champion?.avatarUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
             src={champion.avatarUrl}
             alt=""
-            className="w-12 h-12 rounded-full object-cover border-2 border-gold/40"
+            className="w-12 h-12 rounded-full object-cover border-2 border-gold/40 shrink-0"
           />
         ) : (
-          <div className="w-12 h-12 rounded-full bg-stage-800 border-2 border-gold/40 flex items-center justify-center font-bold text-haze">
+          <div className="w-12 h-12 rounded-full bg-stage-800 border-2 border-gold/40 flex items-center justify-center font-bold text-haze shrink-0">
             {champion?.username[0]?.toUpperCase() ?? '?'}
           </div>
         )}
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1 space-y-1.5">
           <p className="font-display font-bold text-lg leading-tight">
             {champion ? (
               <Link
@@ -174,17 +193,34 @@ function ChampionRow({
               <span className="italic text-haze">unknown</span>
             )}
           </p>
-          <p className="text-xs text-haze">
-            <span className="text-haze/70">defending</span>{' '}
-            <span className="font-semibold text-white">{song.title}</span>
-            {song.artist && <span className="text-haze/60"> · {song.artist}</span>}
-          </p>
+          {/* Song title pill — gives every championship row a clearly
+              visible "what song is this crown on?" label. Gold-bordered
+              so it reads as part of the champion's prestige strip. */}
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gold/10 border border-gold/40 max-w-full">
+            <Music aria-hidden="true" className="w-3.5 h-3.5 text-gold shrink-0" />
+            <span className="text-sm font-semibold text-white truncate">
+              {song.title}
+            </span>
+            {song.artist && (
+              <span className="text-xs text-haze/80 truncate">
+                · {song.artist}
+              </span>
+            )}
+          </span>
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 shrink-0">
         {streak >= 2 && (
-          <span className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold uppercase tracking-widest bg-gold/15 text-gold border border-gold/30 rounded">
+          <span
+            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold uppercase tracking-widest bg-gold/15 text-gold border border-gold/30 rounded"
+            title={`${songStreak} consecutive wins on this song`}
+          >
             🔥 {streak}-streak
+            {songStreak !== streak && (
+              <span className="opacity-75 font-normal">
+                ({songStreak} on song)
+              </span>
+            )}
           </span>
         )}
         <Link

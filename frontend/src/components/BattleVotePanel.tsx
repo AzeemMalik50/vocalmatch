@@ -107,6 +107,7 @@ export default function BattleVotePanel({
           <div className="grid grid-cols-2 gap-3 md:gap-4">
             <VoteButton
               label={performanceA.uploader?.username ?? 'Performer A'}
+              avatarUrl={performanceA.uploader?.avatarUrl ?? null}
               side="A"
               onClick={() => handleVote('A')}
               loading={voting === 'A'}
@@ -115,6 +116,7 @@ export default function BattleVotePanel({
             />
             <VoteButton
               label={performanceB.uploader?.username ?? 'Performer B'}
+              avatarUrl={performanceB.uploader?.avatarUrl ?? null}
               side="B"
               onClick={() => handleVote('B')}
               loading={voting === 'B'}
@@ -189,6 +191,7 @@ export default function BattleVotePanel({
 
 function VoteButton({
   label,
+  avatarUrl,
   side,
   onClick,
   loading,
@@ -196,6 +199,7 @@ function VoteButton({
   variant,
 }: {
   label: string;
+  avatarUrl: string | null;
   side: 'A' | 'B';
   onClick: () => void;
   loading: boolean;
@@ -203,11 +207,13 @@ function VoteButton({
   variant: 'spotlight' | 'gold';
 }) {
   const base =
-    'group relative w-full flex flex-col items-center justify-center gap-1 px-4 py-5 md:py-6 rounded-xl font-bold transition-all border-2';
+    'group relative w-full flex flex-col items-center justify-center gap-2 px-4 py-5 md:py-6 rounded-xl font-bold transition-all border-2';
   const colors =
     variant === 'spotlight'
       ? 'border-spotlight/50 hover:border-spotlight bg-spotlight/5 hover:bg-spotlight/15 text-spotlight hover:text-white'
       : 'border-gold/50 hover:border-gold bg-gold/5 hover:bg-gold/15 text-gold hover:text-white';
+  const avatarBorder =
+    variant === 'spotlight' ? 'border-spotlight/60' : 'border-gold/60';
   return (
     <button
       type="button"
@@ -217,6 +223,24 @@ function VoteButton({
     >
       <span className="text-xs uppercase tracking-widest opacity-70">
         Vote {side}
+      </span>
+      {/* Singer photo — turns the abstract "Vote A / Vote B" choice
+          into a person-vs-person decision, which is the real ask. */}
+      <span
+        className={`relative inline-block h-14 w-14 md:h-16 md:w-16 overflow-hidden rounded-full border-2 ${avatarBorder} bg-stage-800 shadow-lg`}
+      >
+        {avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={avatarUrl}
+            alt=""
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <span className="flex h-full w-full items-center justify-center font-display text-2xl font-black text-haze">
+            {label[0]?.toUpperCase()}
+          </span>
+        )}
       </span>
       <span className="font-display font-bold text-lg md:text-xl">
         @{label}
@@ -256,6 +280,7 @@ function Standings({
     <div className="space-y-3">
       <StandingRow
         label={`@${performanceA.uploader?.username ?? 'A'}`}
+        avatarUrl={performanceA.uploader?.avatarUrl ?? null}
         percent={a}
         count={battle.voteCountA ?? 0}
         side="A"
@@ -264,6 +289,7 @@ function Standings({
       />
       <StandingRow
         label={`@${performanceB.uploader?.username ?? 'B'}`}
+        avatarUrl={performanceB.uploader?.avatarUrl ?? null}
         percent={b}
         count={battle.voteCountB ?? 0}
         side="B"
@@ -293,6 +319,7 @@ function Standings({
 
 function StandingRow({
   label,
+  avatarUrl,
   percent,
   count,
   side,
@@ -300,33 +327,51 @@ function StandingRow({
   isWinner,
 }: {
   label: string;
+  avatarUrl: string | null;
   percent: number;
   count: number;
   side: 'A' | 'B';
   isLeader: boolean;
   isWinner: boolean;
 }) {
-  const accent =
-    side === 'A'
-      ? 'bg-spotlight'
-      : 'bg-gold';
+  const accent = side === 'A' ? 'bg-spotlight' : 'bg-gold';
+  const avatarBorder =
+    side === 'A' ? 'border-spotlight/60' : 'border-gold/60';
+  // Username for the initial fallback — strip the leading "@"
+  const initial = label.replace(/^@/, '')[0]?.toUpperCase() ?? '?';
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
-        <span className="font-bold text-sm flex items-center gap-2">
-          {label}
+        <span className="font-bold text-sm flex items-center gap-2 min-w-0">
+          <span
+            className={`relative inline-block h-7 w-7 shrink-0 overflow-hidden rounded-full border ${avatarBorder} bg-stage-800`}
+          >
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={avatarUrl}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <span className="flex h-full w-full items-center justify-center text-[11px] font-bold text-haze">
+                {initial}
+              </span>
+            )}
+          </span>
+          <span className="truncate">{label}</span>
           {isWinner && (
-            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest bg-gold text-stage-950 rounded">
+            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest bg-gold text-stage-950 rounded shrink-0">
               Winner
             </span>
           )}
           {isLeader && !isWinner && (
-            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest bg-spotlight/20 text-spotlight rounded">
+            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest bg-spotlight/20 text-spotlight rounded shrink-0">
               Leading
             </span>
           )}
         </span>
-        <span className="font-display font-bold text-lg tabular-nums">
+        <span className="font-display font-bold text-lg tabular-nums shrink-0">
           {percent}%
           <span className="text-haze/60 font-normal text-xs ml-2">
             ({count})

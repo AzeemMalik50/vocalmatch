@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import AdminShell from '@/components/AdminShell';
 import { TableRowsSkeleton } from '@/components/Loaders';
 import {
@@ -25,13 +26,68 @@ const FILTERS: { value: FilterStatus; label: string }[] = [
 const PAGE_SIZE = 20;
 
 export default function AdminBattlesPage() {
-  const [filter, setFilter] = useState<FilterStatus>('live');
+  return (
+    <Suspense
+      fallback={
+        <AdminShell>
+          <TableRowsSkeleton rows={4} />
+        </AdminShell>
+      }
+    >
+      <AdminBattlesPageInner />
+    </Suspense>
+  );
+}
+
+function AdminBattlesPageInner() {
+  const searchParams = useSearchParams();
+  // Bug #43 — Backstage's "Needs your decision" list deep-links here as
+  // `/admin/battles?focus=<id>`. The previous default filter was always
+  // `live`, so admins landed on the wrong tab and had to manually switch
+  // to find the battle they just clicked. We resolve the focus target's
+  // status once and default the filter accordingly. The row also gets a
+  // brief scroll-into-view + highlight so the right battle is obvious.
+  const focusId = searchParams?.get('focus') ?? null;
+  const [filter, setFilter] = useState<FilterStatus>(
+    focusId ? 'needs_decision' : 'live',
+  );
   const [items, setItems] = useState<BattleSummaryDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [nextOffset, setNextOffset] = useState(0);
   const [working, setWorking] = useState<string | null>(null);
+  const focusedRef = useRef<HTMLLIElement | null>(null);
+
+  // Resolve the focused battle's actual status the first time we mount
+  // with `?focus=`, so the filter lands on the right tab regardless of
+  // status (a focus into a completed battle still works, etc.).
+  useEffect(() => {
+    if (!focusId) return;
+    let cancelled = false;
+    api
+      .getBattle(focusId)
+      .then((b) => {
+        if (cancelled) return;
+        setFilter(b.status === 'live' ? 'live' : b.status);
+      })
+      .catch(() => {
+        /* fall through — keep the default needs_decision tab */
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId]);
+
+  // Scroll to the focused row once items have loaded.
+  useEffect(() => {
+    if (!focusId || loading) return;
+    const node = focusedRef.current;
+    if (node) {
+      node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [focusId, loading, items]);
 
   const load = async (status: FilterStatus) => {
     setLoading(true);
@@ -135,16 +191,28 @@ export default function AdminBattlesPage() {
       ) : (
         <>
           <ul className="space-y-3">
-            {items.map((b) => (
-              <BattleRow
-                key={b.id}
-                battle={b}
-                busy={working === b.id}
-                onClose={() => handleClose(b.id)}
-                onCancel={() => handleCancel(b.id)}
-                onResolved={() => load(filter)}
-              />
-            ))}
+            {items.map((b) => {
+              const isFocused = focusId === b.id;
+              return (
+                <li
+                  key={b.id}
+                  ref={isFocused ? focusedRef : null}
+                  className={
+                    isFocused
+                      ? 'ring-2 ring-yellow-400/70 ring-offset-2 ring-offset-stage-950 rounded-2xl'
+                      : ''
+                  }
+                >
+                  <BattleRow
+                    battle={b}
+                    busy={working === b.id}
+                    onClose={() => handleClose(b.id)}
+                    onCancel={() => handleCancel(b.id)}
+                    onResolved={() => load(filter)}
+                  />
+                </li>
+              );
+            })}
           </ul>
           {hasMore && (
             <div className="flex justify-center mt-6">
@@ -178,7 +246,10 @@ function BattleRow({
   onResolved: () => void;
 }) {
   return (
-    <li className="relative bg-stage-900 border border-stage-700/60 rounded-xl p-4 md:p-5 hover:border-spotlight/40 transition-colors">
+    // Returns a div now (was a li) so the parent ul can wrap each row in
+    // its own li for focus highlighting; nesting <li> inside <li> would
+    // be invalid HTML.
+    <div className="relative bg-stage-900 border border-stage-700/60 rounded-xl p-4 md:p-5 hover:border-spotlight/40 transition-colors">
       {/* Full-card click target. Sits behind action buttons (z-0 vs z-10)
           so clicks on Close/Cancel/Resolve don't trigger navigation. */}
       <Link
@@ -230,18 +301,22 @@ function BattleRow({
           )}
         </div>
       </div>
-    </li>
+    </div>
   );
 }
 
 function StatusBadge({ status }: { status: BattleStatus }) {
+  // Bug #38 — needs_decision badge sat at yellow-300 on a 15% yellow
+  // wash, which fell well under the 4.5:1 contrast minimum against the
+  // dark theme. Tightened to yellow-100 on a 25% wash with a stronger
+  // border so the "this needs you" signal actually reads.
   const tone =
     status === 'live'
       ? 'bg-spotlight/15 text-spotlight border-spotlight/40'
       : status === 'completed'
         ? 'bg-gold/15 text-gold border-gold/40'
         : status === 'needs_decision'
-          ? 'bg-yellow-500/15 text-yellow-300 border-yellow-500/40'
+          ? 'bg-yellow-500/25 text-yellow-100 border-yellow-300/70'
           : 'bg-stage-800 text-haze border-stage-700';
   return (
     <span
@@ -326,7 +401,9 @@ function ResolveTieControl({
       <button
         type="button"
         onClick={expand}
-        className="px-3 py-1.5 text-xs font-bold rounded-md bg-yellow-500/15 text-yellow-300 border border-yellow-500/40 hover:bg-yellow-500/25 transition-colors"
+        // Bug #38 — see StatusBadge comment. Same low-contrast pattern
+        // applied here.
+        className="px-3 py-1.5 text-xs font-bold rounded-md bg-yellow-500/25 text-yellow-100 border border-yellow-300/70 hover:bg-yellow-500/35 transition-colors"
       >
         Resolve tie
       </button>

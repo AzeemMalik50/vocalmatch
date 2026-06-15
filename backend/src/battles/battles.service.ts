@@ -125,7 +125,40 @@ export class BattlesService {
       status: 'live',
       createdByAdminId: adminId,
     });
-    return this.battles.save(battle);
+    const saved = await this.battles.save(battle);
+
+    // Bug #22 — `createBattleFromChallenge` already notifies both
+    // performers, but a plain admin-created battle (outside the Red
+    // Phone flow) never told either uploader their battle was now live.
+    // Fire-and-forget battle_starting notifications to both, with
+    // distinct copy so they read as "you're up" vs "you're being
+    // challenged" only when one side is actually the defending champion.
+    const battleHref = `/battle/${saved.id}`;
+    const song = await this.songs.findOne(saved.songId).catch(() => null);
+    const songLabel = song?.title ?? 'a Centerstage Song';
+    const championUserId = song?.currentChampionUserId ?? null;
+    for (const performer of [a, b]) {
+      const isChampion = championUserId === performer.uploaderId;
+      this.notifications
+        .create({
+          userId: performer.uploaderId,
+          kind: 'battle_starting',
+          title: isChampion
+            ? 'Your crown is being contested.'
+            : 'Your battle just went live.',
+          body: isChampion
+            ? `A challenger is taking you on for ${songLabel}. Voting is open now.`
+            : `You're going head-to-head on ${songLabel}. Share the link and rally your voters.`,
+          href: battleHref,
+        })
+        .catch((err) =>
+          this.logger.error(
+            `Failed to notify performer ${performer.uploaderId} of new battle: ${err}`,
+          ),
+        );
+    }
+
+    return saved;
   }
 
   // ─── Reads ──────────────────────────────────────────────────────
@@ -316,6 +349,10 @@ export class BattlesService {
 
   /**
    * Admin cancels a battle. Stat changes are NOT applied. Idempotent.
+   * Bug #17 — previously there was no realtime publish on cancel, so
+   * anyone holding the homepage or battle page open kept seeing the
+   * battle as "live" until they hit refresh. Push the status event so
+   * subscribers can react immediately.
    */
   async cancel(id: string) {
     const battle = await this.findOne(id);
@@ -324,7 +361,19 @@ export class BattlesService {
     }
     battle.status = 'cancelled';
     battle.closedAt = new Date();
-    return this.battles.save(battle);
+    const saved = await this.battles.save(battle);
+
+    this.realtime.publish(
+      RealtimeService.battleChannel(saved.id),
+      'status',
+      {
+        ...this.buildLiveCountsPayload(saved),
+        status: 'cancelled',
+        closedAt: saved.closedAt,
+      },
+    );
+
+    return saved;
   }
 
   /**
@@ -413,6 +462,39 @@ export class BattlesService {
         },
       );
 
+      // Bug #4 / #22 — neither side was being notified that the battle
+      // closed. Fire a `battle_result` notification at the winner and
+      // (if distinct) the loser so the bell + email pipeline can pick
+      // it up. Fire-and-forget so a notification failure doesn't roll
+      // back the transaction.
+      const battleHref = `/battle/${battle.id}`;
+      if (winnerUser) {
+        this.notifications
+          .create({
+            userId: winnerUser.id,
+            kind: 'battle_result',
+            title: 'You took the crown.',
+            body: 'Your battle closed and the votes named you the Official Voice. Share the moment.',
+            href: battleHref,
+          })
+          .catch((err) =>
+            this.logger.error(`Failed to notify winner of battle_result: ${err}`),
+          );
+      }
+      if (loserUser && loserUser.id !== winnerUser?.id) {
+        this.notifications
+          .create({
+            userId: loserUser.id,
+            kind: 'battle_result',
+            title: 'Battle closed.',
+            body: 'You didn\'t take the crown this time. Watch the vote breakdown and plan the next challenge.',
+            href: battleHref,
+          })
+          .catch((err) =>
+            this.logger.error(`Failed to notify loser of battle_result: ${err}`),
+          );
+      }
+
       return battle;
     });
   }
@@ -426,6 +508,127 @@ export class BattlesService {
         status: 'live',
         votingClosesAt: LessThanOrEqual(new Date()),
       },
+    });
+  }
+
+  /**
+   * Recent dethronements — completed battles where the winner is NOT the
+   * same user as the previous completed battle's winner for that song
+   * (i.e. the crown changed hands). Enriched with song title, former
+   * champion + new champion usernames/avatars, and the winning margin
+   * so the homepage "Dethroned!" panel can render from a single fetch.
+   *
+   * Overfetches recent completed battles, groups by song, and walks the
+   * adjacent pairs in code — cleaner than the equivalent self-join SQL
+   * and fast enough for the homepage volume.
+   */
+  async findRecentDethronements(
+    limit: number,
+    predicate?: (t: { current: Battle; previous: Battle }) => boolean,
+  ) {
+    const recent = await this.battles.find({
+      where: { status: 'completed' },
+      order: { closedAt: 'DESC' },
+      take: 200,
+    });
+
+    const bySong = new Map<string, Battle[]>();
+    for (const b of recent) {
+      const arr = bySong.get(b.songId) ?? [];
+      arr.push(b);
+      bySong.set(b.songId, arr);
+    }
+
+    const transitions: Array<{ current: Battle; previous: Battle }> = [];
+    for (const battles of bySong.values()) {
+      for (let i = 0; i < battles.length - 1; i++) {
+        const current = battles[i];
+        const previous = battles[i + 1];
+        if (
+          current.winnerUserId &&
+          previous.winnerUserId &&
+          current.winnerUserId !== previous.winnerUserId
+        ) {
+          transitions.push({ current, previous });
+        }
+      }
+    }
+
+    // Personalization predicate (optional). Marquee path passes none.
+    const filtered = predicate ? transitions.filter(predicate) : transitions;
+
+    filtered.sort(
+      (a, b) =>
+        (b.current.closedAt?.getTime() ?? 0) -
+        (a.current.closedAt?.getTime() ?? 0),
+    );
+    const top = filtered.slice(0, limit);
+
+    if (top.length === 0) return [];
+
+    const userIds = new Set<string>();
+    const songIds = new Set<string>();
+    for (const t of top) {
+      if (t.current.winnerUserId) userIds.add(t.current.winnerUserId);
+      if (t.previous.winnerUserId) userIds.add(t.previous.winnerUserId);
+      songIds.add(t.current.songId);
+    }
+
+    const [users, songs] = await Promise.all([
+      this.users.find({ where: { id: In([...userIds]) } }),
+      Promise.all(
+        [...songIds].map((id) =>
+          this.songs.findOne(id).catch(() => null),
+        ),
+      ),
+    ]);
+    const userMap = new Map(users.map((u) => [u.id, u]));
+    const songMap = new Map(
+      songs.filter((s): s is NonNullable<typeof s> => !!s).map((s) => [s.id, s]),
+    );
+
+    return top.map(({ current, previous }) => {
+      const total = current.voteCountA + current.voteCountB;
+      const winnerVotes =
+        current.winnerPerformanceId === current.performanceAId
+          ? current.voteCountA
+          : current.voteCountB;
+      const marginPercent =
+        total === 0 ? 0 : Math.round((winnerVotes / total) * 100);
+      const newChamp = current.winnerUserId
+        ? userMap.get(current.winnerUserId)
+        : undefined;
+      const formerChamp = previous.winnerUserId
+        ? userMap.get(previous.winnerUserId)
+        : undefined;
+      const song = songMap.get(current.songId);
+      return {
+        battleId: current.id,
+        songId: current.songId,
+        songTitle: song?.title ?? null,
+        songArtist: song?.artist ?? null,
+        dethronedAt: current.closedAt,
+        winnerVotePercent: marginPercent,
+        winnerPerformanceId: current.winnerPerformanceId,
+        loserPerformanceId:
+          current.winnerPerformanceId === current.performanceAId
+            ? current.performanceBId
+            : current.performanceAId,
+        newChampion: newChamp
+          ? {
+              userId: newChamp.id,
+              username: newChamp.username,
+              avatarUrl: newChamp.avatarUrl,
+            }
+          : null,
+        formerChampion: formerChamp
+          ? {
+              userId: formerChamp.id,
+              username: formerChamp.username,
+              avatarUrl: formerChamp.avatarUrl,
+            }
+          : null,
+      };
     });
   }
 

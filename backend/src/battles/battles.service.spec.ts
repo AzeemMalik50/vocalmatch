@@ -284,4 +284,72 @@ describe('BattlesService (critical paths)', () => {
       );
     });
   });
+
+  describe('findRecentDethronements (no predicate — marquee path)', () => {
+    it('returns completed battles where the winner changed for the song, newest first', async () => {
+      const songId = 'song-1';
+      const t = (offsetSec: number) => new Date(Date.now() + offsetSec * 1000);
+
+      // Two completed battles for the same song; champion changed in the latter.
+      const battles: Battle[] = [
+        battleFixture({
+          id: 'b-newer',
+          songId,
+          status: 'completed',
+          winnerUserId: 'user-NEW',
+          winnerPerformanceId: 'perf-a',
+          voteCountA: 60,
+          voteCountB: 40,
+          closedAt: t(-10),
+        }),
+        battleFixture({
+          id: 'b-older',
+          songId,
+          status: 'completed',
+          winnerUserId: 'user-OLD',
+          winnerPerformanceId: 'perf-b',
+          voteCountA: 30,
+          voteCountB: 70,
+          closedAt: t(-120),
+        }),
+      ];
+
+      battleRepo.find.mockResolvedValue(battles);
+      userRepo.find = jest.fn().mockResolvedValue([
+        { id: 'user-NEW', username: 'new', avatarUrl: null },
+        { id: 'user-OLD', username: 'old', avatarUrl: null },
+      ]);
+      songsService.findOne.mockResolvedValue({
+        id: songId,
+        title: 'Song One',
+        artist: 'Artist',
+      });
+
+      const out = await service.findRecentDethronements(5);
+
+      expect(out).toHaveLength(1);
+      expect(out[0].battleId).toBe('b-newer');
+      expect(out[0].newChampion?.username).toBe('new');
+      expect(out[0].formerChampion?.username).toBe('old');
+      expect(out[0].winnerVotePercent).toBe(60);
+    });
+
+    it('returns [] when no song has a champion change', async () => {
+      const battles: Battle[] = [
+        battleFixture({
+          id: 'b-1',
+          status: 'completed',
+          winnerUserId: 'user-A',
+          winnerPerformanceId: 'perf-a',
+          closedAt: new Date(),
+        }),
+      ];
+      battleRepo.find.mockResolvedValue(battles);
+      userRepo.find = jest.fn().mockResolvedValue([]);
+      songsService.findOne.mockResolvedValue(null);
+
+      const out = await service.findRecentDethronements(5);
+      expect(out).toEqual([]);
+    });
+  });
 });

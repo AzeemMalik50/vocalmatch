@@ -70,12 +70,12 @@ export class AdminChallengesController {
       'Admin only. Default surface is the actionable queue (`status=open` → pending submissions). Pass `status=selected`, `rejected`, or `pending` to filter explicitly; `songId` narrows to a single song.',
   })
   @ApiQuery({ name: 'songId', required: false, type: String })
-  @ApiQuery({ name: 'status', required: false, enum: ['pending', 'selected', 'rejected', 'open'] })
+  @ApiQuery({ name: 'status', required: false, enum: ['pending', 'selected', 'rejected', 'open', 'all'] })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'offset', required: false, type: Number })
   async list(
     @Query('songId') songId?: string,
-    @Query('status') status?: ChallengeStatus | 'open',
+    @Query('status') status?: ChallengeStatus | 'open' | 'all',
     @Query('limit') limitRaw?: string,
     @Query('offset') offsetRaw?: string,
   ) {

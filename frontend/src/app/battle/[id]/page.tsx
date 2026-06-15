@@ -40,7 +40,12 @@ export default function BattlePage() {
   const [performanceA, setPerformanceA] = useState<VideoDto | null>(null);
   const [performanceB, setPerformanceB] = useState<VideoDto | null>(null);
   const [topLevelError, setTopLevelError] = useState<string | null>(null);
-  const [perfError, setPerfError] = useState<string | null>(null);
+  // Bug #20 — tracked failure per side so the page can replace the
+  // permanently-spinning skeleton with an explicit "unavailable" state
+  // instead of looking like it's still loading.
+  const [perfErrorA, setPerfErrorA] = useState<string | null>(null);
+  const [perfErrorB, setPerfErrorB] = useState<string | null>(null);
+  const perfError = perfErrorA || perfErrorB;
   const [shareState, setShareState] = useState<'idle' | 'copied'>('idle');
 
   const load = useCallback(async () => {
@@ -55,11 +60,15 @@ export default function BattlePage() {
       api
         .getVideo(b.performanceAId)
         .then(setPerformanceA)
-        .catch((e) => setPerfError(e.message || 'Could not load performance A'));
+        .catch((e) =>
+          setPerfErrorA(e.message || 'Performance A is unavailable.'),
+        );
       api
         .getVideo(b.performanceBId)
         .then(setPerformanceB)
-        .catch((e) => setPerfError(e.message || 'Could not load performance B'));
+        .catch((e) =>
+          setPerfErrorB(e.message || 'Performance B is unavailable.'),
+        );
     } catch (e: any) {
       setTopLevelError(e.message || 'Could not load this battle');
     }
@@ -266,6 +275,8 @@ export default function BattlePage() {
                 song.currentChampionPerformanceId === performanceA.id
               }
             />
+          ) : perfErrorA ? (
+            <PerformancePaneUnavailable side="A" message={perfErrorA} />
           ) : (
             <PerformancePaneSkeleton side="A" />
           )}
@@ -278,12 +289,17 @@ export default function BattlePage() {
                 song.currentChampionPerformanceId === performanceB.id
               }
             />
+          ) : perfErrorB ? (
+            <PerformancePaneUnavailable side="B" message={perfErrorB} />
           ) : (
             <PerformancePaneSkeleton side="B" />
           )}
         </div>
 
-        {/* Vote panel — needs both performances loaded */}
+        {/* Vote panel — needs both performances loaded. When either
+            side failed to load (e.g. soft-deleted media) we replace the
+            indefinite "loading" state with a clear explanation so the
+            page doesn't appear stuck. */}
         {performanceA && performanceB ? (
           <BattleVotePanel
             battle={battle}
@@ -291,6 +307,16 @@ export default function BattlePage() {
             performanceB={performanceB}
             onVoted={(updated) => setBattle(updated)}
           />
+        ) : perfError ? (
+          <div className="bg-stage-900 border border-red-900/40 rounded-2xl p-8 text-center">
+            <p className="font-display text-xl font-bold text-white mb-2">
+              Voting is paused for this battle.
+            </p>
+            <p className="text-sm text-haze">
+              One or both performance videos are no longer available. An admin
+              has been notified — check back later or browse other live battles.
+            </p>
+          </div>
         ) : (
           <div className="bg-stage-900 border border-stage-700 rounded-2xl p-8">
             <StageLoader message="Tuning in to both performers…" />
@@ -461,6 +487,41 @@ function StatusPill({ status }: { status: BattleDto['status'] }) {
   );
 }
 
+function PerformancePaneUnavailable({
+  side,
+  message,
+}: {
+  side: 'A' | 'B';
+  message: string;
+}) {
+  // Bug #20 — replaces the indefinite skeleton when the performance
+  // can't be loaded (typical cause: the uploader soft-deleted the
+  // video). Gives the user a clear "this side is gone" state instead
+  // of a permanent loading spinner.
+  const accent = side === 'A' ? 'border-spotlight/30' : 'border-gold/30';
+  return (
+    <div
+      role="status"
+      className={`bg-stage-900 border-2 ${accent} rounded-xl overflow-hidden`}
+    >
+      <div className="aspect-video bg-stage-950 flex items-center justify-center">
+        <div className="text-center px-6">
+          <p className="font-display text-2xl font-bold text-haze mb-1">
+            Side {side}
+          </p>
+          <p className="text-sm text-haze/70">Performance unavailable</p>
+        </div>
+      </div>
+      <div className="p-4">
+        <p className="text-[11px] uppercase tracking-widest text-haze/60 font-bold mb-1">
+          Side {side}
+        </p>
+        <p className="text-sm text-haze leading-relaxed">{message}</p>
+      </div>
+    </div>
+  );
+}
+
 function PerformancePane({
   performance,
   side,
@@ -504,6 +565,26 @@ function PerformancePane({
             href={`/u/${performance.uploader.username}`}
             className="inline-flex items-center gap-2 mt-2 text-sm text-haze hover:text-white transition-colors flex-wrap"
           >
+            {/* Singer avatar next to the @username so the side reads as
+                a person, not just a handle. */}
+            <span
+              className={`relative inline-block h-7 w-7 shrink-0 overflow-hidden rounded-full border ${
+                side === 'A' ? 'border-spotlight/50' : 'border-gold/50'
+              } bg-stage-800`}
+            >
+              {performance.uploader.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={performance.uploader.avatarUrl}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <span className="flex h-full w-full items-center justify-center text-[11px] font-bold text-haze">
+                  {performance.uploader.username[0]?.toUpperCase()}
+                </span>
+              )}
+            </span>
             @{performance.uploader.username}
             {performance.uploader.championTitle && (
               <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-widest bg-gold/15 text-gold rounded">

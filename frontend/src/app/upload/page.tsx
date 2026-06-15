@@ -117,6 +117,22 @@ function UploadForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [songs, prefilledSongId]);
 
+  // Bug #18 — when the user clicked "Upload Your Version" a second
+  // time (e.g. for a different challenger), Next.js soft-navigation
+  // kept the existing form state. Reset the transient fields when the
+  // intent (challenge mode + target song) changes so the user always
+  // starts from a clean form.
+  useEffect(() => {
+    setTitle('');
+    setDescription('');
+    setTagsInput('');
+    setFile(null);
+    setErr(null);
+    setProgress(0);
+    setUploaded(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [challengeMode, prefilledSongId]);
+
   const selectedSong = songs.find((s) => s.id === songId) ?? null;
 
   const filteredSongs = (() => {
@@ -216,8 +232,12 @@ function UploadForm() {
       setProgress(100);
 
       // Challenge mode: register the upload as a Red Phone submission for
-      // the prefilled song. On 409 (a queue already exists) we still send
-      // the user to the song's battle so they aren't stranded.
+      // the prefilled song.
+      // Bug #11 — if the challenge queue rejects the submission (most
+      // common: 409 because someone else is already queued for this
+      // song), the video we just uploaded would be orphaned. Roll back
+      // by deleting the just-created video so we never leave a stranded
+      // performance behind.
       if (challengeMode && songId) {
         try {
           await api.submitChallenge(songId, created.id);
@@ -226,11 +246,18 @@ function UploadForm() {
           );
           return;
         } catch (e: any) {
+          try {
+            await api.deleteVideo(created.id);
+          } catch {
+            /* Best-effort rollback — admin can clean up later if it fails. */
+          }
           setErr(
             e?.message ??
-              'Upload saved, but we couldn\'t queue it as a challenge.',
+              'A challenger is already queued for this song. Your upload was not saved.',
           );
           setSubmitting(false);
+          setProgress(0);
+          setUploaded(0);
           return;
         }
       }
@@ -244,8 +271,28 @@ function UploadForm() {
     }
   };
 
+  // Bug #15 — clicking "Cancel upload" used to abort the in-flight XHR,
+  // but if the server had already saved the video before the abort
+  // reached it, the performance still appeared in the Performances feed.
+  // We now race the abort with a cleanup delete keyed off the promise
+  // outcome: if the server returned a created row before we aborted,
+  // we delete it so cancellation truly means "nothing was uploaded".
   const cancel = () => {
-    handleRef.current?.cancel();
+    const handle = handleRef.current;
+    if (!handle) return;
+    handle.cancel();
+    handle.promise
+      .then((created) => {
+        if (created?.id) {
+          api.deleteVideo(created.id).catch(() => {});
+        }
+      })
+      .catch(() => {
+        /* abort throw is expected — nothing to clean up */
+      });
+    setSubmitting(false);
+    setProgress(0);
+    setUploaded(0);
   };
 
   if (authLoading || !user) {
@@ -512,13 +559,20 @@ function UploadForm() {
               onDrop={onDrop}
               className="block cursor-pointer"
             >
+              {/* Bug #19 — the file input had `required` even though the
+                  picker can be cancelled. On cancel Safari/Firefox clear
+                  the FileList, which made the native HTML5 validation
+                  flash "Please select a file" even when our React state
+                  still held a valid pick. Source of truth is our `file`
+                  state; we validate it in `submit()`. */}
               <input
                 type="file"
                 accept="video/*"
-                required
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (f) acceptFile(f);
+                  // Always clear so the same file can be re-selected.
+                  e.target.value = '';
                 }}
                 className="sr-only"
               />
@@ -554,8 +608,24 @@ function UploadForm() {
           </div>
 
           {err && (
-            <div className="text-sm text-red-300 bg-red-950/40 border border-red-900/40 rounded-md px-4 py-3">
-              {err}
+            // Bug #28 — strong contrast + icon + role=alert so the
+            // message is announced and unmissable.
+            // Bug #34 — text node needs `min-w-0 flex-1` to wrap on
+            // iPhone instead of overflowing horizontally (which was
+            // truncating "Please select a file" to "Select a…").
+            <div
+              role="alert"
+              className="flex items-start gap-3 bg-red-900/50 border border-red-400/60 rounded-md px-4 py-3 text-sm text-red-50 shadow-lg shadow-red-950/40"
+            >
+              <span
+                aria-hidden="true"
+                className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-500 text-[11px] font-black text-white"
+              >
+                !
+              </span>
+              <span className="min-w-0 flex-1 font-semibold leading-relaxed break-words">
+                {err}
+              </span>
             </div>
           )}
 

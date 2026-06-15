@@ -4,18 +4,17 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { useTheme } from '@/lib/theme-context';
 import Logo from './Logo';
 import NotificationBell from './NotificationBell';
 
 export default function Nav() {
   const { user, logout, loading } = useAuth();
-  const { theme, toggle: toggleTheme } = useTheme();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Close on outside click
+  // Close on outside click OR Escape — keyboard users need a way out
+  // of the disclosure menu without grabbing the mouse.
   useEffect(() => {
     if (!menuOpen) return;
     const close = (e: MouseEvent) => {
@@ -23,8 +22,15 @@ export default function Nav() {
         setMenuOpen(false);
       }
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
     document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', onKey);
+    };
   }, [menuOpen]);
 
   return (
@@ -35,55 +41,50 @@ export default function Nav() {
         </Link>
 
         <nav className="flex items-center gap-1.5 sm:gap-3 text-sm shrink-0">
-          <button
-            type="button"
-            onClick={toggleTheme}
-            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-            title={`Switch to ${theme === 'dark' ? 'studio (light)' : 'stage (dark)'}`}
-            className="w-9 h-9 inline-flex items-center justify-center rounded-full border border-stage-700 hover:border-spotlight/50 text-haze hover:text-white transition-colors"
-          >
-            {theme === 'dark' ? (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="4" />
-                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-              </svg>
-            ) : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-              </svg>
-            )}
-          </button>
           {loading ? null : user ? (
             <>
               <NotificationBell />
+              {/* Bug #40 (new) — Admin link was `hidden md:inline-flex`
+                  so it disappeared on iPhone portrait. It now renders in
+                  every orientation; padding tightens on narrow widths
+                  so the row still fits. */}
               {user.isAdmin && (
                 <Link
                   href="/admin"
-                  className="hidden md:inline-flex items-center px-3 py-2 text-spotlight font-bold hover:opacity-90 transition-opacity uppercase tracking-widest text-xs whitespace-nowrap"
+                  className="inline-flex items-center px-2 sm:px-3 py-2 text-spotlight font-bold hover:opacity-90 transition-opacity uppercase tracking-widest text-xs whitespace-nowrap"
                   title="Admin dashboard"
                 >
                   Admin
                 </Link>
               )}
               {/* Upload is a singer action — admins don't have a singer surface,
-                  so we hide the prominent CTA for them. */}
+                  so we hide the prominent CTA for them.
+                  Bug #31 — previously the whole button was hidden on
+                  portrait iPhone (`hidden sm:inline-flex`). It now stays
+                  visible everywhere; the "Upload" label collapses to
+                  an icon-only button below the sm breakpoint. */}
               {!user.isAdmin && (
                 <Link
                   href="/upload"
-                  className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 bg-spotlight text-white font-bold hover:bg-spotlight-dim transition-colors rounded-md shadow-lg shadow-spotlight/20 whitespace-nowrap"
+                  aria-label="Upload performance"
+                  className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-spotlight text-white font-bold hover:bg-spotlight-dim transition-colors rounded-md shadow-lg shadow-spotlight/20 whitespace-nowrap"
                 >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                     <path d="M7 1v12M1 7h12" stroke="white" strokeWidth="2" />
                   </svg>
-                  Upload
+                  <span className="hidden sm:inline">Upload</span>
                 </Link>
               )}
 
               {/* Avatar menu */}
               <div className="relative" ref={menuRef}>
                 <button
+                  type="button"
                   onClick={() => setMenuOpen((o) => !o)}
-                  className="flex items-center gap-2 p-1 pr-3 rounded-full border border-stage-700 hover:border-spotlight/50 transition-colors"
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen}
+                  aria-label={`Account menu for @${user.username}`}
+                  className="flex items-center gap-2 p-1 pr-3 rounded-full border border-stage-700 hover:border-spotlight/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spotlight focus-visible:ring-offset-2 focus-visible:ring-offset-stage-950 transition-colors"
                 >
                   <span className="w-8 h-8 rounded-full bg-stage-800 flex items-center justify-center overflow-hidden">
                     {user.avatarUrl ? (
@@ -122,7 +123,11 @@ export default function Nav() {
                 </button>
 
                 {menuOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-56 bg-stage-900 border border-stage-700 rounded-xl shadow-2xl overflow-hidden">
+                  <div
+                    role="menu"
+                    aria-label="Account"
+                    className="absolute right-0 top-full mt-2 w-56 bg-stage-900 border border-stage-700 rounded-xl shadow-2xl overflow-hidden"
+                  >
                     <Link
                       href={`/u/${user.username}`}
                       onClick={() => setMenuOpen(false)}
@@ -144,15 +149,9 @@ export default function Nav() {
                         Upload performance
                       </Link>
                     )}
-                    {user.isAdmin && (
-                      <Link
-                        href="/admin"
-                        onClick={() => setMenuOpen(false)}
-                        className="md:hidden block px-4 py-3 text-sm font-semibold text-spotlight hover:bg-stage-800 transition-colors"
-                      >
-                        Admin dashboard
-                      </Link>
-                    )}
+                    {/* Admin link removed from the dropdown — the top-bar
+                        Admin link is now always visible (bug #40), so this
+                        duplicate would just be clutter. */}
                     <Link
                       href="/settings"
                       onClick={() => setMenuOpen(false)}

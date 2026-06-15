@@ -65,6 +65,9 @@ export default function AdminSongsPage() {
     setMode('new');
     setForm(empty);
     setError(null);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    }
   };
 
   const openEdit = (s: SongDto) => {
@@ -76,6 +79,14 @@ export default function AdminSongsPage() {
       coverArtUrl: s.coverArtUrl ?? '',
     });
     setError(null);
+    // Bug #42 — the edit form mounts at the top of the page; clicking
+    // Edit from a row mid-scroll left the form invisible until the
+    // admin scrolled back up. Scroll to top so the form is always
+    // immediately visible. `behavior: smooth` mirrors the rest of the
+    // site's anchor jumps.
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    }
   };
 
   const closeForm = () => {

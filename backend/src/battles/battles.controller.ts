@@ -85,6 +85,18 @@ export class BattlesController {
     };
   }
 
+  @Get('dethronements/recent')
+  @ApiOperation({
+    summary: 'Recent dethronements',
+    description:
+      'Public feed of recent crown changes — completed battles where the winning user is NOT the same as the previous battle winner for that song. Each item bundles former + new champion (username + avatarUrl), the song title, dethronement timestamp, and the winner vote-percentage. Used by the homepage "Dethroned!" panel.',
+  })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async dethronements(@Query('limit') limitRaw?: string) {
+    const limit = limitRaw ? parseInt(limitRaw, 10) || 5 : 5;
+    return this.battles.findRecentDethronements(Math.min(limit, 50));
+  }
+
   @Get(':id')
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({

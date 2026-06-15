@@ -116,8 +116,11 @@ export default function ProfilePage() {
                   </div>
 
                   <div className="flex-1 min-w-0">
+                    {/* Bug #27 — the eyebrow label was hardcoded to
+                        "Performer", which surfaced on admin profiles
+                        too. Use the actual role flag. */}
                     <p className="text-xs uppercase tracking-[0.3em] text-haze/60 mb-2">
-                      Performer
+                      {profile.isAdmin ? 'Admin' : 'Performer'}
                       {profile.privateProfile && isOwnProfile && (
                         <span className="ml-2 text-spotlight">· Private</span>
                       )}
