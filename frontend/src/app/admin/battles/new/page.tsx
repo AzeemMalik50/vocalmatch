@@ -185,14 +185,37 @@ export default function AdminNewBattlePage() {
         {/* Voting window */}
         <Field label="Voting window">
           <div className="flex items-center gap-3">
-            <input
-              type="number"
-              min={1}
-              max={168}
-              value={hours}
-              onChange={(e) => setHours(Math.max(1, parseInt(e.target.value || '0', 10) || 0))}
-              className="w-24 px-3 py-2.5 bg-stage-900 border border-stage-700 rounded-md focus:outline-none focus:border-spotlight transition-colors tabular-nums"
-            />
+            {/* Bug #37 — added explicit −/+ stepper controls around the
+                number input so admins can adjust the duration with a tap
+                instead of typing on mobile keyboards. */}
+            <div className="inline-flex items-stretch rounded-md border border-stage-700 overflow-hidden bg-stage-900">
+              <button
+                type="button"
+                onClick={() => setHours((h) => Math.max(1, h - 1))}
+                aria-label="Decrease voting window by one hour"
+                className="px-3 text-lg font-bold text-haze hover:bg-stage-800 hover:text-white transition-colors"
+              >
+                −
+              </button>
+              <input
+                type="number"
+                min={1}
+                max={168}
+                value={hours}
+                onChange={(e) =>
+                  setHours(Math.max(1, parseInt(e.target.value || '0', 10) || 0))
+                }
+                className="w-16 px-2 py-2.5 bg-stage-900 border-x border-stage-700 text-center focus:outline-none focus:border-spotlight transition-colors tabular-nums"
+              />
+              <button
+                type="button"
+                onClick={() => setHours((h) => Math.min(168, h + 1))}
+                aria-label="Increase voting window by one hour"
+                className="px-3 text-lg font-bold text-haze hover:bg-stage-800 hover:text-white transition-colors"
+              >
+                +
+              </button>
+            </div>
             <span className="text-haze">hours</span>
             <span className="text-xs text-haze/60">
               (default 48; recommended 24–48)
@@ -201,8 +224,21 @@ export default function AdminNewBattlePage() {
         </Field>
 
         {error && (
-          <div className="bg-red-950/30 border border-red-900/40 rounded-lg p-3 text-sm text-red-300">
-            {error}
+          // Bug #41 — error panel was red-300 on a 30% red wash with a
+          // 40% red border; on the dark theme that read as just-noticeable
+          // pink. Stronger background + brighter text so the validation
+          // actually grabs the admin's attention.
+          <div
+            role="alert"
+            className="flex items-start gap-3 bg-red-900/50 border border-red-400/60 rounded-lg p-4 text-sm text-red-50 shadow-lg shadow-red-950/40"
+          >
+            <span
+              aria-hidden="true"
+              className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-500 text-[11px] font-black text-white"
+            >
+              !
+            </span>
+            <span className="font-semibold leading-relaxed">{error}</span>
           </div>
         )}
 
