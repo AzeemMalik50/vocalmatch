@@ -17,7 +17,13 @@ export class SignupDto {
 }
 
 export class LoginDto {
-  @IsEmail()
+  // Field name kept as `email` for API + frontend compatibility, but the
+  // value can be EITHER an email address OR a username — the service
+  // looks the user up by both. Validation relaxed to `@IsString` so
+  // usernames (which don't pass `@IsEmail`) aren't rejected at the
+  // pipe layer.
+  @IsString()
+  @MinLength(1)
   email: string;
 
   @IsString()

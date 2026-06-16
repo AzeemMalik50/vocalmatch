@@ -57,9 +57,18 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const user = await this.users.findOne({
-      where: { email: dto.email.toLowerCase() },
-    });
+    // The `email` field on LoginDto is a misnomer for backwards
+    // compatibility — callers may send either an email address or a
+    // username. Match against both columns case-insensitively in a
+    // single query. The signup flow already enforces uniqueness on
+    // each column, so a hit on either is unambiguous.
+    const identifier = dto.email.trim().toLowerCase();
+    const user = await this.users
+      .createQueryBuilder('u')
+      .where('LOWER(u.email) = :identifier OR LOWER(u.username) = :identifier', {
+        identifier,
+      })
+      .getOne();
     if (!user) throw new UnauthorizedException('Invalid credentials');
     const ok = await bcrypt.compare(dto.password, user.passwordHash);
     if (!ok) throw new UnauthorizedException('Invalid credentials');

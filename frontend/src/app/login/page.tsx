@@ -51,7 +51,11 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = safeNext(searchParams?.get('next') ?? null);
-  const [email, setEmail] = useState('');
+  // `identifier` is either an email OR a username — the backend looks
+  // the user up against both columns. Keeping the variable named for
+  // its UX semantics, even though the auth-context API still passes
+  // it via the legacy `email` parameter name.
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -62,7 +66,7 @@ function LoginForm() {
     setErr(null);
     setLoading(true);
     try {
-      await login(email, password);
+      await login(identifier, password);
       router.push(next);
     } catch (e: any) {
       setErr(e.message);
@@ -74,14 +78,18 @@ function LoginForm() {
   return (
     <>
       <form onSubmit={submit} className="space-y-5">
-        <Field label="Email">
+        <Field label="Email or username">
+          {/* type=text (was type=email) so the browser's native
+              "Please include an @" validation doesn't reject usernames.
+              autoComplete="username" lets password managers autofill
+              both email- and username-style identifiers. */}
           <TextInput
-            type="email"
+            type="text"
             required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-            placeholder="you@example.com"
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+            autoComplete="username"
+            placeholder="you@example.com or @username"
           />
         </Field>
 
