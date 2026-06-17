@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
+import LobbyToast from '@/components/LobbyToast';
 import {
   api,
   AtRiskCrownDto,
@@ -45,6 +46,7 @@ import {
   VoiceType,
 } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useLobby } from '@/lib/useLobby';
 import {
   HERO_MAIN,
   HERO_LIVE_BATTLE,
@@ -95,6 +97,10 @@ export default function HomePage() {
       <Reveal><ShareCardsRow /></Reveal>
       <Reveal><CTAFooter user={user} /></Reveal>
       <Footer />
+      {/* Floating real-time toast — pops in for ~4s whenever the lobby SSE
+          pushes a battle lifecycle event (created / closed / cancelled /
+          tied). Anonymous-friendly. */}
+      <LobbyToast />
     </div>
   );
 }
@@ -352,32 +358,47 @@ function LiveBattle() {
     seconds: 0,
   });
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const resp = await api.listBattles({ status: 'live', limit: 1 });
-        if (cancelled || resp.items.length === 0) return;
-        const featured = await api.getBattle(resp.items[0].id);
-        if (cancelled) return;
-        setBattle(featured);
-        const [perfA, perfB] = await Promise.all([
-          api.getVideo(featured.performanceAId),
-          api.getVideo(featured.performanceBId),
-        ]);
-        if (cancelled) return;
-        setA(perfA);
-        setB(perfB);
-      } catch {
-        // Non-fatal — section degrades to empty state.
-      } finally {
-        if (!cancelled) setLoading(false);
+  // Extracted so the lobby SSE listener below can re-run it whenever
+  // a battle lifecycle event arrives — covers create / cancel / close
+  // so the hero stays current without a manual refresh.
+  const refetch = useCallback(async () => {
+    setLoading(true);
+    try {
+      const resp = await api.listBattles({ status: 'live', limit: 1 });
+      if (resp.items.length === 0) {
+        // The featured battle was cancelled / completed and there's no
+        // replacement live one — reset to the empty-state copy.
+        setBattle(null);
+        setA(null);
+        setB(null);
+        return;
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+      const featured = await api.getBattle(resp.items[0].id);
+      setBattle(featured);
+      const [perfA, perfB] = await Promise.all([
+        api.getVideo(featured.performanceAId),
+        api.getVideo(featured.performanceBId),
+      ]);
+      setA(perfA);
+      setB(perfB);
+    } catch {
+      // Non-fatal — section degrades to empty state.
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void refetch();
+  }, [refetch]);
+
+  // Real-time refresh — every lifecycle event on the public lobby
+  // channel triggers a re-pick of the featured battle. If the current
+  // one was just cancelled, this will swap it out (or fall to the
+  // empty state) without requiring a page reload.
+  useLobby(() => {
+    void refetch();
+  });
 
   useEffect(() => {
     if (!battle?.votingClosesAt) return;
@@ -1299,52 +1320,54 @@ function WinnersCarousel() {
   const [winners, setWinners] = useState<WinnerCard[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const completed = await api.listBattles({
-          status: 'completed',
-          limit: 6,
-        });
-        if (cancelled) return;
-        const detailed = await Promise.all(
-          completed.items.slice(0, 6).map(async (b) => {
-            try {
-              const full = await api.getBattle(b.id);
-              if (!full.winnerPerformanceId) return null;
-              const perf = await api.getVideo(full.winnerPerformanceId);
-              const song = await api.getSong(full.songId).catch(() => null);
-              const total = (full.voteCountA ?? 0) + (full.voteCountB ?? 0);
-              const winnerCount =
-                full.winnerPerformanceId === full.performanceAId
-                  ? full.voteCountA ?? 0
-                  : full.voteCountB ?? 0;
-              return {
-                battleId: full.id,
-                songTitle: song?.title ?? 'Centerstage Song',
-                songArtist: song?.artist ?? '',
-                winnerUsername: perf.uploader?.username ?? null,
-                winnerAvatarUrl: perf.uploader?.avatarUrl ?? null,
-                percent: total > 0 ? Math.round((winnerCount / total) * 100) : 0,
-              } satisfies WinnerCard;
-            } catch {
-              return null;
-            }
-          }),
-        );
-        if (cancelled) return;
-        setWinners(detailed.filter((w): w is WinnerCard => w !== null));
-      } catch {
-        // Non-fatal
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+  const refetch = useCallback(async () => {
+    try {
+      const completed = await api.listBattles({
+        status: 'completed',
+        limit: 6,
+      });
+      const detailed = await Promise.all(
+        completed.items.slice(0, 6).map(async (b) => {
+          try {
+            const full = await api.getBattle(b.id);
+            if (!full.winnerPerformanceId) return null;
+            const perf = await api.getVideo(full.winnerPerformanceId);
+            const song = await api.getSong(full.songId).catch(() => null);
+            const total = (full.voteCountA ?? 0) + (full.voteCountB ?? 0);
+            const winnerCount =
+              full.winnerPerformanceId === full.performanceAId
+                ? full.voteCountA ?? 0
+                : full.voteCountB ?? 0;
+            return {
+              battleId: full.id,
+              songTitle: song?.title ?? 'Centerstage Song',
+              songArtist: song?.artist ?? '',
+              winnerUsername: perf.uploader?.username ?? null,
+              winnerAvatarUrl: perf.uploader?.avatarUrl ?? null,
+              percent: total > 0 ? Math.round((winnerCount / total) * 100) : 0,
+            } satisfies WinnerCard;
+          } catch {
+            return null;
+          }
+        }),
+      );
+      setWinners(detailed.filter((w): w is WinnerCard => w !== null));
+    } catch {
+      // Non-fatal
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void refetch();
+  }, [refetch]);
+
+  // When a battle closes, it joins this list — keep it current via the
+  // lobby stream so visitors don't have to refresh.
+  useLobby((e) => {
+    if (e.change === 'closed') void refetch();
+  });
 
   if (!loading && winners.length === 0) return null;
 

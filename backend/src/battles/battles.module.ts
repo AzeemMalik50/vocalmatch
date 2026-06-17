@@ -84,5 +84,32 @@ export class BattlesModule implements OnModuleInit {
         `Failed to create challenge unique index: ${err}`,
       );
     }
+
+    // Bug #6 backfill — any submission that's still `selected` whose
+    // resulting battle has already finalized (completed or cancelled)
+    // should be released to `completed` so the per-song queue index
+    // stops blocking new challengers. This handles rows created BEFORE
+    // the lifecycle fix in BattlesService shipped — going forward,
+    // finalizeWinner / cancel update them atomically.
+    try {
+      const result = await this.dataSource.query(
+        `UPDATE challenge_submissions cs
+            SET status = 'completed'
+           FROM battles b
+          WHERE cs."resultingBattleId" = b.id
+            AND cs.status = 'selected'
+            AND b.status IN ('completed', 'cancelled')`,
+      );
+      const rowCount = Array.isArray(result) ? result[1] : 0;
+      if (rowCount && rowCount > 0) {
+        this.logger.log(
+          `Released ${rowCount} stale 'selected' challenge submission(s) to 'completed' (queue backfill).`,
+        );
+      }
+    } catch (err) {
+      this.logger.error(
+        `Failed to backfill completed challenge submissions: ${err}`,
+      );
+    }
   }
 }

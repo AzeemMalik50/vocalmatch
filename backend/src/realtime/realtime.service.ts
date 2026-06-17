@@ -24,6 +24,15 @@ export class RealtimeService {
   static battleChannel(battleId: string): string {
     return `battle:${battleId}`;
   }
+  /**
+   * Public "lobby" channel — broadcasts list-level battle lifecycle events
+   * (created / cancelled / closed / status flip) so anonymous homepage
+   * visitors can react in real time without subscribing to every battle.
+   * Carries only public, non-gated fields (id, songId, status, closedAt).
+   */
+  static lobbyChannel(): string {
+    return 'lobby:battles';
+  }
 
   /**
    * Register an SSE response object as a subscriber to one or more channels.

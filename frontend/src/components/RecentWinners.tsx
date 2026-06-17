@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   api,
@@ -8,6 +8,7 @@ import {
   SongDto,
   VideoDto,
 } from '@/lib/api';
+import { useLobby } from '@/lib/useLobby';
 
 interface Loaded {
   battle: BattleSummaryDto;
@@ -26,36 +27,40 @@ export default function RecentWinners() {
   const [items, setItems] = useState<Loaded[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const resp = await api.listBattles({
-          status: 'completed',
-          limit: COUNT,
-        });
-        const loaded = await Promise.all(
-          resp.items.map(async (b) => {
-            const [song, winner] = await Promise.all([
-              api.getSong(b.songId).catch(() => null),
-              b.winnerPerformanceId
-                ? api.getVideo(b.winnerPerformanceId).catch(() => null)
-                : Promise.resolve(null),
-            ]);
-            return { battle: b, song, winner };
-          }),
-        );
-        if (!cancelled) setItems(loaded);
-      } catch {
-        // Non-fatal — section just won't render.
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+  const refetch = useCallback(async () => {
+    try {
+      const resp = await api.listBattles({
+        status: 'completed',
+        limit: COUNT,
+      });
+      const loaded = await Promise.all(
+        resp.items.map(async (b) => {
+          const [song, winner] = await Promise.all([
+            api.getSong(b.songId).catch(() => null),
+            b.winnerPerformanceId
+              ? api.getVideo(b.winnerPerformanceId).catch(() => null)
+              : Promise.resolve(null),
+          ]);
+          return { battle: b, song, winner };
+        }),
+      );
+      setItems(loaded);
+    } catch {
+      // Non-fatal — section just won't render.
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void refetch();
+  }, [refetch]);
+
+  // When a battle closes, it joins this list — pick it up via the lobby
+  // stream so visitors don't have to refresh.
+  useLobby((e) => {
+    if (e.change === 'closed') void refetch();
+  });
 
   if (loading || items.length === 0) return null;
 
