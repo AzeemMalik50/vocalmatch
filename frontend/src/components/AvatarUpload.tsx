@@ -2,12 +2,19 @@
 
 import { useState, useRef } from 'react';
 import { api } from '@/lib/api';
+import { useConfirm } from '@/lib/confirm-context';
 import { Spinner } from './forms';
 
 interface Props {
   currentUrl: string | null;
   username: string;
-  onUploaded: (url: string) => void;
+  /**
+   * Fires whenever the avatar changes — including removal. Receives the
+   * new URL, or `null` when the user removed their photo. Consumers
+   * should update both the local profile object and any cached auth
+   * snapshot with the same value.
+   */
+  onUploaded: (url: string | null) => void;
   size?: 'md' | 'lg';
 }
 
@@ -18,9 +25,11 @@ export default function AvatarUpload({
   size = 'lg',
 }: Props) {
   const [uploading, setUploading] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentUrl);
   const inputRef = useRef<HTMLInputElement>(null);
+  const confirm = useConfirm();
 
   const dim = size === 'lg' ? 'w-32 h-32 md:w-36 md:h-36' : 'w-24 h-24';
   const fontSize = size === 'lg' ? 'text-5xl' : 'text-3xl';
@@ -52,6 +61,32 @@ export default function AvatarUpload({
       setPreviewUrl(currentUrl);
     } finally {
       setUploading(false);
+    }
+  };
+
+  // Remove the current profile photo. Confirms first so a stray click
+  // doesn't wipe the avatar. After success, the preview falls back to
+  // the username-initial tile and the parent is notified via the same
+  // onUploaded callback (empty string -> null in the public profile).
+  const handleRemove = async () => {
+    if (!previewUrl) return;
+    const ok = await confirm({
+      title: 'Remove your profile photo?',
+      message: 'Your profile will fall back to the initial tile until you upload a new one.',
+      confirmLabel: 'Remove photo',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setError(null);
+    setRemoving(true);
+    try {
+      const updated = await api.removeAvatar();
+      setPreviewUrl(updated.avatarUrl ?? null);
+      onUploaded(updated.avatarUrl ?? null);
+    } catch (e: any) {
+      setError(e.message || 'Could not remove profile photo');
+    } finally {
+      setRemoving(false);
     }
   };
 
@@ -114,6 +149,20 @@ export default function AvatarUpload({
           e.target.value = ''; // allow re-selecting same file
         }}
       />
+
+      {/* Remove button — only shown when there's a photo to remove.
+          Sits below the avatar tile so it can't be hit by an accidental
+          tap targeting the upload button. */}
+      {previewUrl && !uploading && (
+        <button
+          type="button"
+          onClick={handleRemove}
+          disabled={removing}
+          className="text-xs font-bold uppercase tracking-widest text-haze hover:text-red-300 disabled:opacity-50 transition-colors"
+        >
+          {removing ? 'Removing…' : 'Remove photo'}
+        </button>
+      )}
 
       {error && (
         <p className="text-xs text-spotlight text-center max-w-xs">{error}</p>
