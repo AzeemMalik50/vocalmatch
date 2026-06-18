@@ -210,6 +210,17 @@ export class AdminPerformancesController {
     const video = await this.videos.findOne({ where: { id } });
     if (!video) throw new NotFoundException('Performance not found');
 
+    // Block editing the song link on a soft-deleted performance —
+    // assigning a song to a row that's hidden from every public surface
+    // produces inconsistent state (the new song link is invisible to
+    // everyone except the admin list). Admin must restore the row
+    // first if they want to retag it.
+    if (video.deletedAt) {
+      throw new ConflictException(
+        'This performance is deleted. Restore it before changing the song link.',
+      );
+    }
+
     // Bug #29 — block editing the Centerstage Song link of a performance
     // that is currently participating in a live or tie-pending battle.
     // Allowing it broke the battle's same-song invariant and let admin

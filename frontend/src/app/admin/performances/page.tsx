@@ -301,40 +301,45 @@ function PerformanceRow({
             icon, so admins can scan-read the song-to-performance mapping
             at a glance. Three states: linked, unlinked legacy text,
             no song. */}
+        {/* Visibility pass — pills used to render at /10–/15 bg opacity
+            on stage-900 which made the song name + No-song badges nearly
+            invisible. Bumped to /25 fills with stronger borders and
+            tightened the text shades to colors with real contrast on
+            dark backgrounds. */}
         <div className="mt-2">
           {perf.song ? (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-spotlight/10 border border-spotlight/40 max-w-full">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-spotlight/25 border border-spotlight/60 max-w-full">
               <Music
                 aria-hidden="true"
                 className="w-3.5 h-3.5 text-spotlight shrink-0"
               />
-              <span className="text-sm font-semibold text-white truncate">
+              <span className="text-sm font-bold text-white truncate">
                 {perf.song.title}
               </span>
-              <span className="text-xs text-haze/85 truncate">
+              <span className="text-xs font-semibold text-white/85 truncate">
                 · {perf.song.artist}
               </span>
             </span>
           ) : perf.songTitle ? (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-yellow-500/15 border border-yellow-300/60 max-w-full">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-yellow-500/25 border border-yellow-300/70 max-w-full">
               <Music
                 aria-hidden="true"
-                className="w-3.5 h-3.5 text-yellow-100 shrink-0"
+                className="w-3.5 h-3.5 text-yellow-200 shrink-0"
               />
-              <span className="text-sm font-semibold text-yellow-50 truncate">
+              <span className="text-sm font-bold text-yellow-50 truncate">
                 {perf.songTitle}
               </span>
-              <span className="text-[10px] uppercase tracking-widest text-yellow-100/90 font-bold">
+              <span className="text-[10px] uppercase tracking-widest text-yellow-100 font-bold">
                 · Unlinked
               </span>
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-500/15 border border-red-400/60">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-500/25 border border-red-400/70">
               <Music
                 aria-hidden="true"
-                className="w-3.5 h-3.5 text-red-100 shrink-0"
+                className="w-3.5 h-3.5 text-red-200 shrink-0"
               />
-              <span className="text-sm font-semibold text-red-50">
+              <span className="text-sm font-bold text-red-50 uppercase tracking-wide">
                 No song linked
               </span>
             </span>
@@ -358,11 +363,13 @@ function PerformanceRow({
             <button
               type="button"
               onClick={() => setPicking(true)}
-              disabled={busy || !!perf.activeBattleId}
+              disabled={busy || !!perf.activeBattleId || !!perf.deletedAt}
               title={
-                perf.activeBattleId
-                  ? 'Resolve or cancel the active battle before changing the song link.'
-                  : undefined
+                perf.deletedAt
+                  ? 'This performance is deleted. Restore it before changing the song link.'
+                  : perf.activeBattleId
+                    ? 'Resolve or cancel the active battle before changing the song link.'
+                    : undefined
               }
               className="px-3 py-1.5 text-xs font-bold rounded-md bg-stage-800 border border-stage-700 hover:border-spotlight/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
@@ -375,7 +382,7 @@ function PerformanceRow({
                 disabled={busy}
                 className="px-3 py-1.5 text-xs font-bold rounded-md bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 disabled:opacity-50 transition-colors"
               >
-                Soft-delete
+                Delete
               </button>
             )}
           </>

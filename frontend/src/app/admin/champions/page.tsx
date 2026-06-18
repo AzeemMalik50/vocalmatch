@@ -127,7 +127,11 @@ export default function AdminChampionsPage() {
                         <p className="font-display font-bold text-lg text-white truncate">
                           {song.title}
                         </p>
-                        <p className="text-sm text-haze truncate">
+                        {/* Bumped from text-haze (off-white at ~60–70%
+                            apparent contrast) to text-haze/95 so the
+                            artist line reads alongside the song title
+                            on dark stage-900 bg. */}
+                        <p className="text-sm text-haze/95 truncate">
                           {song.artist}
                         </p>
                       </div>
@@ -194,15 +198,17 @@ function ChampionRow({
             )}
           </p>
           {/* Song title pill — gives every championship row a clearly
-              visible "what song is this crown on?" label. Gold-bordered
-              so it reads as part of the champion's prestige strip. */}
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gold/10 border border-gold/40 max-w-full">
-            <Music aria-hidden="true" className="w-3.5 h-3.5 text-gold shrink-0" />
-            <span className="text-sm font-semibold text-white truncate">
+              visible "what song is this crown on?" label. Bumped the
+              fill from gold/10 → gold/25 + gold-100 text so the pill
+              actually reads against the stage-900 bg; the old 10%
+              opacity blended in and made the song name disappear. */}
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gold/25 border border-gold/60 max-w-full">
+            <Music aria-hidden="true" className="w-3.5 h-3.5 text-yellow-200 shrink-0" />
+            <span className="text-sm font-bold text-yellow-50 truncate">
               {song.title}
             </span>
             {song.artist && (
-              <span className="text-xs text-haze/80 truncate">
+              <span className="text-xs font-semibold text-yellow-100/90 truncate">
                 · {song.artist}
               </span>
             )}
