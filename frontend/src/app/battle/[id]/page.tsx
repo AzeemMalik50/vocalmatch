@@ -18,6 +18,7 @@ import {
 } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useLobby } from '@/lib/useLobby';
+import { useReconnectRefetch } from '@/lib/useReconnectRefetch';
 
 /**
  * Public battle page (Phase 2A primary surface).
@@ -89,6 +90,14 @@ export default function BattlePage() {
     if (e.battleId === id) void load();
   });
 
+  // Mobile clients commonly drop network and pick it back up. The SSE
+  // stream auto-reconnects but only delivers *new* frames — any state
+  // change that landed during the gap is missed. Hit REST whenever the
+  // browser reports online again or the user returns to the tab.
+  useReconnectRefetch(() => {
+    void load();
+  });
+
   // Live vote counts via SSE. The backend only subscribes us to the battle
   // channel when we're allowed to see standings (admin or already-voted) so
   // we mirror that gate here using `canSeeStandings`. Re-runs when it flips
@@ -101,6 +110,19 @@ export default function BattlePage() {
     const url = buildStreamUrl({ battleId: id });
     if (!url) return;
     const es = new EventSource(url);
+
+    // Detect SSE reconnects via the `open` event. The initial open also
+    // fires `open`, so flip a flag after the first one and only refetch
+    // on subsequent opens — those are reconnects after a transient
+    // network drop, and any frames missed during the gap aren't replayed.
+    let firstOpenSeen = false;
+    es.addEventListener('open', () => {
+      if (firstOpenSeen) {
+        void load();
+      } else {
+        firstOpenSeen = true;
+      }
+    });
 
     const merge = (e: MessageEvent) => {
       try {
@@ -136,7 +158,7 @@ export default function BattlePage() {
     return () => {
       es.close();
     };
-  }, [id, user, battle?.canSeeStandings]);
+  }, [id, user, battle?.canSeeStandings, load]);
 
   const handleShare = useCallback(async () => {
     if (typeof window === 'undefined') return;

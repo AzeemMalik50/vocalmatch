@@ -17,6 +17,7 @@ import {
 } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useConfirm } from '@/lib/confirm-context';
+import { useReconnectRefetch } from '@/lib/useReconnectRefetch';
 
 /**
  * Admin-facing battle detail. Shows participants, live vote counts (admins
@@ -64,11 +65,32 @@ export default function AdminBattleDetailPage() {
   // just need to open the EventSource once we know we're authed. Status
   // events (cancel, close, tie) also flow through this same channel and
   // get merged into the local battle state.
+  // Mobile / flaky network catch-up — refetch from REST whenever the
+  // browser comes online or the user returns to the tab so any state
+  // changes that landed during the gap show up immediately.
+  useReconnectRefetch(() => {
+    void load();
+  });
+
   useEffect(() => {
     if (!id || !user?.isAdmin) return;
     const url = buildStreamUrl({ battleId: id });
     if (!url) return;
     const es = new EventSource(url);
+
+    // First `open` is the initial handshake; subsequent ones are SSE
+    // auto-reconnects after a transient disconnect. On those, force a
+    // REST refetch so any missed status changes (winner declared,
+    // cancelled, tied) flow in even though the stream itself only
+    // delivers fresh frames going forward.
+    let firstOpenSeen = false;
+    es.addEventListener('open', () => {
+      if (firstOpenSeen) {
+        void load();
+      } else {
+        firstOpenSeen = true;
+      }
+    });
 
     const merge = (e: MessageEvent) => {
       try {
@@ -104,7 +126,7 @@ export default function AdminBattleDetailPage() {
     return () => {
       es.close();
     };
-  }, [id, user?.isAdmin]);
+  }, [id, user?.isAdmin, load]);
 
   const handleClose = async () => {
     if (!battle) return;
