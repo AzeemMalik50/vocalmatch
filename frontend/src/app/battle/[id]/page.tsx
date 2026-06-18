@@ -17,6 +17,7 @@ import {
   VideoDto,
 } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useLobby } from '@/lib/useLobby';
 
 /**
  * Public battle page (Phase 2A primary surface).
@@ -77,6 +78,16 @@ export default function BattlePage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Anonymous + not-yet-voted viewers still need to see status changes —
+  // particularly cancellations. The vote-gated battle channel (below) is
+  // closed to them, so subscribe to the public lobby channel and re-load
+  // whenever the *currently-displayed* battle's id appears in a lifecycle
+  // event. The full reload is fine here since lobby events fire only on
+  // genuine state transitions, not per-vote.
+  useLobby((e) => {
+    if (e.battleId === id) void load();
+  });
 
   // Live vote counts via SSE. The backend only subscribes us to the battle
   // channel when we're allowed to see standings (admin or already-voted) so
