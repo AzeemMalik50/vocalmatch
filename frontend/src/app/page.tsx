@@ -1102,8 +1102,13 @@ function StageCarousel() {
   const [videos, setVideos] = useState<VideoDto[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Strip a leading "@" so users searching "@foo" get matched against
+  // usernames (stored without the prefix) instead of returning empty.
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    const t = setTimeout(
+      () => setDebouncedSearch(search.trim().replace(/^@+/, '')),
+      300,
+    );
     return () => clearTimeout(t);
   }, [search]);
 
@@ -1155,7 +1160,7 @@ function StageCarousel() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search performances..."
+              placeholder="Search title, song, or @username"
               className="flex-1 bg-muted/50 border border-border rounded-lg px-4 py-3 text-foreground placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-red-600"
             />
             <div className="flex gap-2 flex-wrap">

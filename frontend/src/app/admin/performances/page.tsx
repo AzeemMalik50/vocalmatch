@@ -32,9 +32,14 @@ export default function AdminPerformancesPage() {
   const confirm = useConfirm();
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Debounce search
+  // Debounce search. The placeholder advertises "@uploader" support so
+  // we strip a leading "@" before sending — the backend stores usernames
+  // without the prefix and matching against "@foo" returned nothing.
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    const t = setTimeout(
+      () => setDebouncedSearch(search.trim().replace(/^@+/, '')),
+      300,
+    );
     return () => clearTimeout(t);
   }, [search]);
 
