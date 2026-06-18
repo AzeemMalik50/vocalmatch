@@ -8,16 +8,27 @@ function getToken(): string | null {
 }
 
 /**
- * Build a Server-Sent Events URL with the auth token in the query string.
- * EventSource can't send custom headers, so the token rides on the URL.
- * Returns null when there's no token — callers should skip opening the
- * stream in that case.
+ * Build a Server-Sent Events URL.
+ *
+ * - Authenticated callers get their user channel (and optionally a battle
+ *   channel via `{ battleId }`). Token rides on the query string because
+ *   EventSource can't send custom headers.
+ * - Pass `{ lobby: true }` to subscribe to the public lobby channel for
+ *   battle lifecycle events (homepage real-time refresh). The lobby is
+ *   anonymous-accessible — works even without a token.
+ *
+ * Returns null when there's nothing to subscribe to (no token AND lobby
+ * not requested) so callers can skip opening the stream entirely.
  */
-export function buildStreamUrl(opts: { battleId?: string } = {}): string | null {
+export function buildStreamUrl(
+  opts: { battleId?: string; lobby?: boolean } = {},
+): string | null {
   const token = getToken();
-  if (!token) return null;
-  const params = new URLSearchParams({ token });
+  if (!token && !opts.lobby) return null;
+  const params = new URLSearchParams();
+  if (token) params.set('token', token);
   if (opts.battleId) params.set('battleId', opts.battleId);
+  if (opts.lobby) params.set('lobby', '1');
   return `${API_URL}/stream?${params.toString()}`;
 }
 
@@ -370,7 +381,14 @@ export interface AdminUserDto {
 
 // ─── Phase 2B — Red Phone challenges ──────────────────────────────
 
-export type ChallengeStatus = 'pending' | 'selected' | 'rejected';
+export type ChallengeStatus =
+  | 'pending'
+  | 'selected'
+  | 'rejected'
+  // Terminal state set by the backend once the resulting battle has
+  // finalized (completed or cancelled). Released from the per-song
+  // queue so a new challenger can take the same song.
+  | 'completed';
 
 /** Lightweight shape returned to the user (their own submissions). */
 export interface ChallengeSubmissionDto {
@@ -544,6 +562,11 @@ export const api = {
       body: fd,
     });
   },
+
+  removeAvatar: () =>
+    request<PublicUser>('/users/me/avatar', {
+      method: 'DELETE',
+    }),
 
   listVideos: (params: VideoListParams = {}) => {
     const qs = new URLSearchParams();
@@ -722,7 +745,7 @@ export const api = {
   adminListChallenges: (
     params: {
       songId?: string;
-      status?: ChallengeStatus | 'open';
+      status?: ChallengeStatus | 'all';
       limit?: number;
       offset?: number;
     } = {},

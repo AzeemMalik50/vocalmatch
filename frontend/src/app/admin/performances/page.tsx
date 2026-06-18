@@ -10,6 +10,7 @@ import {
   SongDto,
   api,
 } from '@/lib/api';
+import { useConfirm } from '@/lib/confirm-context';
 
 const PAGE_SIZE = 25;
 
@@ -28,6 +29,7 @@ export default function AdminPerformancesPage() {
   const [includeDeleted, setIncludeDeleted] = useState(false);
   const [songs, setSongs] = useState<SongDto[]>([]);
   const [working, setWorking] = useState<string | null>(null);
+  const confirm = useConfirm();
   const [actionError, setActionError] = useState<string | null>(null);
 
   // Debounce search
@@ -115,7 +117,13 @@ export default function AdminPerformancesPage() {
   };
 
   const handleSoftDelete = async (id: string) => {
-    if (!confirm('Hide this performance from the public feed?')) return;
+    const ok = await confirm({
+      title: 'Hide this performance?',
+      message: 'It will be removed from the public feed and the uploader\'s profile, but battle history stays intact.',
+      confirmLabel: 'Hide it',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setWorking(id);
     setActionError(null);
     try {

@@ -6,7 +6,16 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
-export type ChallengeStatus = 'pending' | 'selected' | 'rejected';
+export type ChallengeStatus =
+  | 'pending'
+  | 'selected'
+  | 'rejected'
+  /** Terminal state — set on the linked submission once the battle it
+   *  produced has finalized (completed or cancelled). Critically NOT in
+   *  the `one_active_challenger_per_song` partial unique index, so a
+   *  completed challenge no longer blocks fresh challenges on the same
+   *  song. */
+  | 'completed';
 
 /**
  * Red Phone challenge submission. A user uploads a performance of a

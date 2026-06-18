@@ -92,16 +92,56 @@ export class ChallengesService {
 
     // App-layer pre-check for clearer errors; the DB partial unique index
     // is still the source of truth (Postgres) / app-layer guard (SQLite).
-    const existing = await this.submissions.findOne({
-      where: {
-        songId: params.songId,
-        status: In(['pending', 'selected'] as ChallengeStatus[]),
-      },
-    });
-    if (existing) {
-      throw new ConflictException(
-        'A challenger is already queued for this song',
-      );
+    //
+    // Bug #6 — the previous check matched any submission still in
+    // status='selected', which left stale rows blocking new
+    // challenges after their resulting battle had completed (the row
+    // was never flipped to 'completed' before the lifecycle fix). The
+    // defensive JOIN below treats a `selected` row as active ONLY
+    // when its linked battle is still live OR needs_decision; in any
+    // other state (completed, cancelled, or no linked battle yet but
+    // still pending) the row is either truly active or already
+    // released, and the query handles both naturally.
+    const blockingRow = await this.submissions
+      .createQueryBuilder('cs')
+      .leftJoin('battles', 'b', 'b.id = cs."resultingBattleId"')
+      .where('cs."songId" = :songId', { songId: params.songId })
+      .andWhere(
+        `(
+           cs.status = 'pending'
+           OR (cs.status = 'selected' AND (
+             b.id IS NULL
+             OR b.status IN ('live', 'needs_decision')
+           ))
+         )`,
+      )
+      .getOne();
+    if (blockingRow) {
+      // Best-effort sweep: if the existing row is 'selected' but its
+      // linked battle has resolved out from under it (race or pre-fix
+      // data), release the stale row right here so the next retry
+      // succeeds. Falls through to the same 409 for genuinely-active
+      // queues.
+      if (blockingRow.status === 'selected' && blockingRow.resultingBattleId) {
+        const linked = await this.battles.findOne({
+          where: { id: blockingRow.resultingBattleId },
+        });
+        if (
+          linked &&
+          (linked.status === 'completed' || linked.status === 'cancelled')
+        ) {
+          blockingRow.status = 'completed';
+          await this.submissions.save(blockingRow);
+        } else {
+          throw new ConflictException(
+            'A challenger is already queued for this song',
+          );
+        }
+      } else {
+        throw new ConflictException(
+          'A challenger is already queued for this song',
+        );
+      }
     }
 
     // Mark the video as a challenge entry so it shows up in admin / filters.

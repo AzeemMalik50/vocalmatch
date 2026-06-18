@@ -8,6 +8,7 @@ import Footer from '@/components/Footer';
 import { Spinner, SkeletonBlock } from '@/components/Loaders';
 import { VideoDto, api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useConfirm } from '@/lib/confirm-context';
 
 /**
  * Single performance page (Phase 1 surface, extended for Phase 2A).
@@ -24,6 +25,7 @@ export default function VideoDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { user } = useAuth();
+  const confirm = useConfirm();
   const [video, setVideo] = useState<VideoDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -59,7 +61,14 @@ export default function VideoDetailPage() {
   }, [id, router]);
 
   const handleDelete = async () => {
-    if (!confirm('Delete this performance? This cannot be undone.')) return;
+    const ok = await confirm({
+      title: 'Delete this performance?',
+      message: 'It will be removed from your profile and the public feed.',
+      detail: 'If the video has been in a battle, it stays in the battle history but is hidden everywhere else.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setDeleting(true);
     try {
       await api.deleteVideo(id);

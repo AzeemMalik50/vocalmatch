@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import AdminShell from '@/components/AdminShell';
 import { TableRowsSkeleton } from '@/components/Loaders';
+import { useConfirm } from '@/lib/confirm-context';
 import {
   api,
   BattleSummaryDto,
@@ -57,6 +58,7 @@ function AdminBattlesPageInner() {
   const [hasMore, setHasMore] = useState(false);
   const [nextOffset, setNextOffset] = useState(0);
   const [working, setWorking] = useState<string | null>(null);
+  const confirm = useConfirm();
   const focusedRef = useRef<HTMLLIElement | null>(null);
 
   // Resolve the focused battle's actual status the first time we mount
@@ -127,7 +129,12 @@ function AdminBattlesPageInner() {
   }, [filter]);
 
   const handleClose = async (id: string) => {
-    if (!confirm('Close this battle now?')) return;
+    const ok = await confirm({
+      title: 'Close this battle now?',
+      message: 'Voting will stop immediately and the current standings decide the winner.',
+      confirmLabel: 'Close now',
+    });
+    if (!ok) return;
     setWorking(id);
     try {
       await api.closeBattle(id);
@@ -138,7 +145,15 @@ function AdminBattlesPageInner() {
   };
 
   const handleCancel = async (id: string) => {
-    if (!confirm('Cancel this battle? Stats will not be updated.')) return;
+    const ok = await confirm({
+      title: 'Cancel this battle?',
+      message: 'Voting will stop and the battle ends with no winner.',
+      detail: 'Stats won\'t be updated — neither performer gets credited.',
+      confirmLabel: 'Cancel battle',
+      cancelLabel: 'Keep it live',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setWorking(id);
     try {
       await api.cancelBattle(id);

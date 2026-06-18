@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   FileTypeValidator,
   ForbiddenException,
   Get,
@@ -164,6 +165,21 @@ export class UsersController {
     const upload = await this.cloudinary.uploadImage(file.buffer, 'avatars');
     const user = await this.users.updateProfile(req.user.userId, {
       avatarUrl: upload.secure_url,
+    });
+    return this.users.toPublic(user);
+  }
+
+  @Delete('me/avatar')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('bearer')
+  @ApiOperation({
+    summary: 'Remove the current avatar image',
+    description:
+      'Clears `avatarUrl` on the caller\'s profile so the avatar falls back to the username initial across the app. Idempotent — calling on an already-empty profile is a no-op. The Cloudinary asset is left for a later sweeper job to keep this endpoint fast.',
+  })
+  async removeAvatar(@Req() req: any) {
+    const user = await this.users.updateProfile(req.user.userId, {
+      avatarUrl: null,
     });
     return this.users.toPublic(user);
   }

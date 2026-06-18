@@ -1,8 +1,9 @@
 'use client';
 
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, BattleSummaryDto, SongDto, VideoDto } from '@/lib/api';
+import { useLobby } from '@/lib/useLobby';
 import CountdownTimer from './CountdownTimer';
 import { FeaturedBattleSkeleton } from './Loaders';
 
@@ -26,26 +27,36 @@ export default function FeaturedBattle({ fallback }: Props) {
   const [data, setData] = useState<Loaded | null>(null);
   const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const resp = await api.listBattles({ status: 'live' });
-        const battle = resp.items[0];
-        if (!battle) {
-          setLoaded(true);
-          return;
-        }
-        const [song, performanceA, performanceB] = await Promise.all([
-          api.getSong(battle.songId).catch(() => null),
-          api.getVideo(battle.performanceAId).catch(() => null),
-          api.getVideo(battle.performanceBId).catch(() => null),
-        ]);
-        setData({ battle, song, performanceA, performanceB });
-      } finally {
-        setLoaded(true);
+  const refetch = useCallback(async () => {
+    try {
+      const resp = await api.listBattles({ status: 'live' });
+      const battle = resp.items[0];
+      if (!battle) {
+        setData(null);
+        return;
       }
-    })();
+      const [song, performanceA, performanceB] = await Promise.all([
+        api.getSong(battle.songId).catch(() => null),
+        api.getVideo(battle.performanceAId).catch(() => null),
+        api.getVideo(battle.performanceBId).catch(() => null),
+      ]);
+      setData({ battle, song, performanceA, performanceB });
+    } finally {
+      setLoaded(true);
+    }
   }, []);
+
+  useEffect(() => {
+    void refetch();
+  }, [refetch]);
+
+  // Lobby SSE — re-pick the featured battle whenever any battle's
+  // lifecycle changes. If the currently-featured battle gets cancelled or
+  // closed, this catches it and swaps to the next live one (or the
+  // fallback if none remain) without a refresh.
+  useLobby(() => {
+    void refetch();
+  });
 
   if (!loaded) return <FeaturedBattleSkeleton />;
   if (!data) return <>{fallback}</>;

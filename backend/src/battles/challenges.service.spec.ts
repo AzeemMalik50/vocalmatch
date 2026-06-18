@@ -31,6 +31,21 @@ describe('ChallengesService (critical paths)', () => {
     find: jest.fn(),
     createQueryBuilder: jest.fn(),
   };
+
+  /**
+   * Helper — return a chainable QueryBuilder mock whose `.getOne()` resolves
+   * to the supplied row. `createSubmission` uses a leftJoin-where-andWhere-
+   * getOne chain to look for blocking rows; tests that exercise that path
+   * point `subRepo.createQueryBuilder` at one of these per call.
+   */
+  function qb(getOneResult: any) {
+    const chain: any = {};
+    chain.leftJoin = jest.fn(() => chain);
+    chain.where = jest.fn(() => chain);
+    chain.andWhere = jest.fn(() => chain);
+    chain.getOne = jest.fn().mockResolvedValue(getOneResult);
+    return chain;
+  }
   const videoRepo: any = { findOne: jest.fn(), save: jest.fn() };
   const battleRepo: any = {};
   const userRepo: any = { findOne: jest.fn() };
@@ -40,6 +55,16 @@ describe('ChallengesService (critical paths)', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    // `clearAllMocks` wipes default mock implementations too — re-seed the
+    // ones the service relies on as fire-and-forget promises so they don't
+    // resolve to `undefined` and break the trailing `.catch(...)`.
+    subRepo.create.mockImplementation((v) => v);
+    subRepo.save.mockImplementation(async (v) => ({ id: v.id ?? 'new-id', ...v }));
+    notifications.create.mockResolvedValue({});
+    // createBattleFromChallenge looks up the challenger to build the
+    // auto-title via `users.findOne(...).catch(() => null)`. A non-thenable
+    // here breaks the `.catch` chain.
+    userRepo.findOne.mockResolvedValue(null);
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
@@ -116,7 +141,11 @@ describe('ChallengesService (critical paths)', () => {
     it('rejects a second pending challenge for the same song (app-layer)', async () => {
       songs.findOne.mockResolvedValueOnce(baseSong());
       videoRepo.findOne.mockResolvedValueOnce(baseVideo());
-      subRepo.findOne.mockResolvedValueOnce({ id: 'existing-pending', status: 'pending' });
+      // Service now does the duplicate-check via createQueryBuilder, not
+      // submissions.findOne — point the QB at an active blocking row.
+      subRepo.createQueryBuilder.mockReturnValueOnce(
+        qb({ id: 'existing-pending', status: 'pending' }),
+      );
       await expect(
         service.createSubmission({
           songId: 'song-1',
@@ -129,7 +158,9 @@ describe('ChallengesService (critical paths)', () => {
     it('translates a Postgres unique-violation into a 409', async () => {
       songs.findOne.mockResolvedValueOnce(baseSong());
       videoRepo.findOne.mockResolvedValueOnce(baseVideo());
-      subRepo.findOne.mockResolvedValueOnce(null);
+      // App-layer check finds no blocker, then the DB insert fails with the
+      // partial-unique-index violation (race condition with another tab).
+      subRepo.createQueryBuilder.mockReturnValueOnce(qb(null));
       videoRepo.save.mockResolvedValueOnce(baseVideo());
       subRepo.save.mockRejectedValueOnce({ code: '23505' });
 
@@ -145,7 +176,7 @@ describe('ChallengesService (critical paths)', () => {
     it('on success: marks the video as a challenge entry and inserts the row', async () => {
       songs.findOne.mockResolvedValueOnce(baseSong());
       videoRepo.findOne.mockResolvedValueOnce(baseVideo());
-      subRepo.findOne.mockResolvedValueOnce(null);
+      subRepo.createQueryBuilder.mockReturnValueOnce(qb(null));
       videoRepo.save.mockResolvedValueOnce({ ...baseVideo(), category: 'challenge_entry' });
 
       await service.createSubmission({

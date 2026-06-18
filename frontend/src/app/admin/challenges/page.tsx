@@ -6,13 +6,17 @@ import { useRouter } from 'next/navigation';
 import AdminShell from '@/components/AdminShell';
 import { TableRowsSkeleton } from '@/components/Loaders';
 import { AdminChallengeDto, ChallengeStatus, api } from '@/lib/api';
+import { useConfirm } from '@/lib/confirm-context';
 
 const PAGE_SIZE = 20;
 
-type FilterStatus = ChallengeStatus | 'open' | 'all';
+type FilterStatus = ChallengeStatus | 'all';
 
+// Bug #10 follow-up — the previous "Open" tab returned pending + selected,
+// then was tightened to pending-only, which made it visually identical to
+// the dedicated "Pending" tab. Dropped the Open tab entirely; each tab now
+// maps to exactly one underlying state, and "All" is the no-filter view.
 const FILTERS: { value: FilterStatus; label: string }[] = [
-  { value: 'open', label: 'Open' }, // pending + selected
   { value: 'pending', label: 'Pending' },
   { value: 'selected', label: 'Selected' },
   { value: 'rejected', label: 'Rejected' },
@@ -27,7 +31,8 @@ const FILTERS: { value: FilterStatus; label: string }[] = [
  */
 export default function AdminChallengesPage() {
   const router = useRouter();
-  const [filter, setFilter] = useState<FilterStatus>('open');
+  const confirm = useConfirm();
+  const [filter, setFilter] = useState<FilterStatus>('pending');
   const [items, setItems] = useState<AdminChallengeDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -78,7 +83,13 @@ export default function AdminChallengesPage() {
   };
 
   const handleReject = async (id: string) => {
-    if (!confirm('Reject this challenge?')) return;
+    const ok = await confirm({
+      title: 'Reject this challenge?',
+      message: 'The challenger will be notified that they weren\'t picked this round.',
+      confirmLabel: 'Reject',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setWorking(id);
     setError(null);
     try {
@@ -92,11 +103,13 @@ export default function AdminChallengesPage() {
   };
 
   const handlePromote = async (id: string) => {
-    if (
-      !confirm('Promote this challenger to a live battle? Voting opens immediately for 48h.')
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Promote this challenger?',
+      message: 'A new battle goes live immediately with voting open for 48 hours.',
+      detail: 'Both performers get notified that the battle has started.',
+      confirmLabel: 'Promote to battle',
+    });
+    if (!ok) return;
     setWorking(id);
     setError(null);
     try {
@@ -293,7 +306,9 @@ function StatusBadge({ status }: { status: ChallengeStatus }) {
       ? 'bg-spotlight/15 text-spotlight border-spotlight/40'
       : status === 'selected'
         ? 'bg-gold/15 text-gold border-gold/40'
-        : 'bg-stage-800 text-haze border-stage-700';
+        : status === 'completed'
+          ? 'bg-stage-800 text-haze/80 border-stage-700'
+          : 'bg-stage-800 text-haze border-stage-700';
   return (
     <span
       className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] uppercase tracking-widest font-bold rounded border ${tone}`}

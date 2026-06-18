@@ -15,6 +15,7 @@ import {
   TextInput,
 } from '@/components/forms';
 import { useAuth } from '@/lib/auth-context';
+import { useConfirm } from '@/lib/confirm-context';
 import {
   api,
   GENRE_OPTIONS,
@@ -571,14 +572,17 @@ function SignOutEverywhereSection({
 }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+  const confirm = useConfirm();
 
   const click = async () => {
-    if (
-      !window.confirm(
-        'Sign out everywhere except this device? You will stay signed in here.',
-      )
-    )
-      return;
+    const ok = await confirm({
+      title: 'Sign out everywhere else?',
+      message: 'Every other device or browser signed into this account will be signed out.',
+      detail: 'You\'ll stay signed in here.',
+      confirmLabel: 'Sign out other sessions',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setBusy(true);
     setMsg(null);
     try {

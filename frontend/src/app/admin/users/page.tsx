@@ -5,11 +5,13 @@ import AdminShell from '@/components/AdminShell';
 import { TableRowsSkeleton } from '@/components/Loaders';
 import { api, AdminUserDto } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useConfirm } from '@/lib/confirm-context';
 
 const PAGE_SIZE = 25;
 
 export default function AdminUsersPage() {
   const { user: me } = useAuth();
+  const confirm = useConfirm();
   const [users, setUsers] = useState<AdminUserDto[]>([]);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -66,9 +68,15 @@ export default function AdminUsersPage() {
     flag: 'isAdmin' | 'isSongwriter',
   ) => {
     if (flag === 'isAdmin' && user.id === me?.id && user.isAdmin) {
-      if (!confirm('Remove admin from yourself? You will lose access to /admin.')) {
-        return;
-      }
+      const ok = await confirm({
+        title: 'Demote yourself?',
+        message: 'You\'ll lose admin access immediately and won\'t be able to reach /admin.',
+        detail: 'Another admin will need to promote you again.',
+        confirmLabel: 'Remove my admin',
+        cancelLabel: 'Keep admin',
+        tone: 'danger',
+      });
+      if (!ok) return;
     }
     setWorking(user.id);
     try {

@@ -4,6 +4,7 @@ import {
   Query,
   Req,
   Res,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -14,7 +15,7 @@ import {
 import type { Request, Response } from 'express';
 import { RealtimeService } from './realtime.service';
 import { BattlesService } from '../battles/battles.service';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/jwt-auth.guard';
 
 /**
  * Server-Sent Events endpoint.
@@ -35,7 +36,10 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
  */
 @ApiTags('Realtime (SSE)')
 @Controller('stream')
-@UseGuards(JwtAuthGuard)
+// OptionalJwtAuthGuard so anonymous homepage visitors can still subscribe
+// to the public `lobby` channel for battle lifecycle events. Authenticated
+// callers additionally get user / battle channels as before.
+@UseGuards(OptionalJwtAuthGuard)
 export class RealtimeController {
   constructor(
     private readonly realtime: RealtimeService,
@@ -46,13 +50,17 @@ export class RealtimeController {
   @ApiOperation({
     summary: 'Open a Server-Sent Events stream for live updates',
     description:
-      'Returns `text/event-stream`. Always subscribes to the caller’s user channel (push notifications). When `battleId` is supplied and the caller has already voted on that battle (or is admin), also subscribes to the battle channel for live vote counts. Heartbeats every 25s. The JWT is passed via `?token=` because EventSource cannot set headers. Frame types: `ready` (initial), `notification`, `vote`, `status`, plus SSE comment heartbeats.',
+      'Returns `text/event-stream`. Subscribes to a combination of channels based on what the caller requests:\n' +
+      '• `?lobby=1` — public homepage feed of battle lifecycle events (no auth required).\n' +
+      '• Authenticated callers always also get their user channel (push notifications).\n' +
+      '• `?battleId=<uuid>` adds the battle channel for live vote counts, but only if the caller has voted on that battle (or is admin).\n\n' +
+      'A request that resolves to zero channels returns 401. JWT travels via `?token=` because EventSource cannot set headers. Heartbeats every 25s. Frame types: `ready` (initial), `notification`, `vote`, `status`, `lifecycle`, plus SSE comment heartbeats.',
   })
   @ApiQuery({
     name: 'token',
-    required: true,
+    required: false,
     type: String,
-    description: 'JWT — same value as the `Authorization: Bearer …` token, supplied in the URL because EventSource can’t set headers.',
+    description: 'JWT — required for the user channel and battle subscriptions. Omit when only subscribing to the public `lobby` channel.',
   })
   @ApiQuery({
     name: 'battleId',
@@ -60,20 +68,47 @@ export class RealtimeController {
     type: String,
     description: 'Subscribe to this battle’s live vote counts. Ignored if the caller hasn’t voted (and isn’t admin).',
   })
+  @ApiQuery({
+    name: 'lobby',
+    required: false,
+    type: String,
+    description: 'Pass `1` to subscribe to the public lobby channel that broadcasts battle lifecycle events (created / cancelled / closed / needs_decision). Safe for anonymous callers — carries only public fields.',
+  })
   async stream(
-    @Req() req: Request & { user: { userId: string; isAdmin: boolean } },
+    @Req() req: Request & {
+      user?: { userId: string; isAdmin: boolean };
+    },
     @Res() res: Response,
     @Query('battleId') battleId?: string,
+    @Query('lobby') lobby?: string,
   ): Promise<void> {
-    const { userId, isAdmin } = req.user;
+    const wantsLobby = lobby === '1' || lobby === 'true';
+    const user = req.user;
+    const channels: string[] = [];
 
-    const channels = [RealtimeService.userChannel(userId)];
-    if (battleId) {
-      const allowed =
-        isAdmin || (await this.battles.hasUserVoted(battleId, userId));
-      if (allowed) {
-        channels.push(RealtimeService.battleChannel(battleId));
+    if (user) {
+      channels.push(RealtimeService.userChannel(user.userId));
+      if (battleId) {
+        const allowed =
+          user.isAdmin ||
+          (await this.battles.hasUserVoted(battleId, user.userId));
+        if (allowed) {
+          channels.push(RealtimeService.battleChannel(battleId));
+        }
       }
+    }
+    if (wantsLobby) {
+      channels.push(RealtimeService.lobbyChannel());
+    }
+
+    // Reject when there's nothing to subscribe to — keeps unauthenticated
+    // probes from holding an empty connection open. (Anonymous callers must
+    // ask for `?lobby=1`; authenticated callers always have at least the
+    // user channel.)
+    if (channels.length === 0) {
+      throw new UnauthorizedException(
+        'No subscribable channels. Provide a token, ?lobby=1, or both.',
+      );
     }
 
     // SSE headers. `X-Accel-Buffering: no` keeps nginx/Railway proxies from

@@ -5,6 +5,7 @@ import { DataSource } from 'typeorm';
 
 import { Battle } from './battle.entity';
 import { Vote } from './vote.entity';
+import { ChallengeSubmission } from './challenge-submission.entity';
 import { BattlesService } from './battles.service';
 import { Video } from '../videos/video.entity';
 import { User } from '../users/user.entity';
@@ -36,6 +37,18 @@ describe('BattlesService (critical paths)', () => {
   const voteRepo: any = { findOne: jest.fn(), insert: jest.fn() };
   const videoRepo: any = { findOne: jest.fn() };
   const userRepo: any = { findOne: jest.fn(), save: jest.fn() };
+  // Added when BattlesService gained the "dethronements" marquee — it
+  // reads from this repo via a queryBuilder, so an empty mock is enough
+  // to keep DI happy for the existing critical-path tests.
+  const challengeSubmissionsRepo: any = {
+    find: jest.fn(),
+    findOne: jest.fn(),
+    createQueryBuilder: jest.fn(),
+    // finalizeWinner runs `manager.getRepository(ChallengeSubmission).update`
+    // as fire-and-forget, so the mock needs to return a thenable for `.catch`
+    // to chain off.
+    update: jest.fn().mockResolvedValue({}),
+  };
   const songsService: any = { findOne: jest.fn(), setChampion: jest.fn() };
   const notificationsService: any = { create: jest.fn() };
   const realtimeService: any = { publish: jest.fn() };
@@ -51,6 +64,10 @@ describe('BattlesService (critical paths)', () => {
       if (entity === Vote) return voteRepo;
       if (entity === Video) return videoRepo;
       if (entity === User) return userRepo;
+      // finalizeWinner now also flips the linked challenge submission's
+      // status inside the transaction so the partial unique index is
+      // released for the next challenger.
+      if (entity === ChallengeSubmission) return challengeSubmissionsRepo;
       throw new Error(`No mock for ${entity?.name ?? entity}`);
     }),
   };
@@ -60,6 +77,11 @@ describe('BattlesService (critical paths)', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    // Re-seed default mock implementations cleared by `clearAllMocks` so the
+    // fire-and-forget paths (e.g. update().catch(...) or notifications.create
+    // (...).catch(...)) still get a thenable rather than undefined.
+    challengeSubmissionsRepo.update.mockResolvedValue({});
+    notificationsService.create.mockResolvedValue({});
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
@@ -68,6 +90,10 @@ describe('BattlesService (critical paths)', () => {
         { provide: getRepositoryToken(Vote), useValue: voteRepo },
         { provide: getRepositoryToken(Video), useValue: videoRepo },
         { provide: getRepositoryToken(User), useValue: userRepo },
+        {
+          provide: getRepositoryToken(ChallengeSubmission),
+          useValue: challengeSubmissionsRepo,
+        },
         { provide: SongsService, useValue: songsService },
         { provide: NotificationsService, useValue: notificationsService },
         { provide: RealtimeService, useValue: realtimeService },

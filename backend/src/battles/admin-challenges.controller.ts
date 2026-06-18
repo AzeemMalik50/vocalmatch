@@ -67,7 +67,7 @@ export class AdminChallengesController {
   @ApiOperation({
     summary: 'Admin — list challenge submissions',
     description:
-      'Admin only. Default surface is the actionable queue (`status=open` → pending submissions). Pass `status=selected`, `rejected`, or `pending` to filter explicitly; `songId` narrows to a single song.',
+      'Admin only. With no `status` query, returns every submission (pending + selected + rejected) — this is what the admin UI\'s "All" tab uses. Pass `status=pending`, `selected`, or `rejected` to filter explicitly; `status=open` is a legacy shortcut equivalent to `pending`; `songId` narrows to a single song.',
   })
   @ApiQuery({ name: 'songId', required: false, type: String })
   @ApiQuery({ name: 'status', required: false, enum: ['pending', 'selected', 'rejected', 'open', 'all'] })
@@ -81,9 +81,14 @@ export class AdminChallengesController {
   ) {
     const limit = limitRaw ? parseInt(limitRaw, 10) || undefined : undefined;
     const offset = offsetRaw ? parseInt(offsetRaw, 10) || 0 : undefined;
+    // Bug fix — previously this defaulted missing-status to 'open', which the
+    // service then mapped to pending-only. That meant the frontend's "All"
+    // tab (which sends no status param) silently hid Rejected and Selected.
+    // No-status now passes through to the service unchanged, where it falls
+    // out of every WHERE branch and returns the full queue.
     const { items, hasMore, nextOffset } = await this.challenges.listForAdmin({
       songId,
-      status: status ?? 'open', // default surfaces the actionable queue
+      status,
       limit,
       offset,
     });

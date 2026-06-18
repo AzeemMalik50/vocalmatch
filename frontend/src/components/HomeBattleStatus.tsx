@@ -1,8 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { api, BattleSummaryDto, SongDto, VideoDto } from '@/lib/api';
+import {
+  api,
+  BattleSummaryDto,
+  SongDto,
+  VideoDto,
+} from '@/lib/api';
+import { useLobby } from '@/lib/useLobby';
 import CountdownTimer from './CountdownTimer';
 import { BattleCardGridSkeleton } from './Loaders';
 
@@ -34,63 +40,85 @@ type State =
 export default function HomeBattleStatus() {
   const [state, setState] = useState<State>({ kind: 'loading' });
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [live, completed, needsDecision] = await Promise.all([
-          api.listBattles({ status: 'live' }),
-          api.listBattles({ status: 'completed' }),
-          api.listBattles({ status: 'needs_decision' }),
-        ]);
+  const refetch = useCallback(async () => {
+    try {
+      const [live, completed, needsDecision] = await Promise.all([
+        api.listBattles({ status: 'live' }),
+        api.listBattles({ status: 'completed' }),
+        api.listBattles({ status: 'needs_decision' }),
+      ]);
 
-        if (live.items.length > 0) {
-          const songIds = Array.from(new Set(live.items.map((b) => b.songId)));
-          const songs: Record<string, SongDto> = {};
-          await Promise.all(
-            songIds.map(async (id) => {
-              try {
-                songs[id] = await api.getSong(id);
-              } catch {
-                // missing song — we'll just render with the battle title
-              }
-            }),
-          );
-          setState({ kind: 'live', battles: live.items, songs });
-          return;
-        }
-
-        // "Between matchups" covers both completed history and tied battles
-        // awaiting admin decision — neither is voteable, so the viewer sees
-        // a quiet stage either way.
-        const offline = [...completed.items, ...needsDecision.items];
-        if (offline.length > 0) {
-          // Sort by closedAt (or createdAt for needs_decision which may not
-          // have closedAt set yet), most recent first.
-          const sorted = offline.sort((a, b) => {
-            const aT = new Date(a.closedAt ?? a.createdAt).getTime();
-            const bT = new Date(b.closedAt ?? b.createdAt).getTime();
-            return bT - aT;
-          });
-          const lastBattle = sorted[0];
-          const [lastSong, winnerVideo] = await Promise.all([
-            lastBattle.songId
-              ? api.getSong(lastBattle.songId).catch(() => null)
-              : Promise.resolve(null),
-            lastBattle.winnerPerformanceId
-              ? api.getVideo(lastBattle.winnerPerformanceId).catch(() => null)
-              : Promise.resolve(null),
-          ]);
-          setState({ kind: 'between', lastBattle, lastSong, winnerVideo });
-          return;
-        }
-
-        setState({ kind: 'no-battles' });
-      } catch {
-        // On hard failure, fall through to the safe Phase-1-style teaser
-        setState({ kind: 'no-battles' });
+      if (live.items.length > 0) {
+        const songIds = Array.from(new Set(live.items.map((b) => b.songId)));
+        const songs: Record<string, SongDto> = {};
+        await Promise.all(
+          songIds.map(async (id) => {
+            try {
+              songs[id] = await api.getSong(id);
+            } catch {
+              // missing song — we'll just render with the battle title
+            }
+          }),
+        );
+        setState({ kind: 'live', battles: live.items, songs });
+        return;
       }
-    })();
+
+      // "Between matchups" covers both completed history and tied battles
+      // awaiting admin decision — neither is voteable, so the viewer sees
+      // a quiet stage either way.
+      const offline = [...completed.items, ...needsDecision.items];
+      if (offline.length > 0) {
+        const sorted = offline.sort((a, b) => {
+          const aT = new Date(a.closedAt ?? a.createdAt).getTime();
+          const bT = new Date(b.closedAt ?? b.createdAt).getTime();
+          return bT - aT;
+        });
+        const lastBattle = sorted[0];
+        const [lastSong, winnerVideo] = await Promise.all([
+          lastBattle.songId
+            ? api.getSong(lastBattle.songId).catch(() => null)
+            : Promise.resolve(null),
+          lastBattle.winnerPerformanceId
+            ? api.getVideo(lastBattle.winnerPerformanceId).catch(() => null)
+            : Promise.resolve(null),
+        ]);
+        setState({ kind: 'between', lastBattle, lastSong, winnerVideo });
+        return;
+      }
+
+      setState({ kind: 'no-battles' });
+    } catch {
+      // On hard failure, fall through to the safe Phase-1-style teaser
+      setState({ kind: 'no-battles' });
+    }
   }, []);
+
+  useEffect(() => {
+    void refetch();
+  }, [refetch]);
+
+  // Bug #17 — admin cancels / scheduler-driven closes / new battles being
+  // created all need to reflect on the homepage immediately, including for
+  // anonymous viewers. Subscribe to the public `lobby` SSE channel and
+  // refetch the whole section on every lifecycle event. One stream covers
+  // all live battles AND the "between matchups" → "live" transition when
+  // a new battle is created, with no auth required.
+  useLobby(() => {
+    void refetch();
+  });
+
+  // Re-fetch when the user comes back to the tab — covers all the
+  // status changes the SSE listener might have missed (e.g. anonymous
+  // viewers who can't open EventSource against the SSE channel).
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refetch();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [refetch]);
 
   if (state.kind === 'loading') {
     // Hold the layout open with a skeleton grid so the page doesn't shift

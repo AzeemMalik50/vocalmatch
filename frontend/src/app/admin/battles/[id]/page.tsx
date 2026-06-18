@@ -13,7 +13,10 @@ import {
   BattleStatus,
   SongDto,
   VideoDto,
+  buildStreamUrl,
 } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
+import { useConfirm } from '@/lib/confirm-context';
 
 /**
  * Admin-facing battle detail. Shows participants, live vote counts (admins
@@ -23,6 +26,8 @@ import {
 export default function AdminBattleDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const { user } = useAuth();
+  const confirm = useConfirm();
   const id = params?.id;
 
   const [battle, setBattle] = useState<BattleDto | null>(null);
@@ -53,9 +58,62 @@ export default function AdminBattleDetailPage() {
     load();
   }, [load]);
 
+  // Bug #9 — admin battle page did not subscribe to the SSE channel, so
+  // vote counts only updated on manual refresh. The backend channel
+  // gate already allows admins (see RealtimeService.channelsFor), so we
+  // just need to open the EventSource once we know we're authed. Status
+  // events (cancel, close, tie) also flow through this same channel and
+  // get merged into the local battle state.
+  useEffect(() => {
+    if (!id || !user?.isAdmin) return;
+    const url = buildStreamUrl({ battleId: id });
+    if (!url) return;
+    const es = new EventSource(url);
+
+    const merge = (e: MessageEvent) => {
+      try {
+        const payload = JSON.parse(e.data) as Partial<BattleDto> & {
+          battleId: string;
+        };
+        if (payload.battleId !== id) return;
+        setBattle((prev) =>
+          prev
+            ? {
+                ...prev,
+                voteCountA: payload.voteCountA ?? prev.voteCountA,
+                voteCountB: payload.voteCountB ?? prev.voteCountB,
+                percentA: payload.percentA ?? prev.percentA,
+                percentB: payload.percentB ?? prev.percentB,
+                currentLeader: payload.currentLeader ?? prev.currentLeader,
+                totalVotes: payload.totalVotes ?? prev.totalVotes,
+                status: payload.status ?? prev.status,
+                winnerPerformanceId:
+                  payload.winnerPerformanceId ?? prev.winnerPerformanceId,
+                winnerUserId: payload.winnerUserId ?? prev.winnerUserId,
+                closedAt: payload.closedAt ?? prev.closedAt,
+              }
+            : prev,
+        );
+      } catch {
+        // Skip malformed frames.
+      }
+    };
+    es.addEventListener('vote', merge);
+    es.addEventListener('status', merge);
+
+    return () => {
+      es.close();
+    };
+  }, [id, user?.isAdmin]);
+
   const handleClose = async () => {
     if (!battle) return;
-    if (!confirm('Close this battle now?')) return;
+    const ok = await confirm({
+      title: 'Close this battle now?',
+      message: 'Voting will stop immediately and the current standings decide the winner.',
+      confirmLabel: 'Close now',
+    });
+    if (!ok) return;
     setWorking('close');
     setActionError(null);
     try {
@@ -70,7 +128,15 @@ export default function AdminBattleDetailPage() {
 
   const handleCancel = async () => {
     if (!battle) return;
-    if (!confirm('Cancel this battle? Stats will not be updated.')) return;
+    const ok = await confirm({
+      title: 'Cancel this battle?',
+      message: 'Voting will stop and the battle ends with no winner.',
+      detail: 'Stats won\'t be updated — neither performer gets credited.',
+      confirmLabel: 'Cancel battle',
+      cancelLabel: 'Keep it live',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setWorking('cancel');
     setActionError(null);
     try {

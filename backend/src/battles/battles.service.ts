@@ -9,6 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, LessThanOrEqual, Repository } from 'typeorm';
 import { Battle, BattleStatus } from './battle.entity';
 import { Vote } from './vote.entity';
+import { ChallengeSubmission } from './challenge-submission.entity';
 import { Video } from '../videos/video.entity';
 import { User } from '../users/user.entity';
 import { SongsService } from '../songs/songs.service';
@@ -35,6 +36,8 @@ export class BattlesService {
     @InjectRepository(Vote) private readonly votes: Repository<Vote>,
     @InjectRepository(Video) private readonly videos: Repository<Video>,
     @InjectRepository(User) private readonly users: Repository<User>,
+    @InjectRepository(ChallengeSubmission)
+    private readonly challengeSubmissions: Repository<ChallengeSubmission>,
     private readonly songs: SongsService,
     private readonly notifications: NotificationsService,
     private readonly realtime: RealtimeService,
@@ -46,6 +49,27 @@ export class BattlesService {
    * toPublic() exposes — the frontend can merge these into its battle
    * state without a refetch.
    */
+  /**
+   * Broadcast a list-level lifecycle event on the public `lobby` channel
+   * so the homepage (HomeBattleStatus / FeaturedBattle / RecentWinners)
+   * can update without a full refetch. Carries only public fields —
+   * vote counts are NOT included so the gate stays honest for not-yet-voters.
+   */
+  private publishLobby(
+    battle: Battle,
+    change: 'created' | 'updated' | 'closed' | 'cancelled' | 'needs_decision',
+  ): void {
+    this.realtime.publish(RealtimeService.lobbyChannel(), 'lifecycle', {
+      battleId: battle.id,
+      songId: battle.songId,
+      status: battle.status,
+      winnerPerformanceId: battle.winnerPerformanceId ?? null,
+      winnerUserId: battle.winnerUserId ?? null,
+      closedAt: battle.closedAt ?? null,
+      change,
+    });
+  }
+
   private buildLiveCountsPayload(battle: Battle) {
     const total = battle.voteCountA + battle.voteCountB;
     const percentA = total === 0 ? 0 : Math.round((battle.voteCountA / total) * 100);
@@ -157,6 +181,10 @@ export class BattlesService {
           ),
         );
     }
+
+    // Lifecycle broadcast — drives the homepage live-battles grid and
+    // FeaturedBattle without polling.
+    this.publishLobby(saved, 'created');
 
     return saved;
   }
@@ -317,6 +345,7 @@ export class BattlesService {
         'status',
         this.buildLiveCountsPayload(battle),
       );
+      this.publishLobby(battle, 'needs_decision');
       return battle;
     }
 
@@ -363,6 +392,20 @@ export class BattlesService {
     battle.closedAt = new Date();
     const saved = await this.battles.save(battle);
 
+    // Bug #6 (also) — release the linked challenge row so a new
+    // challenger can queue against this song without admin cleanup.
+    // See the parallel fix in finalizeWinner.
+    this.challengeSubmissions
+      .update(
+        { resultingBattleId: saved.id, status: 'selected' },
+        { status: 'completed' },
+      )
+      .catch((err) =>
+        this.logger.error(
+          `Failed to mark challenge submission completed for cancelled battle ${saved.id}: ${err}`,
+        ),
+      );
+
     this.realtime.publish(
       RealtimeService.battleChannel(saved.id),
       'status',
@@ -372,6 +415,7 @@ export class BattlesService {
         closedAt: saved.closedAt,
       },
     );
+    this.publishLobby(saved, 'cancelled');
 
     return saved;
   }
@@ -461,6 +505,26 @@ export class BattlesService {
           closedAt: battle.closedAt,
         },
       );
+      this.publishLobby(battle, 'closed');
+
+      // Bug #6 — once the battle finalizes, the linked challenge row
+      // (still status='selected') was blocking new challengers on the
+      // same song because the `one_active_challenger_per_song` partial
+      // unique index includes 'selected'. Flip it to 'completed' here
+      // so the next user can queue without the admin having to clear
+      // anything manually. Fire-and-forget — a notify-only failure
+      // shouldn't roll back finalization.
+      manager
+        .getRepository(ChallengeSubmission)
+        .update(
+          { resultingBattleId: battle.id, status: 'selected' },
+          { status: 'completed' },
+        )
+        .catch((err) =>
+          this.logger.error(
+            `Failed to mark challenge submission completed for battle ${battle.id}: ${err}`,
+          ),
+        );
 
       // Bug #4 / #22 — neither side was being notified that the battle
       // closed. Fire a `battle_result` notification at the winner and
