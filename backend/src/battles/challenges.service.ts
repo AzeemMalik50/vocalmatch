@@ -77,6 +77,25 @@ export class ChallengesService {
       );
     }
 
+    // Block challenge submission while a battle for this song is still
+    // in flight (live, or tied awaiting admin decision). Queueing a
+    // challenger now is meaningless — admin can't promote them until
+    // the current champion is known, and showing the user a different
+    // error after they've already uploaded their video is poor UX.
+    // Frontend pre-checks this too via /api/battles?songId&status, but
+    // the DB-truth gate lives here.
+    const activeBattle = await this.battles.findOne({
+      where: [
+        { songId: params.songId, status: 'live' },
+        { songId: params.songId, status: 'needs_decision' },
+      ],
+    });
+    if (activeBattle) {
+      throw new ConflictException(
+        'Champion for this battle is not yet decided',
+      );
+    }
+
     const video = await this.videos.findOne({
       where: { id: params.videoId },
     });

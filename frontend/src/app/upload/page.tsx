@@ -152,6 +152,44 @@ function UploadForm() {
 
   const selectedSong = songs.find((s) => s.id === songId) ?? null;
 
+  // Challenge-mode pre-check: if a battle for the selected song is still
+  // in flight (live or tied awaiting admin decision), there's nothing for
+  // a challenger to queue against — admin can't promote them yet. Surface
+  // a blocking banner up-front instead of letting the user upload first
+  // and only learn at submit. Mirrors the backend's ConflictException
+  // copy so the message is consistent. Only runs in challenge mode + when
+  // we actually have a song to check.
+  const [songHasActiveBattle, setSongHasActiveBattle] = useState(false);
+  const [checkingActiveBattle, setCheckingActiveBattle] = useState(false);
+  useEffect(() => {
+    if (!challengeMode || !songId) {
+      setSongHasActiveBattle(false);
+      return;
+    }
+    let cancelled = false;
+    setCheckingActiveBattle(true);
+    (async () => {
+      try {
+        const [live, awaiting] = await Promise.all([
+          api.listBattles({ status: 'live', songId, limit: 1 }),
+          api.listBattles({ status: 'needs_decision', songId, limit: 1 }),
+        ]);
+        if (cancelled) return;
+        setSongHasActiveBattle(
+          live.items.length > 0 || awaiting.items.length > 0,
+        );
+      } catch {
+        // On lookup failure, don't block — backend will still enforce.
+        if (!cancelled) setSongHasActiveBattle(false);
+      } finally {
+        if (!cancelled) setCheckingActiveBattle(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [challengeMode, songId]);
+
   // "Dirty" state for the Reset button — true if the user has touched any
   // field beyond what the URL prefilled. Drives both the visible-state of
   // the button and whether we bother showing the confirm.
@@ -244,6 +282,12 @@ function UploadForm() {
     setErr(null);
     if (!file) {
       setErr('Pick a video file first.');
+      return;
+    }
+    if (challengeMode && songHasActiveBattle) {
+      // Pre-empt the backend ConflictException with the exact same copy.
+      // Don't even start the upload — we know it'll be rejected.
+      setErr('Champion for this battle is not yet decided');
       return;
     }
 
@@ -712,10 +756,35 @@ function UploadForm() {
             </div>
           )}
 
+          {/* Block-state banner for challenge mode when a battle for the
+              selected song is still in flight. Matches the backend's
+              ConflictException copy so the message is identical wherever
+              the user encounters it. */}
+          {challengeMode && songHasActiveBattle && (
+            <div
+              role="alert"
+              className="text-sm text-yellow-200 bg-yellow-950/40 border border-yellow-700/50 rounded-md px-4 py-3"
+            >
+              <p className="font-bold">Champion for this battle is not yet decided</p>
+              <p className="text-xs text-yellow-200/80 mt-1">
+                A battle for{' '}
+                <span className="font-semibold">
+                  {selectedSong?.title ?? 'this song'}
+                </span>{' '}
+                is still live or awaiting an admin decision. Come back once
+                the current champion is crowned to submit your challenge.
+              </p>
+            </div>
+          )}
+
           <div className="flex flex-col sm:flex-row gap-2">
             <button
               type="submit"
-              disabled={submitting}
+              disabled={
+                submitting ||
+                checkingActiveBattle ||
+                (challengeMode && songHasActiveBattle)
+              }
               className="flex-1 px-4 py-3.5 bg-spotlight text-white font-bold rounded-md hover:bg-spotlight-dim transition-colors disabled:opacity-50 shadow-lg shadow-spotlight/30"
             >
               {submitting

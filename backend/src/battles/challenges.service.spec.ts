@@ -47,7 +47,7 @@ describe('ChallengesService (critical paths)', () => {
     return chain;
   }
   const videoRepo: any = { findOne: jest.fn(), save: jest.fn() };
-  const battleRepo: any = {};
+  const battleRepo: any = { findOne: jest.fn() };
   const userRepo: any = { findOne: jest.fn() };
   const songs: any = { findOne: jest.fn() };
   const notifications: any = { create: jest.fn().mockResolvedValue({}) };
@@ -112,6 +112,42 @@ describe('ChallengesService (critical paths)', () => {
           videoId: 'video-1',
         }),
       ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('rejects when a live battle for this song is still in progress', async () => {
+      songs.findOne.mockResolvedValueOnce(baseSong());
+      battleRepo.findOne.mockResolvedValueOnce({
+        id: 'active-battle',
+        songId: 'song-1',
+        status: 'live',
+      });
+      await expect(
+        service.createSubmission({
+          songId: 'song-1',
+          userId: 'challenger-1',
+          videoId: 'video-1',
+        }),
+      ).rejects.toMatchObject({
+        message: 'Champion for this battle is not yet decided',
+      });
+    });
+
+    it('rejects when a needs_decision battle for this song is awaiting admin', async () => {
+      songs.findOne.mockResolvedValueOnce(baseSong());
+      battleRepo.findOne.mockResolvedValueOnce({
+        id: 'tied-battle',
+        songId: 'song-1',
+        status: 'needs_decision',
+      });
+      await expect(
+        service.createSubmission({
+          songId: 'song-1',
+          userId: 'challenger-1',
+          videoId: 'video-1',
+        }),
+      ).rejects.toMatchObject({
+        message: 'Champion for this battle is not yet decided',
+      });
     });
 
     it('rejects submitting someone else\'s video', async () => {
