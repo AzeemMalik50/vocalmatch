@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import AdminShell from '@/components/AdminShell';
 import { TableRowsSkeleton } from '@/components/Loaders';
 import { useConfirm } from '@/lib/confirm-context';
+import { useLobby } from '@/lib/useLobby';
 import {
   api,
   BattleSummaryDto,
@@ -127,6 +128,12 @@ function AdminBattlesPageInner() {
   useEffect(() => {
     load(filter);
   }, [filter]);
+
+  // Real-time refresh — any battle lifecycle (create / cancel / close /
+  // tie) re-fetches the current filter view so the list never goes stale.
+  useLobby(() => {
+    void load(filter);
+  });
 
   const handleClose = async (id: string) => {
     const ok = await confirm({

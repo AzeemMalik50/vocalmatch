@@ -120,9 +120,19 @@ export class BattlesController {
       requesterHasVoted = await this.battles.hasUserVoted(id, userId);
       canSeeStandings = requesterHasVoted || !!user?.isAdmin;
     }
+
+    // Pre-fetch the winner's user snapshot so the UI can render their
+    // identity even when the winning video has been soft-deleted —
+    // previously the frontend fell back to fetching the (now-404'd)
+    // video and showed a generic "Crowned" label.
+    const winnerUser = battle.winnerUserId
+      ? await this.users.findOne({ where: { id: battle.winnerUserId } })
+      : null;
+
     return this.battles.toPublic(battle, {
       requesterHasVoted,
       canSeeStandings,
+      winnerUser,
     });
   }
 

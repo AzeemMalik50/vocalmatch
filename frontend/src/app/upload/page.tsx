@@ -1,10 +1,11 @@
 'use client';
 
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Nav from '@/components/Nav';
 import { StageLoader } from '@/components/Loaders';
 import { useAuth } from '@/lib/auth-context';
+import { useConfirm } from '@/lib/confirm-context';
 import {
   api,
   SongDto,
@@ -69,6 +70,7 @@ function UploadForm() {
   const [progress, setProgress] = useState(0); // 0..100
   const [uploaded, setUploaded] = useState(0); // bytes
   const handleRef = useRef<UploadHandle | null>(null);
+  const confirm = useConfirm();
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -117,23 +119,106 @@ function UploadForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [songs, prefilledSongId]);
 
-  // Bug #18 — when the user clicked "Upload Your Version" a second
-  // time (e.g. for a different challenger), Next.js soft-navigation
-  // kept the existing form state. Reset the transient fields when the
-  // intent (challenge mode + target song) changes so the user always
-  // starts from a clean form.
-  useEffect(() => {
+  // Single source of truth for "wipe the form back to a clean state".
+  // Used by both the intent-change effect below and the manual Reset
+  // button. Honors challenge-mode + prefilled song: those come from the
+  // URL and should stay set so the user doesn't have to re-pick a song
+  // after a stray click on Reset.
+  const clearForm = useCallback(() => {
     setTitle('');
     setDescription('');
     setTagsInput('');
     setFile(null);
+    setVisibility('public');
     setErr(null);
     setProgress(0);
     setUploaded(0);
+    setSongSearch('');
+    setSongPickerOpen(false);
+    // Only blow away the song selection when there's no URL-prefilled
+    // song to fall back to — otherwise we'd strand the user on a form
+    // that immediately re-prefills from the URL on the next render.
+    if (!prefilledSongId) setSongId('');
+  }, [prefilledSongId]);
+
+  // Bug #18 — when the user clicked "Upload Your Version" a second
+  // time (e.g. for a different challenger), Next.js soft-navigation
+  // kept the existing form state. Reset whenever the intent (challenge
+  // mode + target song) changes so the user always starts clean.
+  useEffect(() => {
+    clearForm();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [challengeMode, prefilledSongId]);
 
   const selectedSong = songs.find((s) => s.id === songId) ?? null;
+
+  // Challenge-mode pre-check: if a battle for the selected song is still
+  // in flight (live or tied awaiting admin decision), there's nothing for
+  // a challenger to queue against — admin can't promote them yet. Surface
+  // a blocking banner up-front instead of letting the user upload first
+  // and only learn at submit. Mirrors the backend's ConflictException
+  // copy so the message is consistent. Only runs in challenge mode + when
+  // we actually have a song to check.
+  const [songHasActiveBattle, setSongHasActiveBattle] = useState(false);
+  const [checkingActiveBattle, setCheckingActiveBattle] = useState(false);
+  useEffect(() => {
+    if (!challengeMode || !songId) {
+      setSongHasActiveBattle(false);
+      return;
+    }
+    let cancelled = false;
+    setCheckingActiveBattle(true);
+    (async () => {
+      try {
+        const [live, awaiting] = await Promise.all([
+          api.listBattles({ status: 'live', songId, limit: 1 }),
+          api.listBattles({ status: 'needs_decision', songId, limit: 1 }),
+        ]);
+        if (cancelled) return;
+        setSongHasActiveBattle(
+          live.items.length > 0 || awaiting.items.length > 0,
+        );
+      } catch {
+        // On lookup failure, don't block — backend will still enforce.
+        if (!cancelled) setSongHasActiveBattle(false);
+      } finally {
+        if (!cancelled) setCheckingActiveBattle(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [challengeMode, songId]);
+
+  // "Dirty" state for the Reset button — true if the user has touched any
+  // field beyond what the URL prefilled. Drives both the visible-state of
+  // the button and whether we bother showing the confirm.
+  const formDirty =
+    !!title ||
+    !!description ||
+    !!tagsInput ||
+    !!file ||
+    visibility !== 'public' ||
+    !!songSearch ||
+    (!!songId && songId !== prefilledSongId);
+
+  const handleReset = async () => {
+    if (!formDirty) {
+      clearForm();
+      return;
+    }
+    const ok = await confirm({
+      title: challengeMode ? 'Clear this challenge?' : 'Clear the form?',
+      message: 'Everything you\'ve typed or selected here gets reset.',
+      detail: challengeMode && prefilledSongId
+        ? 'The Centerstage Song stays selected so you don\'t have to pick it again.'
+        : undefined,
+      confirmLabel: 'Yes, clear it',
+      cancelLabel: 'Keep editing',
+      tone: 'danger',
+    });
+    if (ok) clearForm();
+  };
 
   const filteredSongs = (() => {
     const q = songSearch.trim().toLowerCase();
@@ -197,6 +282,12 @@ function UploadForm() {
     setErr(null);
     if (!file) {
       setErr('Pick a video file first.');
+      return;
+    }
+    if (challengeMode && songHasActiveBattle) {
+      // Pre-empt the backend ConflictException with the exact same copy.
+      // Don't even start the upload — we know it'll be rejected.
+      setErr('Champion for this battle is not yet decided');
       return;
     }
 
@@ -665,19 +756,55 @@ function UploadForm() {
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full px-4 py-3.5 bg-spotlight text-white font-bold rounded-md hover:bg-spotlight-dim transition-colors disabled:opacity-50 shadow-lg shadow-spotlight/30"
-          >
-            {submitting
-              ? challengeMode
-                ? 'Submitting challenge…'
-                : 'Publishing…'
-              : challengeMode
-                ? 'Submit my challenge →'
-                : 'Publish performance →'}
-          </button>
+          {/* Block-state banner for challenge mode when a battle for the
+              selected song is still in flight. Matches the backend's
+              ConflictException copy so the message is identical wherever
+              the user encounters it. */}
+          {challengeMode && songHasActiveBattle && (
+            <div
+              role="alert"
+              className="text-sm text-yellow-200 bg-yellow-950/40 border border-yellow-700/50 rounded-md px-4 py-3"
+            >
+              <p className="font-bold">Champion for this battle is not yet decided</p>
+              <p className="text-xs text-yellow-200/80 mt-1">
+                A battle for{' '}
+                <span className="font-semibold">
+                  {selectedSong?.title ?? 'this song'}
+                </span>{' '}
+                is still live or awaiting an admin decision. Come back once
+                the current champion is crowned to submit your challenge.
+              </p>
+            </div>
+          )}
+
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button
+              type="submit"
+              disabled={
+                submitting ||
+                checkingActiveBattle ||
+                (challengeMode && songHasActiveBattle)
+              }
+              className="flex-1 px-4 py-3.5 bg-spotlight text-white font-bold rounded-md hover:bg-spotlight-dim transition-colors disabled:opacity-50 shadow-lg shadow-spotlight/30"
+            >
+              {submitting
+                ? challengeMode
+                  ? 'Submitting challenge…'
+                  : 'Publishing…'
+                : challengeMode
+                  ? 'Submit my challenge →'
+                  : 'Publish performance →'}
+            </button>
+            <button
+              type="button"
+              onClick={handleReset}
+              disabled={submitting || !formDirty}
+              title={formDirty ? 'Clear all fields' : 'Nothing to clear yet'}
+              className="sm:w-auto px-4 py-3.5 text-sm font-bold rounded-md bg-stage-800 border border-stage-700 text-haze hover:text-white hover:border-stage-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Clear fields
+            </button>
+          </div>
 
           <p className="text-xs text-haze/60 leading-relaxed">
             Your video is hosted on Cloudinary's CDN. When the Main Stage

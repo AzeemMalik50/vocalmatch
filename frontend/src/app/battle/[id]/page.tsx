@@ -17,6 +17,8 @@ import {
   VideoDto,
 } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useLobby } from '@/lib/useLobby';
+import { useReconnectRefetch } from '@/lib/useReconnectRefetch';
 
 /**
  * Public battle page (Phase 2A primary surface).
@@ -78,6 +80,24 @@ export default function BattlePage() {
     load();
   }, [load]);
 
+  // Anonymous + not-yet-voted viewers still need to see status changes —
+  // particularly cancellations. The vote-gated battle channel (below) is
+  // closed to them, so subscribe to the public lobby channel and re-load
+  // whenever the *currently-displayed* battle's id appears in a lifecycle
+  // event. The full reload is fine here since lobby events fire only on
+  // genuine state transitions, not per-vote.
+  useLobby((e) => {
+    if (e.battleId === id) void load();
+  });
+
+  // Mobile clients commonly drop network and pick it back up. The SSE
+  // stream auto-reconnects but only delivers *new* frames — any state
+  // change that landed during the gap is missed. Hit REST whenever the
+  // browser reports online again or the user returns to the tab.
+  useReconnectRefetch(() => {
+    void load();
+  });
+
   // Live vote counts via SSE. The backend only subscribes us to the battle
   // channel when we're allowed to see standings (admin or already-voted) so
   // we mirror that gate here using `canSeeStandings`. Re-runs when it flips
@@ -90,6 +110,19 @@ export default function BattlePage() {
     const url = buildStreamUrl({ battleId: id });
     if (!url) return;
     const es = new EventSource(url);
+
+    // Detect SSE reconnects via the `open` event. The initial open also
+    // fires `open`, so flip a flag after the first one and only refetch
+    // on subsequent opens — those are reconnects after a transient
+    // network drop, and any frames missed during the gap aren't replayed.
+    let firstOpenSeen = false;
+    es.addEventListener('open', () => {
+      if (firstOpenSeen) {
+        void load();
+      } else {
+        firstOpenSeen = true;
+      }
+    });
 
     const merge = (e: MessageEvent) => {
       try {
@@ -125,7 +158,7 @@ export default function BattlePage() {
     return () => {
       es.close();
     };
-  }, [id, user, battle?.canSeeStandings]);
+  }, [id, user, battle?.canSeeStandings, load]);
 
   const handleShare = useCallback(async () => {
     if (typeof window === 'undefined') return;
@@ -374,8 +407,17 @@ function WinnerBanner({
         : null;
   const winnerPerf =
     winnerSide === 'A' ? performanceA : winnerSide === 'B' ? performanceB : null;
-  const username = winnerPerf?.uploader?.username ?? null;
-  const streak = winnerPerf?.uploader?.currentStreak ?? 0;
+  // Prefer the snapshot on the battle itself — survives soft-delete of
+  // the winning video. Fall back to the live video uploader (richer
+  // data when present), then to the literal id-only state which now
+  // reads "Deleted user" instead of "Crowned".
+  const username =
+    battle.winnerUser?.username ?? winnerPerf?.uploader?.username ?? null;
+  const streak =
+    battle.winnerUser?.currentStreak ??
+    winnerPerf?.uploader?.currentStreak ??
+    0;
+  const winnerKnown = !!battle.winnerUserId || !!username;
   const totalVotes = battle.totalVotes ?? 0;
 
   return (
@@ -394,6 +436,13 @@ function WinnerBanner({
               <Link href={`/u/${username}`} className="hover:opacity-90">
                 @{username}
               </Link>
+            ) : winnerKnown ? (
+              // We have a winner id on the battle but couldn't resolve a
+              // username (extremely unlikely in practice — the user row
+              // would have to have been hard-deleted). Surface the gap
+              // as "Deleted user" so it's never confused with a system
+              // glitch.
+              <span>Deleted user</span>
             ) : (
               <span>Crowned</span>
             )}

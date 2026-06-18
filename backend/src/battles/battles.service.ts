@@ -739,9 +739,22 @@ export class BattlesService {
    */
   toPublic(
     battle: Battle,
-    opts: { requesterHasVoted: boolean; canSeeStandings: boolean },
+    opts: {
+      requesterHasVoted: boolean;
+      canSeeStandings: boolean;
+      /**
+       * Optional winner-user snapshot. Lets the controller surface the
+       * winner's identity (username, avatar, streak) without the
+       * frontend having to fetch the winning video — important because
+       * once a video is soft-deleted, the videos endpoint 404s and the
+       * UI was falling back to a generic "Crowned" label. The user
+       * identity is preserved on the battle (`winnerUserId`) even when
+       * the media is gone.
+       */
+      winnerUser?: User | null;
+    },
   ) {
-    const { requesterHasVoted, canSeeStandings } = opts;
+    const { requesterHasVoted, canSeeStandings, winnerUser } = opts;
     const total = battle.voteCountA + battle.voteCountB;
     const showStandings =
       canSeeStandings ||
@@ -760,6 +773,15 @@ export class BattlesService {
       status: battle.status,
       winnerPerformanceId: battle.winnerPerformanceId,
       winnerUserId: battle.winnerUserId,
+      winnerUser: winnerUser
+        ? {
+            id: winnerUser.id,
+            username: winnerUser.username,
+            avatarUrl: winnerUser.avatarUrl,
+            championTitle: winnerUser.championTitle,
+            currentStreak: winnerUser.currentStreak,
+          }
+        : null,
       createdAt: battle.createdAt,
       closedAt: battle.closedAt,
       requesterHasVoted,

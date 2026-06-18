@@ -1102,8 +1102,13 @@ function StageCarousel() {
   const [videos, setVideos] = useState<VideoDto[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Strip a leading "@" so users searching "@foo" get matched against
+  // usernames (stored without the prefix) instead of returning empty.
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    const t = setTimeout(
+      () => setDebouncedSearch(search.trim().replace(/^@+/, '')),
+      300,
+    );
     return () => clearTimeout(t);
   }, [search]);
 
@@ -1155,7 +1160,7 @@ function StageCarousel() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search performances..."
+              placeholder="Search title, song, or @username"
               className="flex-1 bg-muted/50 border border-border rounded-lg px-4 py-3 text-foreground placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-red-600"
             />
             <div className="flex gap-2 flex-wrap">
@@ -1331,8 +1336,17 @@ function WinnersCarousel() {
           try {
             const full = await api.getBattle(b.id);
             if (!full.winnerPerformanceId) return null;
-            const perf = await api.getVideo(full.winnerPerformanceId);
             const song = await api.getSong(full.songId).catch(() => null);
+            // Video fetch is best-effort — if the winning performance has
+            // been soft-deleted the videos endpoint 404s, but we still
+            // want to render the card using the winner-user snapshot the
+            // battle response includes. Pull avatar from the video when
+            // it's still around for the nicer visual.
+            const perf = full.winnerPerformanceId
+              ? await api
+                  .getVideo(full.winnerPerformanceId)
+                  .catch(() => null)
+              : null;
             const total = (full.voteCountA ?? 0) + (full.voteCountB ?? 0);
             const winnerCount =
               full.winnerPerformanceId === full.performanceAId
@@ -1342,8 +1356,10 @@ function WinnersCarousel() {
               battleId: full.id,
               songTitle: song?.title ?? 'Centerstage Song',
               songArtist: song?.artist ?? '',
-              winnerUsername: perf.uploader?.username ?? null,
-              winnerAvatarUrl: perf.uploader?.avatarUrl ?? null,
+              winnerUsername:
+                full.winnerUser?.username ?? perf?.uploader?.username ?? null,
+              winnerAvatarUrl:
+                full.winnerUser?.avatarUrl ?? perf?.uploader?.avatarUrl ?? null,
               percent: total > 0 ? Math.round((winnerCount / total) * 100) : 0,
             } satisfies WinnerCard;
           } catch {

@@ -21,8 +21,15 @@ export default function AdminUsersPage() {
   const [nextOffset, setNextOffset] = useState(0);
   const [working, setWorking] = useState<string | null>(null);
 
+  // Username searches typed as "@foo" should still match — strip the
+  // leading "@" before sending so the LIKE query against the username
+  // column finds the row. Email matches keep their "@" as-is because
+  // the regex only removes "@" at the very start of the string.
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    const t = setTimeout(
+      () => setDebouncedSearch(search.trim().replace(/^@+/, '')),
+      300,
+    );
     return () => clearTimeout(t);
   }, [search]);
 
@@ -108,7 +115,7 @@ export default function AdminUsersPage() {
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by email or username"
+          placeholder="Search by email or @username"
           className="w-full px-3 py-2.5 bg-stage-900 border border-stage-700 rounded-md focus:outline-none focus:border-spotlight transition-colors"
         />
       </div>
@@ -186,7 +193,7 @@ export default function AdminUsersPage() {
             </tbody>
           </table>
           {hasMore && (
-            <div className="flex justify-center mt-6">
+            <div className="flex justify-center mt-6 mb-12">
               <button
                 type="button"
                 onClick={loadMore}

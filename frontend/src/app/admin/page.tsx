@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import AdminShell from '@/components/AdminShell';
 import { SkeletonBlock, TableRowsSkeleton } from '@/components/Loaders';
 import { api, BattleSummaryDto, SongDto } from '@/lib/api';
+import { useLobby } from '@/lib/useLobby';
 
 interface Stats {
   liveBattles: number;
@@ -20,29 +21,37 @@ export default function AdminOverviewPage() {
   const [songs, setSongs] = useState<SongDto[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [live, awaiting, completed, songsResp] = await Promise.all([
-          api.listBattles({ status: 'live' }),
-          api.listBattles({ status: 'needs_decision' }),
-          api.listBattles({ status: 'completed' }),
-          api.listSongs('all'),
-        ]);
-        setStats({
-          liveBattles: live.items.length,
-          needsDecision: awaiting.items.length,
-          completedBattles: completed.items.length,
-          activeSongs: songsResp.items.filter((s) => s.status === 'active').length,
-        });
-        setRecentLive(live.items.slice(0, 5));
-        setNeedsDecision(awaiting.items);
-        setSongs(songsResp.items);
-      } finally {
-        setLoading(false);
-      }
-    })();
+  const refetch = useCallback(async () => {
+    try {
+      const [live, awaiting, completed, songsResp] = await Promise.all([
+        api.listBattles({ status: 'live' }),
+        api.listBattles({ status: 'needs_decision' }),
+        api.listBattles({ status: 'completed' }),
+        api.listSongs('all'),
+      ]);
+      setStats({
+        liveBattles: live.items.length,
+        needsDecision: awaiting.items.length,
+        completedBattles: completed.items.length,
+        activeSongs: songsResp.items.filter((s) => s.status === 'active').length,
+      });
+      setRecentLive(live.items.slice(0, 5));
+      setNeedsDecision(awaiting.items);
+      setSongs(songsResp.items);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void refetch();
+  }, [refetch]);
+
+  // Real-time refresh — every battle lifecycle event updates the
+  // backstage counts and recent lists without a page reload.
+  useLobby(() => {
+    void refetch();
+  });
 
   return (
     <AdminShell>

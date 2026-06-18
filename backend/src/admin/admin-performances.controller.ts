@@ -138,6 +138,33 @@ export class AdminPerformancesController {
       }
     }
 
+    // Mark performances that are currently locked into an in-flight battle
+    // so the UI can render a badge and disable the song-reassign / soft-
+    // delete affordances up-front (the PATCH endpoint enforces this too,
+    // but pre-empting the click saves a round-trip and avoids confusing
+    // mid-action errors).
+    const activeBattleByPerf = new Map<string, string>();
+    if (items.length > 0) {
+      const perfIds = items.map((v) => v.id);
+      const battles = await this.battles
+        .createQueryBuilder('b')
+        .select(['b.id', 'b.performanceAId', 'b.performanceBId'])
+        .where('b.status IN (:...statuses)', {
+          statuses: ['live', 'needs_decision'],
+        })
+        .andWhere(
+          '(b.performanceAId IN (:...ids) OR b.performanceBId IN (:...ids))',
+          { ids: perfIds },
+        )
+        .getMany();
+      for (const b of battles) {
+        if (perfIds.includes(b.performanceAId))
+          activeBattleByPerf.set(b.performanceAId, b.id);
+        if (perfIds.includes(b.performanceBId))
+          activeBattleByPerf.set(b.performanceBId, b.id);
+      }
+    }
+
     return {
       items: items.map((v) => ({
         id: v.id,
@@ -158,6 +185,7 @@ export class AdminPerformancesController {
         visibility: v.visibility,
         viewCount: v.viewCount,
         voteCount: voteCountMap.get(v.id) ?? 0,
+        activeBattleId: activeBattleByPerf.get(v.id) ?? null,
         deletedAt: v.deletedAt,
         createdAt: v.createdAt,
         uploader: v.uploader
@@ -181,6 +209,17 @@ export class AdminPerformancesController {
   async assignSong(@Param('id') id: string, @Body() dto: AssignSongDto) {
     const video = await this.videos.findOne({ where: { id } });
     if (!video) throw new NotFoundException('Performance not found');
+
+    // Block editing the song link on a soft-deleted performance —
+    // assigning a song to a row that's hidden from every public surface
+    // produces inconsistent state (the new song link is invisible to
+    // everyone except the admin list). Admin must restore the row
+    // first if they want to retag it.
+    if (video.deletedAt) {
+      throw new ConflictException(
+        'This performance is deleted. Restore it before changing the song link.',
+      );
+    }
 
     // Bug #29 — block editing the Centerstage Song link of a performance
     // that is currently participating in a live or tie-pending battle.
