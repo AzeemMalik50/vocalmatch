@@ -193,7 +193,7 @@ export default function AdminUsersPage() {
             </tbody>
           </table>
           {hasMore && (
-            <div className="flex justify-center mt-6">
+            <div className="flex justify-center mt-6 mb-12">
               <button
                 type="button"
                 onClick={loadMore}
