@@ -439,6 +439,13 @@ export interface AdminPerformanceDto {
   viewCount: number;
   /** Total votes received across every battle this performance has been in. */
   voteCount: number;
+  /**
+   * Set when this performance is currently locked into a battle whose
+   * outcome isn't final yet (status `live` or `needs_decision`). When set,
+   * the admin UI disables song-reassignment so battle integrity stays
+   * intact; the backend rejects the PATCH with a 409 either way.
+   */
+  activeBattleId: string | null;
   deletedAt: string | null;
   createdAt: string;
   uploader: {

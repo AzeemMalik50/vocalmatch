@@ -260,6 +260,15 @@ function PerformanceRow({
               Deleted
             </span>
           )}
+          {perf.activeBattleId && (
+            <Link
+              href={`/admin/battles/${perf.activeBattleId}`}
+              title="Locked while a live or tie-pending battle uses this performance"
+              className="text-[10px] uppercase tracking-widest px-2 py-0.5 rounded bg-spotlight/15 text-spotlight border border-spotlight/40 font-bold hover:bg-spotlight/25 transition-colors"
+            >
+              In active battle
+            </Link>
+          )}
         </div>
         <p className="text-xs text-haze">
           {perf.uploader ? (
@@ -349,8 +358,13 @@ function PerformanceRow({
             <button
               type="button"
               onClick={() => setPicking(true)}
-              disabled={busy}
-              className="px-3 py-1.5 text-xs font-bold rounded-md bg-stage-800 border border-stage-700 hover:border-spotlight/40 disabled:opacity-50 transition-colors"
+              disabled={busy || !!perf.activeBattleId}
+              title={
+                perf.activeBattleId
+                  ? 'Resolve or cancel the active battle before changing the song link.'
+                  : undefined
+              }
+              className="px-3 py-1.5 text-xs font-bold rounded-md bg-stage-800 border border-stage-700 hover:border-spotlight/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               {perf.songId ? 'Reassign song' : 'Assign song'}
             </button>
