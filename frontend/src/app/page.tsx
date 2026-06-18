@@ -1336,8 +1336,17 @@ function WinnersCarousel() {
           try {
             const full = await api.getBattle(b.id);
             if (!full.winnerPerformanceId) return null;
-            const perf = await api.getVideo(full.winnerPerformanceId);
             const song = await api.getSong(full.songId).catch(() => null);
+            // Video fetch is best-effort — if the winning performance has
+            // been soft-deleted the videos endpoint 404s, but we still
+            // want to render the card using the winner-user snapshot the
+            // battle response includes. Pull avatar from the video when
+            // it's still around for the nicer visual.
+            const perf = full.winnerPerformanceId
+              ? await api
+                  .getVideo(full.winnerPerformanceId)
+                  .catch(() => null)
+              : null;
             const total = (full.voteCountA ?? 0) + (full.voteCountB ?? 0);
             const winnerCount =
               full.winnerPerformanceId === full.performanceAId
@@ -1347,8 +1356,10 @@ function WinnersCarousel() {
               battleId: full.id,
               songTitle: song?.title ?? 'Centerstage Song',
               songArtist: song?.artist ?? '',
-              winnerUsername: perf.uploader?.username ?? null,
-              winnerAvatarUrl: perf.uploader?.avatarUrl ?? null,
+              winnerUsername:
+                full.winnerUser?.username ?? perf?.uploader?.username ?? null,
+              winnerAvatarUrl:
+                full.winnerUser?.avatarUrl ?? perf?.uploader?.avatarUrl ?? null,
               percent: total > 0 ? Math.round((winnerCount / total) * 100) : 0,
             } satisfies WinnerCard;
           } catch {

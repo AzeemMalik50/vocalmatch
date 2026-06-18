@@ -407,8 +407,17 @@ function WinnerBanner({
         : null;
   const winnerPerf =
     winnerSide === 'A' ? performanceA : winnerSide === 'B' ? performanceB : null;
-  const username = winnerPerf?.uploader?.username ?? null;
-  const streak = winnerPerf?.uploader?.currentStreak ?? 0;
+  // Prefer the snapshot on the battle itself — survives soft-delete of
+  // the winning video. Fall back to the live video uploader (richer
+  // data when present), then to the literal id-only state which now
+  // reads "Deleted user" instead of "Crowned".
+  const username =
+    battle.winnerUser?.username ?? winnerPerf?.uploader?.username ?? null;
+  const streak =
+    battle.winnerUser?.currentStreak ??
+    winnerPerf?.uploader?.currentStreak ??
+    0;
+  const winnerKnown = !!battle.winnerUserId || !!username;
   const totalVotes = battle.totalVotes ?? 0;
 
   return (
@@ -427,6 +436,13 @@ function WinnerBanner({
               <Link href={`/u/${username}`} className="hover:opacity-90">
                 @{username}
               </Link>
+            ) : winnerKnown ? (
+              // We have a winner id on the battle but couldn't resolve a
+              // username (extremely unlikely in practice — the user row
+              // would have to have been hard-deleted). Surface the gap
+              // as "Deleted user" so it's never confused with a system
+              // glitch.
+              <span>Deleted user</span>
             ) : (
               <span>Crowned</span>
             )}
