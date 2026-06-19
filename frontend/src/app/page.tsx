@@ -32,6 +32,7 @@ import {
   api,
   AtRiskCrownDto,
   BattleDto,
+  BattleSummaryDto,
   DethronementDto,
   FeaturedSongRiskDto,
   GENRE_OPTIONS,
@@ -419,6 +420,12 @@ function LiveBattle() {
   const [battle, setBattle] = useState<BattleDto | null>(null);
   const [a, setA] = useState<VideoDto | null>(null);
   const [b, setB] = useState<VideoDto | null>(null);
+  // Bug #57 — the section used to fetch a single live battle and pretend
+  // it was the only one. Track the other concurrent live battles
+  // separately so we can render them as a compact grid below the
+  // featured card. List endpoint already returns summary DTOs, no
+  // per-battle detail fetch needed.
+  const [extraBattles, setExtraBattles] = useState<BattleSummaryDto[]>([]);
   // Separate loading flag so the "no live battle" empty state only
   // renders AFTER we've heard back from the server. Previously the
   // empty state flashed during initial fetch because `!battle || !a || !b`
@@ -437,17 +444,19 @@ function LiveBattle() {
   const refetch = useCallback(async () => {
     setLoading(true);
     try {
-      const resp = await api.listBattles({ status: 'live', limit: 1 });
+      const resp = await api.listBattles({ status: 'live', limit: 20 });
       if (resp.items.length === 0) {
         // The featured battle was cancelled / completed and there's no
         // replacement live one — reset to the empty-state copy.
         setBattle(null);
         setA(null);
         setB(null);
+        setExtraBattles([]);
         return;
       }
       const featured = await api.getBattle(resp.items[0].id);
       setBattle(featured);
+      setExtraBattles(resp.items.slice(1));
       const [perfA, perfB] = await Promise.all([
         api.getVideo(featured.performanceAId),
         api.getVideo(featured.performanceBId),
@@ -564,9 +573,77 @@ function LiveBattle() {
           </div>
         )}
 
+        {/* Other concurrently-live battles. The featured card above is
+            the marquee; this strip surfaces every other battle that's
+            also accepting votes right now so visitors don't think there's
+            only one. Renders nothing when there's just the one featured
+            battle. */}
+        {!loading && extraBattles.length > 0 && (
+          <div className="mt-12">
+            <div className="flex items-end justify-between mb-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-red-500 font-bold mb-1">
+                  Also live
+                </p>
+                <h3 className="font-display text-2xl md:text-3xl font-bold text-white">
+                  More battles open for voting
+                </h3>
+              </div>
+              <p className="hidden sm:block text-sm text-gray-400 tabular-nums">
+                {extraBattles.length}{' '}
+                {extraBattles.length === 1 ? 'battle' : 'battles'}
+              </p>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {extraBattles.map((b) => (
+                <ExtraLiveBattleCard key={b.id} battle={b} />
+              ))}
+            </div>
+          </div>
+        )}
+
         <BattlePillarsRow />
       </div>
     </section>
+  );
+}
+
+function ExtraLiveBattleCard({ battle }: { battle: BattleSummaryDto }) {
+  // Compact link card for any live battle beyond the featured one.
+  // Uses the battle's own `title` (backend always populates it, even
+  // when admin doesn't set one — see Bug #56) so the row reads
+  // cleanly without a per-battle song lookup.
+  return (
+    <Link
+      href={`/battle/${battle.id}`}
+      className="group block bg-card/50 backdrop-blur border border-red-600/30 hover:border-red-500 rounded-2xl p-5 transition-colors"
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <span className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+        </span>
+        <span className="text-[10px] uppercase tracking-widest font-bold text-red-500">
+          Live · accepting votes
+        </span>
+      </div>
+      <h4 className="font-display font-bold text-lg text-white mb-3 leading-tight group-hover:text-red-400 transition-colors line-clamp-2">
+        {battle.title || 'Live battle'}
+      </h4>
+      <div className="flex items-end justify-between pt-3 border-t border-red-600/20">
+        <div>
+          <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-0.5">
+            Closes
+          </p>
+          <p className="text-xs text-gray-300 tabular-nums">
+            {new Date(battle.votingClosesAt).toLocaleString()}
+          </p>
+        </div>
+        <span className="text-xs text-red-400 font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
+          Vote →
+        </span>
+      </div>
+    </Link>
   );
 }
 
