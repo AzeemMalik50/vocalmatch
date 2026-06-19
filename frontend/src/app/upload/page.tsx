@@ -479,6 +479,52 @@ function UploadForm() {
             ) : (
               <div className="relative">
                 {selectedSong ? (
+                  // Bug #61 — when the user lands here via challenge mode
+                  // with a song pre-filled from the URL (`?challenge=1&songId=…`,
+                  // typically from clicking "Upload your version" on a
+                  // specific champion's battle/profile page), they
+                  // arrived intending to challenge THAT champion. Letting
+                  // them swap the song silently retargets the challenge
+                  // at a different champion without any UI cue — that's
+                  // the bug. Lock the song in this case; if they want a
+                  // different target, they should re-enter the flow
+                  // from that other champion's page.
+                  challengeMode && prefilledSongId === selectedSong.id ? (
+                    <div className="w-full flex items-stretch bg-stage-900 border border-spotlight/50 rounded-md overflow-hidden">
+                      <div className="flex-1 flex items-center justify-between px-4 py-3">
+                        <span>
+                          <span className="font-bold">{selectedSong.title}</span>
+                          <span className="text-haze/60"> · {selectedSong.artist}</span>
+                        </span>
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] uppercase tracking-widest font-bold bg-spotlight/15 text-spotlight border border-spotlight/40"
+                          title="Locked to the champion you launched this challenge from"
+                        >
+                          🔒 Locked
+                        </span>
+                      </div>
+                      {selectedSong.trackUrl && (
+                        <a
+                          href={selectedSong.trackUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-4 text-[11px] uppercase tracking-widest font-bold text-spotlight hover:bg-stage-800 border-l border-spotlight/30"
+                          title="Open backing track in a new tab"
+                        >
+                          <svg
+                            width="12"
+                            height="12"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            aria-hidden="true"
+                          >
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                          Play sound
+                        </a>
+                      )}
+                    </div>
+                  ) : (
                   <div className="w-full flex items-stretch bg-stage-900 border border-spotlight/50 rounded-md overflow-hidden">
                     <button
                       type="button"
@@ -518,6 +564,7 @@ function UploadForm() {
                       </a>
                     )}
                   </div>
+                  )
                 ) : (
                   <>
                     <input
@@ -604,6 +651,16 @@ function UploadForm() {
               Battles match performers who covered the same Centerstage Song.
               Pick one from the catalog so admins can pair your performance.
             </p>
+            {challengeMode &&
+              prefilledSongId &&
+              prefilledSongId === songId && (
+                <p className="mt-1.5 text-xs text-spotlight/90">
+                  Song is locked because you launched this challenge from
+                  the current champion of this song. To challenge a
+                  different champion, open that champion&apos;s battle and
+                  hit &ldquo;Upload your version&rdquo; there.
+                </p>
+              )}
           </div>
 
           <div>
