@@ -1686,33 +1686,51 @@ function CrownAtRiskPanel() {
   const [marquee, setMarquee] = useState<FeaturedSongRiskDto | null>(null);
   const [personal, setPersonal] = useState<AtRiskCrownDto | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      // 3-state lookup: authed → try personal → fall back to marquee.
-      try {
-        if (user) {
-          const mine = await api.getMyAtRiskCrowns();
-          if (!cancelled && mine.length > 0) {
-            setPersonal(mine[0]);
-            return;
-          }
+  // Bug #64 — the panel used to fetch once on mount, so after the user
+  // won a new crown on a different song the section kept showing the
+  // previously-won song's risk data until a hard refresh. Mirrors the
+  // same fix applied to ChampionSection / DethronedPanel: fold the
+  // fetch into a callback, drive both initial-mount and SSE-triggered
+  // refetches through it, and explicitly clear stale state when the
+  // backend returns nothing (otherwise `personal` would stay sticky
+  // and the panel would render an outdated song forever).
+  const refetch = useCallback(async () => {
+    // 3-state lookup: authed → try personal → fall back to marquee.
+    try {
+      if (user) {
+        const mine = await api.getMyAtRiskCrowns();
+        if (mine.length > 0) {
+          setPersonal(mine[0]);
+          setMarquee(null);
+          return;
         }
-        const f = await api.getFeaturedRisk();
-        if (!cancelled) setMarquee(f);
-      } catch {
-        try {
-          const f = await api.getFeaturedRisk();
-          if (!cancelled) setMarquee(f);
-        } catch {
-          /* both failed → panel renders nothing */
-        }
+        // No personal crown anymore (e.g. lost it) — clear so we don't
+        // keep rendering the stale row.
+        setPersonal(null);
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.id]);
+      const f = await api.getFeaturedRisk();
+      setMarquee(f);
+    } catch {
+      try {
+        const f = await api.getFeaturedRisk();
+        setMarquee(f);
+      } catch {
+        /* both failed → panel renders nothing */
+      }
+    }
+  }, [user]);
+
+  useEffect(() => {
+    void refetch();
+  }, [refetch]);
+
+  // Real-time refresh — any battle lifecycle event (newly crowned,
+  // dethroned, new battle queued against your song) shifts the user's
+  // at-risk picture. Re-evaluate from the lobby SSE so the section
+  // tracks the latest champion status without a hard refresh.
+  useLobby(() => {
+    void refetch();
+  });
 
   if (personal) {
     return (
