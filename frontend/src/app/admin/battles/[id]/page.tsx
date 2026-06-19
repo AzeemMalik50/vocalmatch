@@ -264,7 +264,12 @@ export default function AdminBattleDetailPage() {
           )}
         </div>
         <h1 className="font-display font-black text-3xl md:text-4xl mb-2">
-          {battle.title || (song ? `Battle · ${song.title}` : 'Untitled battle')}
+          {/* Bug #56 — fallback must match the list page's so the same
+              battle reads the same name in both places. New battles
+              always carry a real title (backend auto-generates one
+              from the song on create); only legacy null-title rows
+              hit this fallback. */}
+          {battle.title || 'Untitled battle'}
         </h1>
         {song && (
           <p className="text-haze text-sm">

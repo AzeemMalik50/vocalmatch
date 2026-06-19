@@ -123,7 +123,7 @@ export class BattlesService {
       );
     }
     // Song must exist (will throw NotFound if not)
-    await this.songs.findOne(dto.songId);
+    const song = await this.songs.findOne(dto.songId);
 
     // Block duplicate live battles for the same song. Postgres has a partial
     // unique index for this; keep the app-layer check for SQLite parity.
@@ -139,9 +139,18 @@ export class BattlesService {
       );
     }
 
+    // Bug #56 — when admin created a battle without a title, the DB
+    // stored null. The list page rendered "Untitled battle", but the
+    // detail page synthesized a different fallback ("Battle · <song>"),
+    // so the same battle had two different names depending on where
+    // you looked at it. Auto-generate a title at write time using the
+    // song name (mirrors what `createBattleFromChallenge` already does
+    // for promoted challenges), so going forward `battle.title` is
+    // always populated and both list + detail render identically.
+    const explicitTitle = dto.title?.trim() || null;
     const battle = this.battles.create({
       songId: dto.songId,
-      title: dto.title?.trim() || null,
+      title: explicitTitle ?? `Battle · ${song.title}`,
       performanceAId: dto.performanceAId,
       performanceBId: dto.performanceBId,
       votingOpensAt: opensAt,
@@ -158,9 +167,8 @@ export class BattlesService {
     // distinct copy so they read as "you're up" vs "you're being
     // challenged" only when one side is actually the defending champion.
     const battleHref = `/battle/${saved.id}`;
-    const song = await this.songs.findOne(saved.songId).catch(() => null);
-    const songLabel = song?.title ?? 'a Centerstage Song';
-    const championUserId = song?.currentChampionUserId ?? null;
+    const songLabel = song.title;
+    const championUserId = song.currentChampionUserId ?? null;
     for (const performer of [a, b]) {
       const isChampion = championUserId === performer.uploaderId;
       this.notifications
