@@ -244,6 +244,16 @@ export class AdminPerformancesController {
     } else if (dto.songId) {
       const song = await this.songs.findOne({ where: { id: dto.songId } });
       if (!song) throw new NotFoundException('Song not found');
+      // Don't let a retired Centerstage Song be assigned — retired
+      // songs are explicitly off the battle slate, so binding a new or
+      // existing performance to one would let it slip back into
+      // surfaces that filter on `status='active'` and reintroduce the
+      // very catalog state admin retired it to prevent.
+      if (song.status === 'retired') {
+        throw new ConflictException(
+          `"${song.title}" is retired and can't be assigned. Activate it first or pick a different song.`,
+        );
+      }
       video.songId = song.id;
       video.songTitle = song.title;
     }
