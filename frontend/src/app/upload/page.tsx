@@ -288,8 +288,24 @@ function UploadForm() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
+    // Bug #54 — every validation must fire BEFORE `setSubmitting(true)`
+    // and the upload state flips. Previously the `!songId` check ran
+    // *after* `setSubmitting(true)` + `setProgress(0)`, which left the
+    // UI stuck: the button stayed on "Publishing…", a 0% progress bar
+    // appeared, and the "Cancel upload" affordance did nothing because
+    // there was no upload to cancel. User had to refresh to recover.
     if (!file) {
       setErr('Pick a video file first.');
+      return;
+    }
+    if (!title.trim()) {
+      // HTML `required` catches the empty case, but a whitespace-only
+      // title would slip through to the backend. Keep the gate tight.
+      setErr('Give your performance a title.');
+      return;
+    }
+    if (!songId) {
+      setErr('Pick a Centerstage Song from the list.');
       return;
     }
     if (challengeMode && songHasActiveBattle) {
@@ -307,14 +323,12 @@ function UploadForm() {
       return;
     }
 
+    // All validation passed — now it's safe to flip into the uploading
+    // state. From here, the only way back is the real cancel path or a
+    // success/error response from the upload itself.
     setSubmitting(true);
     setProgress(0);
     setUploaded(0);
-
-    if (!songId) {
-      setErr('Pick a Centerstage Song from the list.');
-      return;
-    }
 
     const fd = new FormData();
     fd.append('title', title);
