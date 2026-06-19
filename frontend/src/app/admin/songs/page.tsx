@@ -126,8 +126,20 @@ export default function AdminSongsPage() {
 
   const toggleStatus = async (s: SongDto) => {
     const next = s.status === 'active' ? 'retired' : 'active';
-    await api.updateSong(s.id, { status: next });
-    await load();
+    // Bug #47 — previously this called `load()` after the toggle, which
+    // refetched only the first page. Any rows the admin had pulled in
+    // via "Load more" disappeared, and the toggled song appeared to
+    // jump to a different position (it was actually fine — the rows
+    // *below* it had been dropped). Backend sorts by `createdAt DESC`,
+    // so the song's position is stable across status changes; a
+    // pinpoint in-place patch preserves both the loaded page count
+    // and the row's position.
+    const updated = await api.updateSong(s.id, { status: next });
+    setSongs((prev) =>
+      prev.map((row) =>
+        row.id === s.id ? { ...row, status: updated.status ?? next } : row,
+      ),
+    );
   };
 
   return (
