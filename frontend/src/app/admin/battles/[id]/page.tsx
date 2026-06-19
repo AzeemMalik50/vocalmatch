@@ -35,6 +35,15 @@ export default function AdminBattleDetailPage() {
   const [song, setSong] = useState<SongDto | null>(null);
   const [perfA, setPerfA] = useState<VideoDto | null>(null);
   const [perfB, setPerfB] = useState<VideoDto | null>(null);
+  // Bug #55 — track whether each performance fetch has settled, separate
+  // from whether it returned data. Both "still loading" and "soft-
+  // deleted" used to look identical (perf === null), so the participant
+  // card rendered a permanent skeleton with no indication that the
+  // video had actually been deleted. With a load flag we can show a
+  // clear "Performance unavailable" placeholder once the fetch resolves
+  // empty.
+  const [perfALoaded, setPerfALoaded] = useState(false);
+  const [perfBLoaded, setPerfBLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -42,14 +51,26 @@ export default function AdminBattleDetailPage() {
   const load = useCallback(async () => {
     if (!id) return;
     setLoadError(null);
+    setPerfALoaded(false);
+    setPerfBLoaded(false);
     try {
       const b = await api.getBattle(id);
       setBattle(b);
       // Fire each sub-fetch independently — a slow video shouldn't block the
-      // header / vote-count panel from rendering.
+      // header / vote-count panel from rendering. The `finally` block flips
+      // the load flag whether the request succeeded or 404'd, so the card
+      // can distinguish "loading" from "soft-deleted" downstream.
       api.getSong(b.songId).then(setSong).catch(() => setSong(null));
-      api.getVideo(b.performanceAId).then(setPerfA).catch(() => setPerfA(null));
-      api.getVideo(b.performanceBId).then(setPerfB).catch(() => setPerfB(null));
+      api
+        .getVideo(b.performanceAId)
+        .then(setPerfA)
+        .catch(() => setPerfA(null))
+        .finally(() => setPerfALoaded(true));
+      api
+        .getVideo(b.performanceBId)
+        .then(setPerfB)
+        .catch(() => setPerfB(null))
+        .finally(() => setPerfBLoaded(true));
     } catch (e: any) {
       setLoadError(e.message || 'Could not load this battle');
     }
@@ -243,7 +264,12 @@ export default function AdminBattleDetailPage() {
           )}
         </div>
         <h1 className="font-display font-black text-3xl md:text-4xl mb-2">
-          {battle.title || (song ? `Battle · ${song.title}` : 'Untitled battle')}
+          {/* Bug #56 — fallback must match the list page's so the same
+              battle reads the same name in both places. New battles
+              always carry a real title (backend auto-generates one
+              from the song on create); only legacy null-title rows
+              hit this fallback. */}
+          {battle.title || 'Untitled battle'}
         </h1>
         {song && (
           <p className="text-haze text-sm">
@@ -317,9 +343,16 @@ export default function AdminBattleDetailPage() {
               Winner
             </p>
             <p className="font-display text-xl font-bold">
-              {winnerSide === 'A'
-                ? `@${perfA?.uploader?.username ?? '—'}`
-                : `@${perfB?.uploader?.username ?? '—'}`}
+              {/* Prefer the live video's uploader handle; fall back to the
+                  winnerUser snapshot the battle response carries — that
+                  snapshot survives a soft-deleted winning performance, so
+                  admin still sees @<user> instead of an empty "@—". */}
+              @
+              {(winnerSide === 'A'
+                ? perfA?.uploader?.username
+                : perfB?.uploader?.username) ??
+                battle.winnerUser?.username ??
+                '—'}
               <span className="text-haze font-normal text-sm ml-2">
                 (Side {winnerSide})
               </span>
@@ -339,6 +372,15 @@ export default function AdminBattleDetailPage() {
         <ParticipantCard
           side="A"
           performance={perfA}
+          loaded={perfALoaded}
+          fallbackUser={
+            winnerSide === 'A' && battle.winnerUser
+              ? {
+                  username: battle.winnerUser.username,
+                  avatarUrl: battle.winnerUser.avatarUrl,
+                }
+              : null
+          }
           voteCount={battle.voteCountA}
           percent={battle.percentA}
           totalVotes={totalVotes}
@@ -347,6 +389,15 @@ export default function AdminBattleDetailPage() {
         <ParticipantCard
           side="B"
           performance={perfB}
+          loaded={perfBLoaded}
+          fallbackUser={
+            winnerSide === 'B' && battle.winnerUser
+              ? {
+                  username: battle.winnerUser.username,
+                  avatarUrl: battle.winnerUser.avatarUrl,
+                }
+              : null
+          }
           voteCount={battle.voteCountB}
           percent={battle.percentB}
           totalVotes={totalVotes}
@@ -411,6 +462,8 @@ function StatusBadge({ status }: { status: BattleStatus }) {
 function ParticipantCard({
   side,
   performance,
+  loaded,
+  fallbackUser,
   voteCount,
   percent,
   totalVotes,
@@ -418,6 +471,10 @@ function ParticipantCard({
 }: {
   side: 'A' | 'B';
   performance: VideoDto | null;
+  loaded: boolean;
+  /** Winner snapshot from the battle DTO — used to label the side when the
+   *  performance video itself has been soft-deleted. */
+  fallbackUser: { username: string; avatarUrl: string | null } | null;
   voteCount: number | null;
   percent: number | null;
   totalVotes: number;
@@ -427,6 +484,15 @@ function ParticipantCard({
     side === 'A' ? 'border-spotlight/40' : 'border-gold/40';
   const accentBar =
     side === 'A' ? 'bg-spotlight' : 'bg-gold';
+
+  // Three render states:
+  //   - performance present → normal card with the video
+  //   - !loaded → still fetching; show skeleton (legitimate loading)
+  //   - loaded && !performance → fetch settled empty (404), so the
+  //     underlying video has been soft-deleted. Show an explicit
+  //     "Performance unavailable" media block instead of the same
+  //     skeleton-shape the loading state uses.
+  const unavailable = loaded && !performance;
 
   return (
     <div
@@ -445,15 +511,39 @@ function ParticipantCard({
             className="w-full h-full object-contain bg-black"
           />
         </div>
+      ) : unavailable ? (
+        <div className="aspect-video bg-stage-800/60 border-b border-stage-700/60 flex flex-col items-center justify-center gap-2 text-center px-6">
+          <span
+            aria-hidden="true"
+            className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-red-500/15 border border-red-500/40 text-red-300 text-lg"
+          >
+            ⚠
+          </span>
+          <p className="font-display text-lg font-bold text-white">
+            Performance unavailable
+          </p>
+          <p className="text-xs text-haze/80 max-w-xs">
+            This performance video was deleted. Battle history (votes,
+            winner, tally) is preserved, but the video can no longer be
+            played back.
+          </p>
+        </div>
       ) : (
         <div className="aspect-video bg-stage-800 animate-pulse" />
       )}
       <div className="p-4">
         <div className="flex items-center justify-between mb-2">
-          <p className="text-[11px] uppercase tracking-widest text-haze/60 font-bold">
-            Side {side}
-            {isWinner && (
-              <span className="ml-2 text-gold">· Winner</span>
+          <p className="text-[11px] uppercase tracking-widest text-haze/60 font-bold flex items-center gap-2">
+            <span>
+              Side {side}
+              {isWinner && (
+                <span className="ml-2 text-gold">· Winner</span>
+              )}
+            </span>
+            {unavailable && (
+              <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-widest bg-red-500/15 text-red-300 border border-red-500/40 rounded">
+                Deleted
+              </span>
             )}
           </p>
           <p className="text-xs tabular-nums text-haze">
@@ -464,9 +554,9 @@ function ParticipantCard({
           </p>
         </div>
         <p className="font-display font-bold text-lg leading-tight mb-1">
-          {performance?.title ?? '—'}
+          {performance?.title ?? (unavailable ? 'Deleted performance' : '—')}
         </p>
-        {performance?.uploader && (
+        {performance?.uploader ? (
           <Link
             href={`/u/${performance.uploader.username}`}
             className="inline-flex items-center gap-2 text-sm text-haze hover:text-white"
@@ -478,7 +568,22 @@ function ParticipantCard({
               </span>
             )}
           </Link>
-        )}
+        ) : unavailable && fallbackUser ? (
+          // Winner snapshot only — the uploader of a non-winning deleted
+          // performance can't be recovered from the battle DTO, so we
+          // only show this for the winning side.
+          <Link
+            href={`/u/${fallbackUser.username}`}
+            className="inline-flex items-center gap-2 text-sm text-haze hover:text-white"
+          >
+            @{fallbackUser.username}
+            <span className="text-xs text-haze/60">(from battle snapshot)</span>
+          </Link>
+        ) : unavailable ? (
+          <p className="text-sm text-haze/60 italic">
+            Uploader unknown (video deleted)
+          </p>
+        ) : null}
         {/* Vote share bar */}
         <div className="mt-3 h-1.5 bg-stage-800 rounded-full overflow-hidden">
           <div

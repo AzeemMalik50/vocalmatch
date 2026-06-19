@@ -2,6 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Hide the native number-input spinner arrows on inputs we wrap with
+   our own −/+ stepper controls. Without this, both the browser's
+   built-in arrows AND our custom buttons render, which looks cluttered
+   and lets admins step the value two different ways. Cross-browser:
+   WebKit / Blink ship inner+outer spin pseudo-elements; Firefox uses
+   the older `appearance: textfield`. */
+.no-spinner::-webkit-inner-spin-button,
+.no-spinner::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.no-spinner {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 :root {
   /* Phase 3 typography stack — cinematic + premium.
      - display: Bebas Neue (condensed sans, hero + section headlines)
@@ -413,7 +429,17 @@ html, body {
   }
 }
 
-/* Entrance — image + chrome fade up on first paint. Cheap, runs once. */
+/* Entrance — image + chrome fade up on first paint. Cheap, runs once.
+   Bug #50 — `animation-fill-mode: both` (the `both` token below) holds
+   the final keyframe's `transform` forever, which silently overrides
+   any Tailwind `-translate-x-1/2` / `-translate-y-1/2` utility on the
+   same element. That's why the crown emblem and the "Tonight's Battle"
+   chip — both centered with `left-1/2 -translate-x-1/2` — visually
+   slid right after the animation finished: their X-centering transform
+   was wiped out. Fix: keep the default keyframes (used by elements
+   that *don't* need horizontal centering), and add two centered
+   variants below for the elements that do. The animation now ends on
+   the correct translate, so the centering survives. */
 .hero-enter {
   animation: heroEnter 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -423,6 +449,27 @@ html, body {
 @keyframes heroEnter {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Crown emblem — needs both X and Y centering preserved across the
+   entrance animation (uses `left-1/2 top-0 -translate-x-1/2 -translate-y-1/2`). */
+@keyframes heroEnterCrown {
+  0%   { opacity: 0; transform: translate(-50%, calc(-50% + 8px)); }
+  100% { opacity: 1; transform: translate(-50%, -50%); }
+}
+.hero-enter.crown-glow {
+  animation-name: heroEnterCrown;
+}
+
+/* "Tonight's Battle" chip — needs X centering preserved (uses
+   `left-1/2 -translate-x-1/2`). Anything else that combines `.hero-enter`
+   with `left-1/2` and isn't the crown picks this up automatically. */
+@keyframes heroEnterCenterX {
+  0%   { opacity: 0; transform: translate(-50%, 8px); }
+  100% { opacity: 1; transform: translate(-50%, 0); }
+}
+.hero-enter.left-1\/2:not(.crown-glow) {
+  animation-name: heroEnterCenterX;
 }
 
 /* ─── Red Phone Challenge section ───────────────────────────────────

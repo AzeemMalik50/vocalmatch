@@ -10,6 +10,7 @@ export type NotificationKind =
   | 'challenger_selected'  // Phase 2B — admin picks your challenge
   | 'challenger_rejected'  // Phase 2B — admin doesn't pick your challenge
   | 'battle_starting'      // Phase 2B — your battle goes live (admin promoted)
+  | 'battle_cancelled'     // Bug #60 — admin cancels a live battle
   | 'battle_result'        // Phase 2B reserved
   | 'system';
 

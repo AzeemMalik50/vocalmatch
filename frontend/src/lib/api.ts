@@ -471,7 +471,13 @@ export interface AdminPerformanceDto {
 
 export interface NotificationDto {
   id: string;
-  kind: 'challenger_selected' | 'battle_starting' | 'battle_result' | 'system';
+  kind:
+    | 'challenger_selected'
+    | 'challenger_rejected'
+    | 'battle_starting'
+    | 'battle_cancelled'
+    | 'battle_result'
+    | 'system';
   title: string;
   body: string;
   href: string | null;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Music } from 'lucide-react';
 import AdminShell from '@/components/AdminShell';
@@ -184,8 +184,53 @@ export default function AdminPerformancesPage() {
         </label>
       </div>
 
+      {/* Action-result alert. Sticky-positioned at the top of the page
+          content so it stays visible even when the admin is scrolled
+          deep in the list and clicks Assign / Soft-delete on a row that
+          fails (e.g. the backend returns 409 for an already-retired
+          song or a performance in an active battle). Plain `<p>` was
+          easy to miss because the click happens far below the page top. */}
       {actionError && (
-        <p className="text-sm text-red-400 mb-3">{actionError}</p>
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="sticky top-2 z-30 mb-3 bg-red-900/40 backdrop-blur border border-red-500/60 rounded-md shadow-xl px-4 py-3 flex items-start gap-3"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            className="w-5 h-5 text-red-300 shrink-0 mt-0.5"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs uppercase tracking-widest font-bold text-red-200 mb-0.5">
+              Action failed
+            </p>
+            <p className="text-sm text-red-50 leading-snug break-words">
+              {actionError}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            aria-label="Dismiss"
+            className="shrink-0 text-red-200 hover:text-white transition-colors p-1"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
       )}
 
       {loading && items.length === 0 ? (
@@ -306,17 +351,25 @@ function PerformanceRow({
             invisible. Bumped to /25 fills with stronger borders and
             tightened the text shades to colors with real contrast on
             dark backgrounds. */}
+        {/* Bug #58 follow-up — the linked-song pill used the spotlight
+            (orange-red) palette, which read as the same warning tone
+            as the red "No song linked" pill alongside it; admins
+            couldn't tell at a glance which rows were healthy and
+            which weren't. Linked is the default/positive state and
+            now uses a neutral emerald palette, so only the genuine
+            warning rows (unlinked-legacy yellow, no-song red) draw
+            the eye. */}
         <div className="mt-2">
           {perf.song ? (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-spotlight/25 border border-spotlight/60 max-w-full">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/15 border border-emerald-400/50 max-w-full">
               <Music
                 aria-hidden="true"
-                className="w-3.5 h-3.5 text-spotlight shrink-0"
+                className="w-3.5 h-3.5 text-emerald-300 shrink-0"
               />
-              <span className="text-sm font-bold text-white truncate">
+              <span className="text-sm font-bold text-emerald-50 truncate">
                 {perf.song.title}
               </span>
-              <span className="text-xs font-semibold text-white/85 truncate">
+              <span className="text-xs font-semibold text-emerald-100/85 truncate">
                 · {perf.song.artist}
               </span>
             </span>
@@ -404,6 +457,19 @@ function SongPicker({
   onCancel: () => void;
 }) {
   const [val, setVal] = useState(currentId ?? '');
+  // Only active songs are valid assign targets — the backend rejects
+  // retired ones with a 409. We still surface the *currently linked*
+  // song when it has since been retired, but as a disabled option
+  // labelled "(retired)" so the admin sees why their previous selection
+  // can't be reused. The "(clear song link)" option stays available so
+  // they can detach the row entirely.
+  const activeSongs = songs.filter((s) => s.status === 'active');
+  const currentSong = currentId
+    ? songs.find((s) => s.id === currentId) ?? null
+    : null;
+  const showRetiredCurrent =
+    !!currentSong && currentSong.status === 'retired';
+
   // Bug #39 — the previous `flex` row overflowed the parent container
   // on narrow widths, pushing the Cancel button off the right edge.
   // `flex-wrap` + `min-w-0` on the select lets the row reflow onto a
@@ -416,7 +482,12 @@ function SongPicker({
         className="min-w-0 flex-1 max-w-full px-3 py-1.5 text-xs bg-stage-900 border border-stage-700 rounded-md focus:outline-none focus:border-spotlight"
       >
         <option value="">(clear song link)</option>
-        {songs.map((s) => (
+        { showRetiredCurrent && currentSong && (
+          <option value={currentSong.id} disabled>
+            {currentSong.title} — {currentSong.artist} (retired)
+          </option>
+        )}
+        {activeSongs.map((s) => (
           <option key={s.id} value={s.id}>
             {s.title} — {s.artist}
           </option>

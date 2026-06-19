@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Song, SongStatus } from './song.entity';
 import { CreateSongDto, UpdateSongDto } from './songs.dto';
 import { Battle } from '../battles/battle.entity';
@@ -77,6 +77,28 @@ export class SongsService {
 
   async update(id: string, dto: UpdateSongDto) {
     const song = await this.findOne(id);
+
+    // Bug #48 — block retiring a song that's currently hosting a live or
+    // tie-pending battle. Retiring it mid-battle hides the song from
+    // public surfaces while votes / decisions are still being recorded
+    // against it, and reintroduces the same catalog-consistency issue
+    // that the retired-song guard on performance assignment closes.
+    // Admin must resolve or cancel the battle first.
+    if (
+      dto.status !== undefined &&
+      dto.status === 'retired' &&
+      song.status !== 'retired'
+    ) {
+      const activeBattle = await this.battles.findOne({
+        where: { songId: id, status: In(['live', 'needs_decision']) },
+      });
+      if (activeBattle) {
+        throw new ConflictException(
+          `"${song.title}" has an active battle (${activeBattle.id}). Resolve or cancel that battle before retiring the song.`,
+        );
+      }
+    }
+
     if (dto.title !== undefined) song.title = dto.title.trim();
     if (dto.artist !== undefined) song.artist = dto.artist.trim();
     if (dto.trackUrl !== undefined) song.trackUrl = dto.trackUrl.trim() || null;

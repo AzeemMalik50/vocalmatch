@@ -140,11 +140,20 @@ export default function Nav() {
                         @{user.username}
                       </p>
                     </Link>
+                    {/* Bug #63 — "Upload performance" used to be
+                        `sm:hidden`, so it only appeared in the mobile
+                        profile menu. The original logic was that
+                        desktop already has the prominent top-bar
+                        Upload button, but that meant the same menu
+                        rendered different items on the two platforms.
+                        Show it on all viewports so the profile menu
+                        is a consistent surface; the top-bar button
+                        stays as the primary CTA. */}
                     {!user.isAdmin && (
                       <Link
                         href="/upload"
                         onClick={() => setMenuOpen(false)}
-                        className="sm:hidden block px-4 py-3 text-sm font-semibold hover:bg-stage-800 transition-colors"
+                        className="block px-4 py-3 text-sm font-semibold hover:bg-stage-800 transition-colors"
                       >
                         Upload performance
                       </Link>

@@ -71,6 +71,19 @@ export class ChallengesService {
     videoId: string;
   }) {
     const song = await this.songs.findOne(params.songId); // throws 404
+
+    // Bug #49 — Red Phone challenges have no meaning until the song has
+    // a defending champion. The original gate was deep in the
+    // promote-to-battle step (`createBattleFromChallenge`), which let
+    // the user upload + queue + wait, only to have admin discover the
+    // mismatch days later. Validate at submission time so the user is
+    // told immediately and steered to a real target.
+    if (!song.currentChampionUserId || !song.currentChampionPerformanceId) {
+      throw new BadRequestException(
+        'This song has no current champion yet. Wait for the first battle to crown one, or pick a different song.',
+      );
+    }
+
     if (song.currentChampionUserId === params.userId) {
       throw new ConflictException(
         'You are the current champion of this song — nothing to challenge',
@@ -412,37 +425,16 @@ export class ChallengesService {
     sub.resultingBattleId = battle.id;
     await this.submissions.save(sub);
 
-    // Notify both performers that their head-to-head is live. The deep-link
-    // takes them straight to the battle page so they can share + watch votes
-    // come in. Champion and challenger get the same kind so the bell read-
-    // status logic stays trivial.
-    const songLabel = song.title;
-    const battleHref = `/battle/${battle.id}`;
-    this.notifications
-      .create({
-        userId: sub.userId,
-        kind: 'battle_starting',
-        title: 'Your battle just went live.',
-        body: `You're going head-to-head on ${songLabel}. Share the link and rally your voters.`,
-        href: battleHref,
-      })
-      .catch((err) =>
-        this.logger.error(`Failed to notify challenger of live battle: ${err}`),
-      );
-    if (song.currentChampionUserId) {
-      this.notifications
-        .create({
-          userId: song.currentChampionUserId,
-          kind: 'battle_starting',
-          title: 'A challenger just stepped up.',
-          body: `Your crown on ${songLabel} is up for grabs. Voting is open now.`,
-          href: battleHref,
-        })
-        .catch((err) =>
-          this.logger.error(`Failed to notify champion of new battle: ${err}`),
-        );
-    }
-
+    // Bug #59 — `battle_starting` notifications used to fire from
+    // here *as well as* from `battlesService.create()` (which sends
+    // them to both performers with champion/challenger-aware copy —
+    // see Bug #22 there). On the Red Phone path that meant the
+    // challenger and the champion each received the notification
+    // twice. The base create() already covers both sides; this
+    // duplicate block has been removed. If the Red Phone flow ever
+    // needs distinct copy from a plain admin-created battle, do it
+    // by passing a flag into `battlesService.create()` rather than
+    // re-sending the same notification.
     return battle;
   }
 

@@ -360,6 +360,70 @@ describe('BattlesService (critical paths)', () => {
       expect(out[0].winnerVotePercent).toBe(60);
     });
 
+    it('Bug #52: a reclaimed crown is no longer reported as a dethronement', async () => {
+      // History on song-1 (newest first):
+      //   Battle 3 — userA WINS (reclaims)
+      //   Battle 2 — userB wins (userA dethroned)
+      //   Battle 1 — userA wins (originally crowned)
+      // The OLDER transition (Battle2 → Battle1) used to leak through as
+      // "userA was dethroned", even though userA is now the current
+      // champion via Battle 3. Only the most recent transition per song
+      // — Battle3 → Battle2 (userB dethroned by userA) — should surface.
+      const songId = 'song-1';
+      const t = (offsetSec: number) => new Date(Date.now() + offsetSec * 1000);
+      const battles: Battle[] = [
+        battleFixture({
+          id: 'b-3',
+          songId,
+          status: 'completed',
+          winnerUserId: 'user-A',
+          winnerPerformanceId: 'perf-a2',
+          voteCountA: 55,
+          voteCountB: 45,
+          closedAt: t(-5),
+        }),
+        battleFixture({
+          id: 'b-2',
+          songId,
+          status: 'completed',
+          winnerUserId: 'user-B',
+          winnerPerformanceId: 'perf-b',
+          voteCountA: 40,
+          voteCountB: 60,
+          closedAt: t(-60),
+        }),
+        battleFixture({
+          id: 'b-1',
+          songId,
+          status: 'completed',
+          winnerUserId: 'user-A',
+          winnerPerformanceId: 'perf-a1',
+          voteCountA: 65,
+          voteCountB: 35,
+          closedAt: t(-300),
+        }),
+      ];
+      battleRepo.find.mockResolvedValue(battles);
+      userRepo.find = jest.fn().mockResolvedValue([
+        { id: 'user-A', username: 'a', avatarUrl: null },
+        { id: 'user-B', username: 'b', avatarUrl: null },
+      ]);
+      songsService.findOne.mockResolvedValue({
+        id: songId,
+        title: 'Song One',
+        artist: 'Artist',
+      });
+
+      const out = await service.findRecentDethronements(5);
+
+      // Exactly one transition emitted — the newest one (b-3, where
+      // userA reclaimed). The older b-2 transition has been superseded.
+      expect(out).toHaveLength(1);
+      expect(out[0].battleId).toBe('b-3');
+      expect(out[0].newChampion?.username).toBe('a');
+      expect(out[0].formerChampion?.username).toBe('b');
+    });
+
     it('returns [] when no song has a champion change', async () => {
       const battles: Battle[] = [
         battleFixture({

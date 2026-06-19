@@ -28,10 +28,12 @@ import {
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import LobbyToast from '@/components/LobbyToast';
+import CountdownTimer from '@/components/CountdownTimer';
 import {
   api,
   AtRiskCrownDto,
   BattleDto,
+  BattleSummaryDto,
   DethronementDto,
   FeaturedSongRiskDto,
   GENRE_OPTIONS,
@@ -245,6 +247,44 @@ function Hero({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
 }
 
 function HeroComposite() {
+  // Bug #51 — the "Tonight's Battle" chip used to be decorative copy
+  // with no path into the battle. Fetch the current live battle so the
+  // chip can deep-link to `/battle/{id}` and surface the battle title
+  // as an actual detail. Single one-shot fetch; falls back silently
+  // to the static chip when no live battle is in flight.
+  const [liveBattle, setLiveBattle] = useState<{
+    id: string;
+    title: string | null;
+  } | null>(null);
+
+  const refetchLive = useCallback(async () => {
+    try {
+      const resp = await api.listBattles({ status: 'live', limit: 1 });
+      if (resp.items.length === 0) {
+        // The featured battle was cancelled or completed — drop the link
+        // so the chip falls back to its decorative state.
+        setLiveBattle(null);
+        return;
+      }
+      const b = resp.items[0];
+      setLiveBattle({ id: b.id, title: b.title });
+    } catch {
+      // Non-fatal — chip renders the static fallback.
+    }
+  }, []);
+
+  useEffect(() => {
+    void refetchLive();
+  }, [refetchLive]);
+
+  // Subscribe to the public lobby SSE so the chip swaps to the new
+  // battle as soon as admin posts / cancels / closes one — no manual
+  // refresh needed. Mirrors the LiveBattle section's wiring below so
+  // the hero and the live-battle card stay in sync.
+  useLobby(() => {
+    void refetchLive();
+  });
+
   return (
     <div className="relative aspect-square w-full max-w-[34rem] mx-auto">
       {/* Twin halo cones — crimson left + gold right, meeting at the
@@ -303,16 +343,51 @@ function HeroComposite() {
         </div>
 
         {/* Bottom-center "Tonight's Battle" chip — anchors the scene
-            as live + present. */}
-        <div className="hero-enter hero-enter-delay-3 absolute bottom-[8%] left-1/2 z-40 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-yellow-500/40 bg-black/75 px-4 py-1.5 backdrop-blur">
-          <span
-            aria-hidden="true"
-            className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500"
-          />
-          <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-gray-200">
-            Tonight&apos;s Battle
-          </span>
-        </div>
+            as live + present. Centering survives the entrance animation
+            via the `.hero-enter.left-1/2:not(.crown-glow)` rule in
+            globals.css (see Bug #50 note there). When a live battle
+            exists, the chip is a deep link into `/battle/{id}` and
+            surfaces the battle title inline; otherwise it stays as a
+            decorative chip. */}
+        {liveBattle ? (
+          <Link
+            href={`/battle/${liveBattle.id}`}
+            aria-label={
+              liveBattle.title
+                ? `Open tonight's battle: ${liveBattle.title}`
+                : "Open tonight's battle"
+            }
+            className="hero-enter hero-enter-delay-3 group absolute bottom-[8%] left-1/2 z-40 inline-flex max-w-[88%] -translate-x-1/2 items-center gap-2 rounded-full border border-yellow-500/60 bg-black/80 px-4 py-1.5 backdrop-blur transition-colors hover:border-yellow-400 hover:bg-black/95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400"
+          >
+            <span
+              aria-hidden="true"
+              className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500"
+            />
+            <span className="truncate text-[10px] font-bold uppercase tracking-[0.3em] text-gray-200">
+              Tonight&apos;s Battle
+              {liveBattle.title ? (
+                <>
+                  <span aria-hidden="true" className="mx-1.5 text-yellow-400/70">·</span>
+                  <span className="text-yellow-200">{liveBattle.title}</span>
+                </>
+              ) : null}
+            </span>
+            <ChevronRight
+              aria-hidden="true"
+              className="h-3 w-3 shrink-0 text-yellow-400 transition-transform group-hover:translate-x-0.5"
+            />
+          </Link>
+        ) : (
+          <div className="hero-enter hero-enter-delay-3 absolute bottom-[8%] left-1/2 z-40 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-yellow-500/40 bg-black/75 px-4 py-1.5 backdrop-blur">
+            <span
+              aria-hidden="true"
+              className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500"
+            />
+            <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-gray-200">
+              Tonight&apos;s Battle
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Crown emblem — literalizes "One Crown" from the headline,
@@ -346,17 +421,17 @@ function LiveBattle() {
   const [battle, setBattle] = useState<BattleDto | null>(null);
   const [a, setA] = useState<VideoDto | null>(null);
   const [b, setB] = useState<VideoDto | null>(null);
+  // Bug #57 — the section used to fetch a single live battle and pretend
+  // it was the only one. Track the other concurrent live battles
+  // separately so we can render them as a compact grid below the
+  // featured card. List endpoint already returns summary DTOs, no
+  // per-battle detail fetch needed.
+  const [extraBattles, setExtraBattles] = useState<BattleSummaryDto[]>([]);
   // Separate loading flag so the "no live battle" empty state only
   // renders AFTER we've heard back from the server. Previously the
   // empty state flashed during initial fetch because `!battle || !a || !b`
   // is true on first render too.
   const [loading, setLoading] = useState(true);
-  const [remaining, setRemaining] = useState({
-    days: 0,
-    hours: 0,
-    minutes: 0,
-    seconds: 0,
-  });
 
   // Extracted so the lobby SSE listener below can re-run it whenever
   // a battle lifecycle event arrives — covers create / cancel / close
@@ -364,17 +439,19 @@ function LiveBattle() {
   const refetch = useCallback(async () => {
     setLoading(true);
     try {
-      const resp = await api.listBattles({ status: 'live', limit: 1 });
+      const resp = await api.listBattles({ status: 'live', limit: 20 });
       if (resp.items.length === 0) {
         // The featured battle was cancelled / completed and there's no
         // replacement live one — reset to the empty-state copy.
         setBattle(null);
         setA(null);
         setB(null);
+        setExtraBattles([]);
         return;
       }
       const featured = await api.getBattle(resp.items[0].id);
       setBattle(featured);
+      setExtraBattles(resp.items.slice(1));
       const [perfA, perfB] = await Promise.all([
         api.getVideo(featured.performanceAId),
         api.getVideo(featured.performanceBId),
@@ -399,23 +476,6 @@ function LiveBattle() {
   useLobby(() => {
     void refetch();
   });
-
-  useEffect(() => {
-    if (!battle?.votingClosesAt) return;
-    const tick = () => {
-      const end = new Date(battle.votingClosesAt).getTime();
-      const diff = Math.max(0, end - Date.now());
-      setRemaining({
-        days: Math.floor(diff / 86_400_000),
-        hours: Math.floor((diff % 86_400_000) / 3_600_000),
-        minutes: Math.floor((diff % 3_600_000) / 60_000),
-        seconds: Math.floor((diff % 60_000) / 1000),
-      });
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [battle?.votingClosesAt]);
 
   return (
     <section id="live-battle" className="bg-background py-12 md:py-20">
@@ -466,13 +526,17 @@ function LiveBattle() {
 
             <div className="flex flex-col items-center justify-center gap-6">
               <div className="text-6xl font-black text-white">VS</div>
-              <div className="bg-card/50 backdrop-blur border border-red-600/30 rounded-2xl p-8 w-full">
-                <div className="grid grid-cols-4 gap-4 text-center tabular">
-                  <CountdownCell value={remaining.days} label="Days" />
-                  <CountdownCell value={remaining.hours} label="Hrs" />
-                  <CountdownCell value={remaining.minutes} label="Mins" />
-                  <CountdownCell value={remaining.seconds} label="Secs" />
-                </div>
+              <div className="bg-card/50 backdrop-blur border border-red-600/30 rounded-2xl p-8 w-full flex justify-center">
+                {/* Bug #65 — use the shared CountdownTimer so this
+                    surface is in lockstep with the admin + battle-
+                    detail pages. Was previously a bespoke 4-cell
+                    Days/Hrs/Mins/Secs block backed by a local
+                    setInterval, which drifted from the standard
+                    H:M:S formatting used everywhere else. */}
+                <CountdownTimer
+                  endsAt={battle.votingClosesAt}
+                  size="large"
+                />
               </div>
               <Link
                 href={`/battle/${battle.id}`}
@@ -491,9 +555,77 @@ function LiveBattle() {
           </div>
         )}
 
+        {/* Other concurrently-live battles. The featured card above is
+            the marquee; this strip surfaces every other battle that's
+            also accepting votes right now so visitors don't think there's
+            only one. Renders nothing when there's just the one featured
+            battle. */}
+        {!loading && extraBattles.length > 0 && (
+          <div className="mt-12">
+            <div className="flex items-end justify-between mb-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-red-500 font-bold mb-1">
+                  Also live
+                </p>
+                <h3 className="font-display text-2xl md:text-3xl font-bold text-white">
+                  More battles open for voting
+                </h3>
+              </div>
+              <p className="hidden sm:block text-sm text-gray-400 tabular-nums">
+                {extraBattles.length}{' '}
+                {extraBattles.length === 1 ? 'battle' : 'battles'}
+              </p>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {extraBattles.map((b) => (
+                <ExtraLiveBattleCard key={b.id} battle={b} />
+              ))}
+            </div>
+          </div>
+        )}
+
         <BattlePillarsRow />
       </div>
     </section>
+  );
+}
+
+function ExtraLiveBattleCard({ battle }: { battle: BattleSummaryDto }) {
+  // Compact link card for any live battle beyond the featured one.
+  // Uses the battle's own `title` (backend always populates it, even
+  // when admin doesn't set one — see Bug #56) so the row reads
+  // cleanly without a per-battle song lookup.
+  return (
+    <Link
+      href={`/battle/${battle.id}`}
+      className="group block bg-card/50 backdrop-blur border border-red-600/30 hover:border-red-500 rounded-2xl p-5 transition-colors"
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <span className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+        </span>
+        <span className="text-[10px] uppercase tracking-widest font-bold text-red-500">
+          Live · accepting votes
+        </span>
+      </div>
+      <h4 className="font-display font-bold text-lg text-white mb-3 leading-tight group-hover:text-red-400 transition-colors line-clamp-2">
+        {battle.title || 'Live battle'}
+      </h4>
+      <div className="flex items-end justify-between pt-3 border-t border-red-600/20">
+        <div>
+          <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-0.5">
+            Closes
+          </p>
+          <p className="text-xs text-gray-300 tabular-nums">
+            {new Date(battle.votingClosesAt).toLocaleString()}
+          </p>
+        </div>
+        <span className="text-xs text-red-400 font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
+          Vote →
+        </span>
+      </div>
+    </Link>
   );
 }
 
@@ -556,19 +688,6 @@ function BattlePillarsRow() {
           </div>
         </div>
       ))}
-    </div>
-  );
-}
-
-function CountdownCell({ value, label }: { value: number; label: string }) {
-  return (
-    <div>
-      <div className="text-3xl font-bold text-red-600">
-        {String(value).padStart(2, '0')}
-      </div>
-      <div className="text-xs text-gray-400 mt-2 uppercase tracking-widest">
-        {label}
-      </div>
     </div>
   );
 }
@@ -710,9 +829,15 @@ function ChallengeFlow({
 }: {
   user: ReturnType<typeof useAuth>['user'];
 }) {
+  // Bug #62 — logged-out visitors used to land on /signup, which
+  // funneled returning users into account creation instead of letting
+  // them authenticate. Most clickers already have an account; send
+  // them to /login (which itself links to /signup for genuinely new
+  // users) and preserve the challenge intent through the bounce so
+  // they land back on the upload-as-challenge flow after signing in.
   const href = user
     ? '/upload?challenge=1'
-    : '/signup?next=/upload?challenge=1';
+    : `/login?next=${encodeURIComponent('/upload?challenge=1')}`;
 
   return (
     <section className="relative bg-background py-12 md:py-20 overflow-hidden">
@@ -895,20 +1020,28 @@ function FlowStep({
 function ChampionSection() {
   const [featured, setFeatured] = useState<FeaturedSongRiskDto | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const f = await api.getFeaturedRisk();
-        if (!cancelled) setFeatured(f);
-      } catch {
-        // Non-fatal
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+  const refetch = useCallback(async () => {
+    try {
+      const f = await api.getFeaturedRisk();
+      setFeatured(f);
+    } catch {
+      // Non-fatal
+    }
   }, []);
+
+  useEffect(() => {
+    void refetch();
+  }, [refetch]);
+
+  // Bug #52 — the defending-champion details used to only fetch on mount,
+  // so after a battle closed (champion crowned / dethroned), this section
+  // showed stale champion + streak + title-defenses counts until a hard
+  // refresh. Subscribe to the lobby SSE so any battle lifecycle event
+  // (created / cancelled / closed) triggers a refetch and the panel
+  // reflects the new defending champion.
+  useLobby(() => {
+    void refetch();
+  });
 
   if (!featured) return null;
   const { song, champion, titleDefenses } = featured;
@@ -1522,33 +1655,51 @@ function CrownAtRiskPanel() {
   const [marquee, setMarquee] = useState<FeaturedSongRiskDto | null>(null);
   const [personal, setPersonal] = useState<AtRiskCrownDto | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      // 3-state lookup: authed → try personal → fall back to marquee.
-      try {
-        if (user) {
-          const mine = await api.getMyAtRiskCrowns();
-          if (!cancelled && mine.length > 0) {
-            setPersonal(mine[0]);
-            return;
-          }
+  // Bug #64 — the panel used to fetch once on mount, so after the user
+  // won a new crown on a different song the section kept showing the
+  // previously-won song's risk data until a hard refresh. Mirrors the
+  // same fix applied to ChampionSection / DethronedPanel: fold the
+  // fetch into a callback, drive both initial-mount and SSE-triggered
+  // refetches through it, and explicitly clear stale state when the
+  // backend returns nothing (otherwise `personal` would stay sticky
+  // and the panel would render an outdated song forever).
+  const refetch = useCallback(async () => {
+    // 3-state lookup: authed → try personal → fall back to marquee.
+    try {
+      if (user) {
+        const mine = await api.getMyAtRiskCrowns();
+        if (mine.length > 0) {
+          setPersonal(mine[0]);
+          setMarquee(null);
+          return;
         }
-        const f = await api.getFeaturedRisk();
-        if (!cancelled) setMarquee(f);
-      } catch {
-        try {
-          const f = await api.getFeaturedRisk();
-          if (!cancelled) setMarquee(f);
-        } catch {
-          /* both failed → panel renders nothing */
-        }
+        // No personal crown anymore (e.g. lost it) — clear so we don't
+        // keep rendering the stale row.
+        setPersonal(null);
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.id]);
+      const f = await api.getFeaturedRisk();
+      setMarquee(f);
+    } catch {
+      try {
+        const f = await api.getFeaturedRisk();
+        setMarquee(f);
+      } catch {
+        /* both failed → panel renders nothing */
+      }
+    }
+  }, [user]);
+
+  useEffect(() => {
+    void refetch();
+  }, [refetch]);
+
+  // Real-time refresh — any battle lifecycle event (newly crowned,
+  // dethroned, new battle queued against your song) shifts the user's
+  // at-risk picture. Re-evaluate from the lobby SSE so the section
+  // tracks the latest champion status without a hard refresh.
+  useLobby(() => {
+    void refetch();
+  });
 
   if (personal) {
     return (
@@ -1759,32 +1910,44 @@ function DethronedPanel() {
   const { user } = useAuth();
   const [personal, setPersonal] = useState<PersonalDethronementDto | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        if (user) {
-          const mine = await api.getMyRecentDethronements();
-          if (!cancelled && mine.length > 0) {
-            setPersonal(mine[0]);
-            return;
-          }
+  const refetch = useCallback(async () => {
+    try {
+      if (user) {
+        const mine = await api.getMyRecentDethronements();
+        if (mine.length > 0) {
+          setPersonal(mine[0]);
+          setLatest(null);
+          return;
         }
-        const list = await api.getRecentDethronements(1);
-        if (!cancelled && list.length > 0) setLatest(list[0]);
-      } catch {
-        try {
-          const list = await api.getRecentDethronements(1);
-          if (!cancelled && list.length > 0) setLatest(list[0]);
-        } catch {
-          /* both failed → panel renders nothing */
-        }
+        // Bug #52 — the personal slot used to be sticky: once set, an
+        // empty refetch wouldn't clear it, so "Your reign just ended."
+        // stayed on screen after the user reclaimed the crown. Clear
+        // it explicitly when the backend no longer reports any
+        // outstanding personal dethronement.
+        setPersonal(null);
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.id]);
+      const list = await api.getRecentDethronements(1);
+      setLatest(list.length > 0 ? list[0] : null);
+    } catch {
+      try {
+        const list = await api.getRecentDethronements(1);
+        setLatest(list.length > 0 ? list[0] : null);
+      } catch {
+        /* both failed → panel renders nothing */
+      }
+    }
+  }, [user]);
+
+  useEffect(() => {
+    void refetch();
+  }, [refetch]);
+
+  // Same rationale as ChampionSection — re-evaluate when a battle
+  // closes so "Your reign just ended." disappears as soon as the user
+  // reclaims the crown.
+  useLobby(() => {
+    void refetch();
+  });
 
   if (personal) {
     const isFormerChamp = personal.yourRole === 'former-champion';

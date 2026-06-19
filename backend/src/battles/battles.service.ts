@@ -123,7 +123,7 @@ export class BattlesService {
       );
     }
     // Song must exist (will throw NotFound if not)
-    await this.songs.findOne(dto.songId);
+    const song = await this.songs.findOne(dto.songId);
 
     // Block duplicate live battles for the same song. Postgres has a partial
     // unique index for this; keep the app-layer check for SQLite parity.
@@ -139,9 +139,18 @@ export class BattlesService {
       );
     }
 
+    // Bug #56 — when admin created a battle without a title, the DB
+    // stored null. The list page rendered "Untitled battle", but the
+    // detail page synthesized a different fallback ("Battle · <song>"),
+    // so the same battle had two different names depending on where
+    // you looked at it. Auto-generate a title at write time using the
+    // song name (mirrors what `createBattleFromChallenge` already does
+    // for promoted challenges), so going forward `battle.title` is
+    // always populated and both list + detail render identically.
+    const explicitTitle = dto.title?.trim() || null;
     const battle = this.battles.create({
       songId: dto.songId,
-      title: dto.title?.trim() || null,
+      title: explicitTitle ?? `Battle · ${song.title}`,
       performanceAId: dto.performanceAId,
       performanceBId: dto.performanceBId,
       votingOpensAt: opensAt,
@@ -158,9 +167,8 @@ export class BattlesService {
     // distinct copy so they read as "you're up" vs "you're being
     // challenged" only when one side is actually the defending champion.
     const battleHref = `/battle/${saved.id}`;
-    const song = await this.songs.findOne(saved.songId).catch(() => null);
-    const songLabel = song?.title ?? 'a Centerstage Song';
-    const championUserId = song?.currentChampionUserId ?? null;
+    const songLabel = song.title;
+    const championUserId = song.currentChampionUserId ?? null;
     for (const performer of [a, b]) {
       const isChampion = championUserId === performer.uploaderId;
       this.notifications
@@ -417,7 +425,55 @@ export class BattlesService {
     );
     this.publishLobby(saved, 'cancelled');
 
+    // Bug #60 — cancel published a realtime status event for clients
+    // that already had the battle open, but persisted no notification.
+    // Anyone who wasn't on the page never found out their battle had
+    // been cancelled. Send a `battle_cancelled` to both performers.
+    // Fire-and-forget; a failed lookup or write shouldn't block the
+    // cancel itself.
+    void this.notifyCancelled(saved).catch((err) =>
+      this.logger.error(
+        `Failed to send cancellation notifications for battle ${saved.id}: ${err}`,
+      ),
+    );
+
     return saved;
+  }
+
+  /** Look up both performers + the song title, then write a
+   *  `battle_cancelled` notification per performer. Extracted so the
+   *  cancel path stays linear-readable. */
+  private async notifyCancelled(battle: Battle) {
+    const [a, b, song] = await Promise.all([
+      this.videos.findOne({ where: { id: battle.performanceAId } }),
+      this.videos.findOne({ where: { id: battle.performanceBId } }),
+      this.songs.findOne(battle.songId).catch(() => null),
+    ]);
+    const songLabel = song?.title ?? 'a Centerstage Song';
+    const uploaderIds = Array.from(
+      new Set(
+        [a?.uploaderId, b?.uploaderId].filter(
+          (uid): uid is string => !!uid,
+        ),
+      ),
+    );
+    await Promise.all(
+      uploaderIds.map((userId) =>
+        this.notifications
+          .create({
+            userId,
+            kind: 'battle_cancelled',
+            title: 'Your battle was cancelled.',
+            body: `Admin cancelled the battle on ${songLabel}. No winner was declared and no stats changed — a fresh matchup can be queued for this song.`,
+            href: `/battle/${battle.id}`,
+          })
+          .catch((err) =>
+            this.logger.error(
+              `Failed to notify ${userId} of cancelled battle ${battle.id}: ${err}`,
+            ),
+          ),
+      ),
+    );
   }
 
   /**
@@ -605,16 +661,23 @@ export class BattlesService {
 
     const transitions: Array<{ current: Battle; previous: Battle }> = [];
     for (const battles of bySong.values()) {
-      for (let i = 0; i < battles.length - 1; i++) {
-        const current = battles[i];
-        const previous = battles[i + 1];
-        if (
-          current.winnerUserId &&
-          previous.winnerUserId &&
-          current.winnerUserId !== previous.winnerUserId
-        ) {
-          transitions.push({ current, previous });
-        }
+      // Bug #52 — previously this loop emitted EVERY adjacent change-of-
+      // hands in the song's history. That meant a user who was once
+      // dethroned and then later reclaimed the crown still surfaced as
+      // a "former champion" forever (the older transition kept matching
+      // even though their current state is `defending champion`). Each
+      // song should contribute only its CURRENT crown state — i.e. the
+      // most-recent transition. Anything older has been superseded by
+      // whatever happened next.
+      if (battles.length < 2) continue;
+      const current = battles[0];
+      const previous = battles[1];
+      if (
+        current.winnerUserId &&
+        previous.winnerUserId &&
+        current.winnerUserId !== previous.winnerUserId
+      ) {
+        transitions.push({ current, previous });
       }
     }
 

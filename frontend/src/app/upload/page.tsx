@@ -152,6 +152,14 @@ function UploadForm() {
 
   const selectedSong = songs.find((s) => s.id === songId) ?? null;
 
+  // Challenge-mode pre-check: a song with no defending champion can't
+  // accept a Red Phone challenge — there's nothing to battle against.
+  // The SongDto already carries `currentChampionUserId`, so this is a
+  // pure client-side check (no extra round-trip). Backend re-validates
+  // at submission via BadRequestException.
+  const songHasNoChampion =
+    challengeMode && !!selectedSong && !selectedSong.currentChampionUserId;
+
   // Challenge-mode pre-check: if a battle for the selected song is still
   // in flight (live or tied awaiting admin decision), there's nothing for
   // a challenger to queue against — admin can't promote them yet. Surface
@@ -280,8 +288,24 @@ function UploadForm() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
+    // Bug #54 — every validation must fire BEFORE `setSubmitting(true)`
+    // and the upload state flips. Previously the `!songId` check ran
+    // *after* `setSubmitting(true)` + `setProgress(0)`, which left the
+    // UI stuck: the button stayed on "Publishing…", a 0% progress bar
+    // appeared, and the "Cancel upload" affordance did nothing because
+    // there was no upload to cancel. User had to refresh to recover.
     if (!file) {
       setErr('Pick a video file first.');
+      return;
+    }
+    if (!title.trim()) {
+      // HTML `required` catches the empty case, but a whitespace-only
+      // title would slip through to the backend. Keep the gate tight.
+      setErr('Give your performance a title.');
+      return;
+    }
+    if (!songId) {
+      setErr('Pick a Centerstage Song from the list.');
       return;
     }
     if (challengeMode && songHasActiveBattle) {
@@ -290,15 +314,21 @@ function UploadForm() {
       setErr('Champion for this battle is not yet decided');
       return;
     }
+    if (songHasNoChampion) {
+      // Mirror the backend BadRequestException copy so the user sees the
+      // same message whether the check fires here or server-side.
+      setErr(
+        'This song has no current champion yet. Wait for the first battle to crown one, or pick a different song.',
+      );
+      return;
+    }
 
+    // All validation passed — now it's safe to flip into the uploading
+    // state. From here, the only way back is the real cancel path or a
+    // success/error response from the upload itself.
     setSubmitting(true);
     setProgress(0);
     setUploaded(0);
-
-    if (!songId) {
-      setErr('Pick a Centerstage Song from the list.');
-      return;
-    }
 
     const fd = new FormData();
     fd.append('title', title);
@@ -449,6 +479,52 @@ function UploadForm() {
             ) : (
               <div className="relative">
                 {selectedSong ? (
+                  // Bug #61 — when the user lands here via challenge mode
+                  // with a song pre-filled from the URL (`?challenge=1&songId=…`,
+                  // typically from clicking "Upload your version" on a
+                  // specific champion's battle/profile page), they
+                  // arrived intending to challenge THAT champion. Letting
+                  // them swap the song silently retargets the challenge
+                  // at a different champion without any UI cue — that's
+                  // the bug. Lock the song in this case; if they want a
+                  // different target, they should re-enter the flow
+                  // from that other champion's page.
+                  challengeMode && prefilledSongId === selectedSong.id ? (
+                    <div className="w-full flex items-stretch bg-stage-900 border border-spotlight/50 rounded-md overflow-hidden">
+                      <div className="flex-1 flex items-center justify-between px-4 py-3">
+                        <span>
+                          <span className="font-bold">{selectedSong.title}</span>
+                          <span className="text-haze/60"> · {selectedSong.artist}</span>
+                        </span>
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] uppercase tracking-widest font-bold bg-spotlight/15 text-spotlight border border-spotlight/40"
+                          title="Locked to the champion you launched this challenge from"
+                        >
+                          🔒 Locked
+                        </span>
+                      </div>
+                      {selectedSong.trackUrl && (
+                        <a
+                          href={selectedSong.trackUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-4 text-[11px] uppercase tracking-widest font-bold text-spotlight hover:bg-stage-800 border-l border-spotlight/30"
+                          title="Open backing track in a new tab"
+                        >
+                          <svg
+                            width="12"
+                            height="12"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            aria-hidden="true"
+                          >
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                          Play sound
+                        </a>
+                      )}
+                    </div>
+                  ) : (
                   <div className="w-full flex items-stretch bg-stage-900 border border-spotlight/50 rounded-md overflow-hidden">
                     <button
                       type="button"
@@ -488,6 +564,7 @@ function UploadForm() {
                       </a>
                     )}
                   </div>
+                  )
                 ) : (
                   <>
                     <input
@@ -508,7 +585,10 @@ function UploadForm() {
                             No matches. Ask an admin to add this song to the catalog.
                           </li>
                         ) : (
-                          filteredSongs.map((s) => (
+                          filteredSongs.map((s) => {
+                            const noChampion =
+                              challengeMode && !s.currentChampionUserId;
+                            return (
                             <li key={s.id} className="flex items-stretch border-b border-stage-800 last:border-b-0">
                               <button
                                 type="button"
@@ -521,6 +601,14 @@ function UploadForm() {
                               >
                                 <span className="font-bold">{s.title}</span>
                                 <span className="text-haze/60"> · {s.artist}</span>
+                                {noChampion && (
+                                  <span
+                                    className="ml-2 inline-block px-1.5 py-0.5 rounded text-[10px] uppercase tracking-widest font-bold bg-yellow-950/60 border border-yellow-700/60 text-yellow-200 align-middle"
+                                    title="No defending champion yet — can't be challenged"
+                                  >
+                                    No champion
+                                  </span>
+                                )}
                               </button>
                               {s.trackUrl && (
                                 <a
@@ -550,7 +638,8 @@ function UploadForm() {
                                 </a>
                               )}
                             </li>
-                          ))
+                            );
+                          })
                         )}
                       </ul>
                     )}
@@ -562,6 +651,16 @@ function UploadForm() {
               Battles match performers who covered the same Centerstage Song.
               Pick one from the catalog so admins can pair your performance.
             </p>
+            {challengeMode &&
+              prefilledSongId &&
+              prefilledSongId === songId && (
+                <p className="mt-1.5 text-xs text-spotlight/90">
+                  Song is locked because you launched this challenge from
+                  the current champion of this song. To challenge a
+                  different champion, open that champion&apos;s battle and
+                  hit &ldquo;Upload your version&rdquo; there.
+                </p>
+              )}
           </div>
 
           <div>
@@ -777,13 +876,34 @@ function UploadForm() {
             </div>
           )}
 
+          {/* Block-state banner for challenge mode when the selected song
+              has no defending champion yet. Mirrors the backend
+              BadRequestException copy. */}
+          {songHasNoChampion && (
+            <div
+              role="alert"
+              className="text-sm text-yellow-200 bg-yellow-950/40 border border-yellow-700/50 rounded-md px-4 py-3"
+            >
+              <p className="font-bold">This song has no champion yet</p>
+              <p className="text-xs text-yellow-200/80 mt-1">
+                <span className="font-semibold">
+                  {selectedSong?.title ?? 'This song'}
+                </span>{' '}
+                hasn&apos;t been battled yet, so there&apos;s no crown to
+                challenge. Wait for the first battle to crown a champion,
+                or pick a different Centerstage Song.
+              </p>
+            </div>
+          )}
+
           <div className="flex flex-col sm:flex-row gap-2">
             <button
               type="submit"
               disabled={
                 submitting ||
                 checkingActiveBattle ||
-                (challengeMode && songHasActiveBattle)
+                (challengeMode && songHasActiveBattle) ||
+                songHasNoChampion
               }
               className="flex-1 px-4 py-3.5 bg-spotlight text-white font-bold rounded-md hover:bg-spotlight-dim transition-colors disabled:opacity-50 shadow-lg shadow-spotlight/30"
             >
