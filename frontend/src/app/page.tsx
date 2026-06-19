@@ -28,6 +28,7 @@ import {
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import LobbyToast from '@/components/LobbyToast';
+import CountdownTimer from '@/components/CountdownTimer';
 import {
   api,
   AtRiskCrownDto,
@@ -431,12 +432,6 @@ function LiveBattle() {
   // empty state flashed during initial fetch because `!battle || !a || !b`
   // is true on first render too.
   const [loading, setLoading] = useState(true);
-  const [remaining, setRemaining] = useState({
-    days: 0,
-    hours: 0,
-    minutes: 0,
-    seconds: 0,
-  });
 
   // Extracted so the lobby SSE listener below can re-run it whenever
   // a battle lifecycle event arrives — covers create / cancel / close
@@ -481,23 +476,6 @@ function LiveBattle() {
   useLobby(() => {
     void refetch();
   });
-
-  useEffect(() => {
-    if (!battle?.votingClosesAt) return;
-    const tick = () => {
-      const end = new Date(battle.votingClosesAt).getTime();
-      const diff = Math.max(0, end - Date.now());
-      setRemaining({
-        days: Math.floor(diff / 86_400_000),
-        hours: Math.floor((diff % 86_400_000) / 3_600_000),
-        minutes: Math.floor((diff % 3_600_000) / 60_000),
-        seconds: Math.floor((diff % 60_000) / 1000),
-      });
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [battle?.votingClosesAt]);
 
   return (
     <section id="live-battle" className="bg-background py-12 md:py-20">
@@ -548,13 +526,17 @@ function LiveBattle() {
 
             <div className="flex flex-col items-center justify-center gap-6">
               <div className="text-6xl font-black text-white">VS</div>
-              <div className="bg-card/50 backdrop-blur border border-red-600/30 rounded-2xl p-8 w-full">
-                <div className="grid grid-cols-4 gap-4 text-center tabular">
-                  <CountdownCell value={remaining.days} label="Days" />
-                  <CountdownCell value={remaining.hours} label="Hrs" />
-                  <CountdownCell value={remaining.minutes} label="Mins" />
-                  <CountdownCell value={remaining.seconds} label="Secs" />
-                </div>
+              <div className="bg-card/50 backdrop-blur border border-red-600/30 rounded-2xl p-8 w-full flex justify-center">
+                {/* Bug #65 — use the shared CountdownTimer so this
+                    surface is in lockstep with the admin + battle-
+                    detail pages. Was previously a bespoke 4-cell
+                    Days/Hrs/Mins/Secs block backed by a local
+                    setInterval, which drifted from the standard
+                    H:M:S formatting used everywhere else. */}
+                <CountdownTimer
+                  endsAt={battle.votingClosesAt}
+                  size="large"
+                />
               </div>
               <Link
                 href={`/battle/${battle.id}`}
@@ -706,19 +688,6 @@ function BattlePillarsRow() {
           </div>
         </div>
       ))}
-    </div>
-  );
-}
-
-function CountdownCell({ value, label }: { value: number; label: string }) {
-  return (
-    <div>
-      <div className="text-3xl font-bold text-red-600">
-        {String(value).padStart(2, '0')}
-      </div>
-      <div className="text-xs text-gray-400 mt-2 uppercase tracking-widest">
-        {label}
-      </div>
     </div>
   );
 }
