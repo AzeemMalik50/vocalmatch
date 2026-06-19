@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import AdminShell from '@/components/AdminShell';
 import { TableRowsSkeleton } from '@/components/Loaders';
 import { api, SongDto } from '@/lib/api';
@@ -27,6 +27,13 @@ export default function AdminSongsPage() {
   const [form, setForm] = useState<SongFormState>(empty);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Action-result error (toggle Retire / Activate). Separate from the
+  // form-level `error` so it can render as a sticky banner at the top
+  // of the list — the toggle click happens mid-scroll and a plain
+  // inline error would be off-screen.
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const alertRef = useRef<HTMLDivElement | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -125,21 +132,40 @@ export default function AdminSongsPage() {
   };
 
   const toggleStatus = async (s: SongDto) => {
+    if (togglingId) return;
     const next = s.status === 'active' ? 'retired' : 'active';
-    // Bug #47 — previously this called `load()` after the toggle, which
-    // refetched only the first page. Any rows the admin had pulled in
-    // via "Load more" disappeared, and the toggled song appeared to
-    // jump to a different position (it was actually fine — the rows
-    // *below* it had been dropped). Backend sorts by `createdAt DESC`,
-    // so the song's position is stable across status changes; a
-    // pinpoint in-place patch preserves both the loaded page count
-    // and the row's position.
-    const updated = await api.updateSong(s.id, { status: next });
-    setSongs((prev) =>
-      prev.map((row) =>
-        row.id === s.id ? { ...row, status: updated.status ?? next } : row,
-      ),
-    );
+    setTogglingId(s.id);
+    setActionError(null);
+    try {
+      // Bug #47 — previously this called `load()` after the toggle, which
+      // refetched only the first page. Any rows the admin had pulled in
+      // via "Load more" disappeared, and the toggled song appeared to
+      // jump to a different position (it was actually fine — the rows
+      // *below* it had been dropped). Backend sorts by `createdAt DESC`,
+      // so the song's position is stable across status changes; a
+      // pinpoint in-place patch preserves both the loaded page count
+      // and the row's position.
+      const updated = await api.updateSong(s.id, { status: next });
+      setSongs((prev) =>
+        prev.map((row) =>
+          row.id === s.id ? { ...row, status: updated.status ?? next } : row,
+        ),
+      );
+    } catch (e: any) {
+      // Bug #48 — the backend now rejects retiring a song with a live
+      // or tie-pending battle. Surface that 409 in a sticky banner so
+      // the admin sees it even when the row they clicked is far below
+      // the page top.
+      setActionError(
+        e?.message ||
+          `Could not ${next === 'retired' ? 'retire' : 'activate'} "${s.title}".`,
+      );
+      requestAnimationFrame(() =>
+        alertRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+      );
+    } finally {
+      setTogglingId(null);
+    }
   };
 
   return (
@@ -159,6 +185,50 @@ export default function AdminSongsPage() {
           {mode === 'new' ? 'Cancel' : '+ New song'}
         </button>
       </div>
+
+      {actionError && (
+        <div
+          ref={alertRef}
+          role="alert"
+          aria-live="assertive"
+          className="sticky top-2 z-30 mb-3 bg-red-900/40 backdrop-blur border border-red-500/60 rounded-md shadow-xl px-4 py-3 flex items-start gap-3"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            className="w-5 h-5 text-red-300 shrink-0 mt-0.5"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs uppercase tracking-widest font-bold text-red-200 mb-0.5">
+              Action failed
+            </p>
+            <p className="text-sm text-red-50 leading-snug break-words">
+              {actionError}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            aria-label="Dismiss"
+            className="shrink-0 text-red-200 hover:text-white transition-colors p-1"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       {mode && (
         <form
@@ -273,9 +343,14 @@ export default function AdminSongsPage() {
                 <button
                   type="button"
                   onClick={() => toggleStatus(s)}
-                  className="px-3 py-1.5 text-xs font-bold rounded-md bg-stage-800 border border-stage-700 hover:border-spotlight/40 transition-colors"
+                  disabled={togglingId === s.id}
+                  className="px-3 py-1.5 text-xs font-bold rounded-md bg-stage-800 border border-stage-700 hover:border-spotlight/40 transition-colors disabled:opacity-50"
                 >
-                  {s.status === 'active' ? 'Retire' : 'Activate'}
+                  {togglingId === s.id
+                    ? '…'
+                    : s.status === 'active'
+                      ? 'Retire'
+                      : 'Activate'}
                 </button>
               </div>
             </li>
