@@ -140,9 +140,20 @@ export default function VideoDetailPage() {
               </div>
 
               <div className="p-6 md:p-8">
-                {video.songTitle && (
+                {/* Bug #58 — render a distinct warning chip when the
+                    performance isn't tied to a Centerstage Song, so the
+                    page state is unambiguous (previously this slot was
+                    just empty for unlinked uploads). */}
+                {video.songTitle ? (
                   <span className="inline-block mb-3 px-2.5 py-1 text-[10px] uppercase tracking-widest font-bold bg-spotlight/10 text-spotlight rounded border border-spotlight/30">
                     ♪ {video.songTitle}
+                  </span>
+                ) : (
+                  <span
+                    className="inline-block mb-3 px-2.5 py-1 text-[10px] uppercase tracking-widest font-bold bg-amber-500/10 text-amber-300 rounded border border-amber-400/40"
+                    title="This performance isn't linked to a Centerstage Song"
+                  >
+                    ⚠ No song linked
                   </span>
                 )}
 

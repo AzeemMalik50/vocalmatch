@@ -351,17 +351,25 @@ function PerformanceRow({
             invisible. Bumped to /25 fills with stronger borders and
             tightened the text shades to colors with real contrast on
             dark backgrounds. */}
+        {/* Bug #58 follow-up — the linked-song pill used the spotlight
+            (orange-red) palette, which read as the same warning tone
+            as the red "No song linked" pill alongside it; admins
+            couldn't tell at a glance which rows were healthy and
+            which weren't. Linked is the default/positive state and
+            now uses a neutral emerald palette, so only the genuine
+            warning rows (unlinked-legacy yellow, no-song red) draw
+            the eye. */}
         <div className="mt-2">
           {perf.song ? (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-spotlight/25 border border-spotlight/60 max-w-full">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/15 border border-emerald-400/50 max-w-full">
               <Music
                 aria-hidden="true"
-                className="w-3.5 h-3.5 text-spotlight shrink-0"
+                className="w-3.5 h-3.5 text-emerald-300 shrink-0"
               />
-              <span className="text-sm font-bold text-white truncate">
+              <span className="text-sm font-bold text-emerald-50 truncate">
                 {perf.song.title}
               </span>
-              <span className="text-xs font-semibold text-white/85 truncate">
+              <span className="text-xs font-semibold text-emerald-100/85 truncate">
                 · {perf.song.artist}
               </span>
             </span>

@@ -65,10 +65,22 @@ export default function PerformanceCard({ video }: Props) {
           </span>
         )}
 
-        {/* Song badge */}
-        {video.songTitle && (
+        {/* Song badge. Bug #58 — when songTitle is missing, the chip
+            used to render nothing at all, which made it impossible to
+            tell from the card whether a performance had a Centerstage
+            Song linked. Render an explicit warning chip (amber, not
+            the spotlight orange used for valid songs) so the unlinked
+            state is visually distinct. */}
+        {video.songTitle ? (
           <span className="absolute top-2 left-2 px-2.5 py-1 text-[10px] uppercase tracking-widest font-bold bg-stage-950/80 backdrop-blur text-spotlight rounded border border-spotlight/30">
             ♪ {video.songTitle}
+          </span>
+        ) : (
+          <span
+            className="absolute top-2 left-2 px-2.5 py-1 text-[10px] uppercase tracking-widest font-bold bg-stage-950/80 backdrop-blur text-amber-300 rounded border border-amber-400/50"
+            title="This performance isn't linked to a Centerstage Song"
+          >
+            ⚠ No song
           </span>
         )}
       </Link>
