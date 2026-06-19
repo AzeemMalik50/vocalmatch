@@ -605,16 +605,23 @@ export class BattlesService {
 
     const transitions: Array<{ current: Battle; previous: Battle }> = [];
     for (const battles of bySong.values()) {
-      for (let i = 0; i < battles.length - 1; i++) {
-        const current = battles[i];
-        const previous = battles[i + 1];
-        if (
-          current.winnerUserId &&
-          previous.winnerUserId &&
-          current.winnerUserId !== previous.winnerUserId
-        ) {
-          transitions.push({ current, previous });
-        }
+      // Bug #52 — previously this loop emitted EVERY adjacent change-of-
+      // hands in the song's history. That meant a user who was once
+      // dethroned and then later reclaimed the crown still surfaced as
+      // a "former champion" forever (the older transition kept matching
+      // even though their current state is `defending champion`). Each
+      // song should contribute only its CURRENT crown state — i.e. the
+      // most-recent transition. Anything older has been superseded by
+      // whatever happened next.
+      if (battles.length < 2) continue;
+      const current = battles[0];
+      const previous = battles[1];
+      if (
+        current.winnerUserId &&
+        previous.winnerUserId &&
+        current.winnerUserId !== previous.winnerUserId
+      ) {
+        transitions.push({ current, previous });
       }
     }
 

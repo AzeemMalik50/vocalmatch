@@ -968,20 +968,28 @@ function FlowStep({
 function ChampionSection() {
   const [featured, setFeatured] = useState<FeaturedSongRiskDto | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const f = await api.getFeaturedRisk();
-        if (!cancelled) setFeatured(f);
-      } catch {
-        // Non-fatal
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+  const refetch = useCallback(async () => {
+    try {
+      const f = await api.getFeaturedRisk();
+      setFeatured(f);
+    } catch {
+      // Non-fatal
+    }
   }, []);
+
+  useEffect(() => {
+    void refetch();
+  }, [refetch]);
+
+  // Bug #52 — the defending-champion details used to only fetch on mount,
+  // so after a battle closed (champion crowned / dethroned), this section
+  // showed stale champion + streak + title-defenses counts until a hard
+  // refresh. Subscribe to the lobby SSE so any battle lifecycle event
+  // (created / cancelled / closed) triggers a refetch and the panel
+  // reflects the new defending champion.
+  useLobby(() => {
+    void refetch();
+  });
 
   if (!featured) return null;
   const { song, champion, titleDefenses } = featured;
@@ -1832,32 +1840,44 @@ function DethronedPanel() {
   const { user } = useAuth();
   const [personal, setPersonal] = useState<PersonalDethronementDto | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        if (user) {
-          const mine = await api.getMyRecentDethronements();
-          if (!cancelled && mine.length > 0) {
-            setPersonal(mine[0]);
-            return;
-          }
+  const refetch = useCallback(async () => {
+    try {
+      if (user) {
+        const mine = await api.getMyRecentDethronements();
+        if (mine.length > 0) {
+          setPersonal(mine[0]);
+          setLatest(null);
+          return;
         }
-        const list = await api.getRecentDethronements(1);
-        if (!cancelled && list.length > 0) setLatest(list[0]);
-      } catch {
-        try {
-          const list = await api.getRecentDethronements(1);
-          if (!cancelled && list.length > 0) setLatest(list[0]);
-        } catch {
-          /* both failed → panel renders nothing */
-        }
+        // Bug #52 — the personal slot used to be sticky: once set, an
+        // empty refetch wouldn't clear it, so "Your reign just ended."
+        // stayed on screen after the user reclaimed the crown. Clear
+        // it explicitly when the backend no longer reports any
+        // outstanding personal dethronement.
+        setPersonal(null);
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.id]);
+      const list = await api.getRecentDethronements(1);
+      setLatest(list.length > 0 ? list[0] : null);
+    } catch {
+      try {
+        const list = await api.getRecentDethronements(1);
+        setLatest(list.length > 0 ? list[0] : null);
+      } catch {
+        /* both failed → panel renders nothing */
+      }
+    }
+  }, [user]);
+
+  useEffect(() => {
+    void refetch();
+  }, [refetch]);
+
+  // Same rationale as ChampionSection — re-evaluate when a battle
+  // closes so "Your reign just ended." disappears as soon as the user
+  // reclaims the crown.
+  useLobby(() => {
+    void refetch();
+  });
 
   if (personal) {
     const isFormerChamp = personal.yourRole === 'former-champion';
