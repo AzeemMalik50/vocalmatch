@@ -860,9 +860,15 @@ function ChallengeFlow({
 }: {
   user: ReturnType<typeof useAuth>['user'];
 }) {
+  // Bug #62 — logged-out visitors used to land on /signup, which
+  // funneled returning users into account creation instead of letting
+  // them authenticate. Most clickers already have an account; send
+  // them to /login (which itself links to /signup for genuinely new
+  // users) and preserve the challenge intent through the bounce so
+  // they land back on the upload-as-challenge flow after signing in.
   const href = user
     ? '/upload?challenge=1'
-    : '/signup?next=/upload?challenge=1';
+    : `/login?next=${encodeURIComponent('/upload?challenge=1')}`;
 
   return (
     <section className="relative bg-background py-12 md:py-20 overflow-hidden">
