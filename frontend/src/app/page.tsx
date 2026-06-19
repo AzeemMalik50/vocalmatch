@@ -245,6 +245,44 @@ function Hero({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
 }
 
 function HeroComposite() {
+  // Bug #51 — the "Tonight's Battle" chip used to be decorative copy
+  // with no path into the battle. Fetch the current live battle so the
+  // chip can deep-link to `/battle/{id}` and surface the battle title
+  // as an actual detail. Single one-shot fetch; falls back silently
+  // to the static chip when no live battle is in flight.
+  const [liveBattle, setLiveBattle] = useState<{
+    id: string;
+    title: string | null;
+  } | null>(null);
+
+  const refetchLive = useCallback(async () => {
+    try {
+      const resp = await api.listBattles({ status: 'live', limit: 1 });
+      if (resp.items.length === 0) {
+        // The featured battle was cancelled or completed — drop the link
+        // so the chip falls back to its decorative state.
+        setLiveBattle(null);
+        return;
+      }
+      const b = resp.items[0];
+      setLiveBattle({ id: b.id, title: b.title });
+    } catch {
+      // Non-fatal — chip renders the static fallback.
+    }
+  }, []);
+
+  useEffect(() => {
+    void refetchLive();
+  }, [refetchLive]);
+
+  // Subscribe to the public lobby SSE so the chip swaps to the new
+  // battle as soon as admin posts / cancels / closes one — no manual
+  // refresh needed. Mirrors the LiveBattle section's wiring below so
+  // the hero and the live-battle card stay in sync.
+  useLobby(() => {
+    void refetchLive();
+  });
+
   return (
     <div className="relative aspect-square w-full max-w-[34rem] mx-auto">
       {/* Twin halo cones — crimson left + gold right, meeting at the
@@ -305,16 +343,49 @@ function HeroComposite() {
         {/* Bottom-center "Tonight's Battle" chip — anchors the scene
             as live + present. Centering survives the entrance animation
             via the `.hero-enter.left-1/2:not(.crown-glow)` rule in
-            globals.css (see Bug #50 note there). */}
-        <div className="hero-enter hero-enter-delay-3 absolute bottom-[8%] left-1/2 z-40 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-yellow-500/40 bg-black/75 px-4 py-1.5 backdrop-blur">
-          <span
-            aria-hidden="true"
-            className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500"
-          />
-          <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-gray-200">
-            Tonight&apos;s Battle
-          </span>
-        </div>
+            globals.css (see Bug #50 note there). When a live battle
+            exists, the chip is a deep link into `/battle/{id}` and
+            surfaces the battle title inline; otherwise it stays as a
+            decorative chip. */}
+        {liveBattle ? (
+          <Link
+            href={`/battle/${liveBattle.id}`}
+            aria-label={
+              liveBattle.title
+                ? `Open tonight's battle: ${liveBattle.title}`
+                : "Open tonight's battle"
+            }
+            className="hero-enter hero-enter-delay-3 group absolute bottom-[8%] left-1/2 z-40 inline-flex max-w-[88%] -translate-x-1/2 items-center gap-2 rounded-full border border-yellow-500/60 bg-black/80 px-4 py-1.5 backdrop-blur transition-colors hover:border-yellow-400 hover:bg-black/95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400"
+          >
+            <span
+              aria-hidden="true"
+              className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500"
+            />
+            <span className="truncate text-[10px] font-bold uppercase tracking-[0.3em] text-gray-200">
+              Tonight&apos;s Battle
+              {liveBattle.title ? (
+                <>
+                  <span aria-hidden="true" className="mx-1.5 text-yellow-400/70">·</span>
+                  <span className="text-yellow-200">{liveBattle.title}</span>
+                </>
+              ) : null}
+            </span>
+            <ChevronRight
+              aria-hidden="true"
+              className="h-3 w-3 shrink-0 text-yellow-400 transition-transform group-hover:translate-x-0.5"
+            />
+          </Link>
+        ) : (
+          <div className="hero-enter hero-enter-delay-3 absolute bottom-[8%] left-1/2 z-40 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-yellow-500/40 bg-black/75 px-4 py-1.5 backdrop-blur">
+            <span
+              aria-hidden="true"
+              className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500"
+            />
+            <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-gray-200">
+              Tonight&apos;s Battle
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Crown emblem — literalizes "One Crown" from the headline,
