@@ -425,7 +425,55 @@ export class BattlesService {
     );
     this.publishLobby(saved, 'cancelled');
 
+    // Bug #60 — cancel published a realtime status event for clients
+    // that already had the battle open, but persisted no notification.
+    // Anyone who wasn't on the page never found out their battle had
+    // been cancelled. Send a `battle_cancelled` to both performers.
+    // Fire-and-forget; a failed lookup or write shouldn't block the
+    // cancel itself.
+    void this.notifyCancelled(saved).catch((err) =>
+      this.logger.error(
+        `Failed to send cancellation notifications for battle ${saved.id}: ${err}`,
+      ),
+    );
+
     return saved;
+  }
+
+  /** Look up both performers + the song title, then write a
+   *  `battle_cancelled` notification per performer. Extracted so the
+   *  cancel path stays linear-readable. */
+  private async notifyCancelled(battle: Battle) {
+    const [a, b, song] = await Promise.all([
+      this.videos.findOne({ where: { id: battle.performanceAId } }),
+      this.videos.findOne({ where: { id: battle.performanceBId } }),
+      this.songs.findOne(battle.songId).catch(() => null),
+    ]);
+    const songLabel = song?.title ?? 'a Centerstage Song';
+    const uploaderIds = Array.from(
+      new Set(
+        [a?.uploaderId, b?.uploaderId].filter(
+          (uid): uid is string => !!uid,
+        ),
+      ),
+    );
+    await Promise.all(
+      uploaderIds.map((userId) =>
+        this.notifications
+          .create({
+            userId,
+            kind: 'battle_cancelled',
+            title: 'Your battle was cancelled.',
+            body: `Admin cancelled the battle on ${songLabel}. No winner was declared and no stats changed — a fresh matchup can be queued for this song.`,
+            href: `/battle/${battle.id}`,
+          })
+          .catch((err) =>
+            this.logger.error(
+              `Failed to notify ${userId} of cancelled battle ${battle.id}: ${err}`,
+            ),
+          ),
+      ),
+    );
   }
 
   /**
