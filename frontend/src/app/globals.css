@@ -2,6 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Hide the native number-input spinner arrows on inputs we wrap with
+   our own −/+ stepper controls. Without this, both the browser's
+   built-in arrows AND our custom buttons render, which looks cluttered
+   and lets admins step the value two different ways. Cross-browser:
+   WebKit / Blink ship inner+outer spin pseudo-elements; Firefox uses
+   the older `appearance: textfield`. */
+.no-spinner::-webkit-inner-spin-button,
+.no-spinner::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.no-spinner {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 :root {
   /* Phase 3 typography stack — cinematic + premium.
      - display: Bebas Neue (condensed sans, hero + section headlines)

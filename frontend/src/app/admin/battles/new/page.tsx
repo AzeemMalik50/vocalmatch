@@ -205,7 +205,7 @@ export default function AdminNewBattlePage() {
                 onChange={(e) =>
                   setHours(Math.max(1, parseInt(e.target.value || '0', 10) || 0))
                 }
-                className="w-16 px-2 py-2.5 bg-stage-900 border-x border-stage-700 text-center focus:outline-none focus:border-spotlight transition-colors tabular-nums"
+                className="no-spinner w-16 px-2 py-2.5 bg-stage-900 border-x border-stage-700 text-center focus:outline-none focus:border-spotlight transition-colors tabular-nums"
               />
               <button
                 type="button"
