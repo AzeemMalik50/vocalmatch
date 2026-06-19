@@ -303,12 +303,9 @@ function HeroComposite() {
         </div>
 
         {/* Bottom-center "Tonight's Battle" chip — anchors the scene
-            as live + present. The chip itself is centered via
-            `left-1/2 -translate-x-1/2`, but the leading red dot + gap
-            pushes the *text* off-axis to the right, which broke the
-            visual line-up with the crown emblem above. An invisible
-            spacer matching the dot+gap restores symmetry so the
-            label centers under the crown. */}
+            as live + present. Centering survives the entrance animation
+            via the `.hero-enter.left-1/2:not(.crown-glow)` rule in
+            globals.css (see Bug #50 note there). */}
         <div className="hero-enter hero-enter-delay-3 absolute bottom-[8%] left-1/2 z-40 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-yellow-500/40 bg-black/75 px-4 py-1.5 backdrop-blur">
           <span
             aria-hidden="true"
@@ -317,7 +314,6 @@ function HeroComposite() {
           <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-gray-200">
             Tonight&apos;s Battle
           </span>
-          <span aria-hidden="true" className="invisible h-1.5 w-1.5" />
         </div>
       </div>
 
