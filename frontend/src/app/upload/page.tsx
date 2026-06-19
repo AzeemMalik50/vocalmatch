@@ -152,6 +152,14 @@ function UploadForm() {
 
   const selectedSong = songs.find((s) => s.id === songId) ?? null;
 
+  // Challenge-mode pre-check: a song with no defending champion can't
+  // accept a Red Phone challenge — there's nothing to battle against.
+  // The SongDto already carries `currentChampionUserId`, so this is a
+  // pure client-side check (no extra round-trip). Backend re-validates
+  // at submission via BadRequestException.
+  const songHasNoChampion =
+    challengeMode && !!selectedSong && !selectedSong.currentChampionUserId;
+
   // Challenge-mode pre-check: if a battle for the selected song is still
   // in flight (live or tied awaiting admin decision), there's nothing for
   // a challenger to queue against — admin can't promote them yet. Surface
@@ -288,6 +296,14 @@ function UploadForm() {
       // Pre-empt the backend ConflictException with the exact same copy.
       // Don't even start the upload — we know it'll be rejected.
       setErr('Champion for this battle is not yet decided');
+      return;
+    }
+    if (songHasNoChampion) {
+      // Mirror the backend BadRequestException copy so the user sees the
+      // same message whether the check fires here or server-side.
+      setErr(
+        'This song has no current champion yet. Wait for the first battle to crown one, or pick a different song.',
+      );
       return;
     }
 
@@ -508,7 +524,10 @@ function UploadForm() {
                             No matches. Ask an admin to add this song to the catalog.
                           </li>
                         ) : (
-                          filteredSongs.map((s) => (
+                          filteredSongs.map((s) => {
+                            const noChampion =
+                              challengeMode && !s.currentChampionUserId;
+                            return (
                             <li key={s.id} className="flex items-stretch border-b border-stage-800 last:border-b-0">
                               <button
                                 type="button"
@@ -521,6 +540,14 @@ function UploadForm() {
                               >
                                 <span className="font-bold">{s.title}</span>
                                 <span className="text-haze/60"> · {s.artist}</span>
+                                {noChampion && (
+                                  <span
+                                    className="ml-2 inline-block px-1.5 py-0.5 rounded text-[10px] uppercase tracking-widest font-bold bg-yellow-950/60 border border-yellow-700/60 text-yellow-200 align-middle"
+                                    title="No defending champion yet — can't be challenged"
+                                  >
+                                    No champion
+                                  </span>
+                                )}
                               </button>
                               {s.trackUrl && (
                                 <a
@@ -550,7 +577,8 @@ function UploadForm() {
                                 </a>
                               )}
                             </li>
-                          ))
+                            );
+                          })
                         )}
                       </ul>
                     )}
@@ -777,13 +805,34 @@ function UploadForm() {
             </div>
           )}
 
+          {/* Block-state banner for challenge mode when the selected song
+              has no defending champion yet. Mirrors the backend
+              BadRequestException copy. */}
+          {songHasNoChampion && (
+            <div
+              role="alert"
+              className="text-sm text-yellow-200 bg-yellow-950/40 border border-yellow-700/50 rounded-md px-4 py-3"
+            >
+              <p className="font-bold">This song has no champion yet</p>
+              <p className="text-xs text-yellow-200/80 mt-1">
+                <span className="font-semibold">
+                  {selectedSong?.title ?? 'This song'}
+                </span>{' '}
+                hasn&apos;t been battled yet, so there&apos;s no crown to
+                challenge. Wait for the first battle to crown a champion,
+                or pick a different Centerstage Song.
+              </p>
+            </div>
+          )}
+
           <div className="flex flex-col sm:flex-row gap-2">
             <button
               type="submit"
               disabled={
                 submitting ||
                 checkingActiveBattle ||
-                (challengeMode && songHasActiveBattle)
+                (challengeMode && songHasActiveBattle) ||
+                songHasNoChampion
               }
               className="flex-1 px-4 py-3.5 bg-spotlight text-white font-bold rounded-md hover:bg-spotlight-dim transition-colors disabled:opacity-50 shadow-lg shadow-spotlight/30"
             >

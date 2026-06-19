@@ -71,6 +71,19 @@ export class ChallengesService {
     videoId: string;
   }) {
     const song = await this.songs.findOne(params.songId); // throws 404
+
+    // Bug #49 — Red Phone challenges have no meaning until the song has
+    // a defending champion. The original gate was deep in the
+    // promote-to-battle step (`createBattleFromChallenge`), which let
+    // the user upload + queue + wait, only to have admin discover the
+    // mismatch days later. Validate at submission time so the user is
+    // told immediately and steered to a real target.
+    if (!song.currentChampionUserId || !song.currentChampionPerformanceId) {
+      throw new BadRequestException(
+        'This song has no current champion yet. Wait for the first battle to crown one, or pick a different song.',
+      );
+    }
+
     if (song.currentChampionUserId === params.userId) {
       throw new ConflictException(
         'You are the current champion of this song — nothing to challenge',

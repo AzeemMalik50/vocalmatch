@@ -114,6 +114,24 @@ describe('ChallengesService (critical paths)', () => {
       ).rejects.toBeInstanceOf(ConflictException);
     });
 
+    it('rejects submitting a challenge for a song that has no defending champion', async () => {
+      // Bug #49 — Red Phone challenges only make sense once a song has a
+      // current champion to dethrone. Validate up-front instead of letting
+      // the user wait until admin tries to promote.
+      songs.findOne.mockResolvedValueOnce({
+        ...baseSong(),
+        currentChampionUserId: null,
+        currentChampionPerformanceId: null,
+      });
+      await expect(
+        service.createSubmission({
+          songId: 'song-1',
+          userId: 'challenger-1',
+          videoId: 'video-1',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
     it('rejects when a live battle for this song is still in progress', async () => {
       songs.findOne.mockResolvedValueOnce(baseSong());
       battleRepo.findOne.mockResolvedValueOnce({
