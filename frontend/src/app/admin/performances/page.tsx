@@ -32,7 +32,7 @@ export default function AdminPerformancesPage() {
   const confirm = useConfirm();
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Debounce search. The placeholder advertises "@uploader" support so
+  // Debounce search. The placeholder advertises "@username" support so
   // we strip a leading "@" before sending — the backend stores usernames
   // without the prefix and matching against "@foo" returned nothing.
   useEffect(() => {
@@ -161,7 +161,7 @@ export default function AdminPerformancesPage() {
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search title, song, or @uploader"
+          placeholder="Search title, song, or @username"
           className="flex-1 min-w-[200px] px-3 py-2 bg-stage-900 border border-stage-700 rounded-md text-sm focus:outline-none focus:border-spotlight transition-colors"
         />
         <label className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold cursor-pointer">
