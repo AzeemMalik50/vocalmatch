@@ -363,7 +363,15 @@ function HeroComposite() {
               aria-hidden="true"
               className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500"
             />
-            <span className="truncate text-[10px] font-bold uppercase tracking-[0.3em] text-gray-200">
+            {/* Bug #71 — on iPhone widths the wide `tracking-[0.3em]`
+                stretched the label far enough that it could break at
+                the space in "Tonight's Battle", showing on two lines.
+                `whitespace-nowrap` keeps it on a single line; the
+                outer `truncate` still collapses an overlong battle
+                title into an ellipsis when there isn't room. The
+                tracking tightens slightly under `sm:` so the chip
+                doesn't crowd the chevron on tiny screens. */}
+            <span className="truncate whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.3em] text-gray-200">
               Tonight&apos;s Battle
               {liveBattle.title ? (
                 <>
@@ -381,9 +389,12 @@ function HeroComposite() {
           <div className="hero-enter hero-enter-delay-3 absolute bottom-[8%] left-1/2 z-40 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-yellow-500/40 bg-black/75 px-4 py-1.5 backdrop-blur">
             <span
               aria-hidden="true"
-              className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500"
+              className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500"
             />
-            <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-gray-200">
+            {/* Bug #71 — `whitespace-nowrap` keeps the label on a
+                single line on iPhone widths where the wide tracking
+                otherwise broke at the space. */}
+            <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.3em] text-gray-200">
               Tonight&apos;s Battle
             </span>
           </div>
