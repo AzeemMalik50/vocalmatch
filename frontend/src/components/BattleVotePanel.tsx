@@ -31,6 +31,7 @@ export default function BattleVotePanel({
   const router = useRouter();
   const [voting, setVoting] = useState<'A' | 'B' | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isCompleted =
@@ -66,6 +67,23 @@ export default function BattleVotePanel({
     }
   };
 
+  // Bug #74 — dedicated "Copy link" affordance so users who don't want
+  // to invoke the native share sheet (or who are on desktop, where the
+  // share sheet doesn't exist) have a one-click way to grab the URL.
+  // Separate from `handleShare` + its own `linkCopied` flag so the
+  // feedback text is unambiguous about which button the user clicked.
+  const handleCopyLink = async () => {
+    const url = typeof window !== 'undefined' ? window.location.href : '';
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      setError('Could not copy link');
+    }
+  };
+
   const handleShare = async () => {
     const url = typeof window !== 'undefined' ? window.location.href : '';
     if (typeof navigator !== 'undefined' && navigator.share) {
@@ -76,8 +94,17 @@ export default function BattleVotePanel({
           url,
         });
         return;
-      } catch {
-        // user cancelled — fall through to copy
+      } catch (err: any) {
+        // Bug #72 — the previous catch swallowed every error and
+        // fell through to clipboard. On mobile the share-sheet
+        // dismissal throws `AbortError`, then the clipboard fallback
+        // typically fails too (the user gesture has been consumed by
+        // the share sheet, and iOS Safari is strict about clipboard
+        // permissions outside a fresh gesture) — so dismissing the
+        // sheet showed a misleading "Could not copy share link"
+        // error. Treat AbortError as "user is done; do nothing" and
+        // only fall through for genuine share failures.
+        if (err?.name === 'AbortError') return;
       }
     }
     try {
@@ -137,15 +164,22 @@ export default function BattleVotePanel({
         />
       )}
 
-      {/* Post-vote engagement prompt — drives return behavior + sharing. */}
-      {battle.requesterHasVoted && isLive && (
+      {/* Post-vote engagement prompt — drives return behavior + sharing.
+          Bug #73 — was gated on `requesterHasVoted` only, which hid the
+          share + remind-me CTAs from the two performers (participants
+          can't vote in their own battle). Participants have the
+          strongest incentive to share — they should see this block
+          too, with copy that reads as a "rally your voters" prompt
+          rather than the voter's "vote locked in" framing. */}
+      {isLive && (battle.requesterHasVoted || isParticipant) && (
         <div className="mt-6 pt-6 border-t border-stage-700/60 text-center">
           <p className="font-display text-lg md:text-xl font-bold mb-1">
-            Vote locked in.
+            {isParticipant ? 'Your battle is live.' : 'Vote locked in.'}
           </p>
           <p className="text-sm text-haze mb-4">
-            Come back when the timer hits zero to see who took it. Share to bring
-            more voters in.
+            {isParticipant
+              ? 'Come back when the timer hits zero to see the result. Share to rally your voters.'
+              : 'Come back when the timer hits zero to see who took it. Share to bring more voters in.'}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2">
             <button
@@ -154,6 +188,28 @@ export default function BattleVotePanel({
               className="inline-flex items-center gap-2 px-5 py-3 bg-spotlight text-white font-bold rounded-md hover:bg-spotlight-dim transition-colors"
             >
               {shareCopied ? 'Link copied!' : 'Share this battle'}
+            </button>
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              aria-label="Copy battle link"
+              className="inline-flex items-center gap-2 px-5 py-3 bg-stage-800 border border-stage-700 hover:border-spotlight/40 text-haze hover:text-white font-bold rounded-md transition-colors text-sm"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+              {linkCopied ? 'Copied!' : 'Copy link'}
             </button>
             <a
               href={`data:text/calendar;charset=utf-8,${encodeURIComponent(
