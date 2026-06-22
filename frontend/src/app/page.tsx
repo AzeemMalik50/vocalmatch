@@ -1784,8 +1784,20 @@ function CrownAtRiskPanelView({
   return (
     <section id="crown-at-risk" className="bg-background py-12 md:py-20">
       <div className="max-w-7xl mx-auto px-4">
+        {/* Bug #79 — the `.personal-stake` panel pins a "FOR YOU" pill
+            at `top: 0.75rem; right: 0.75rem` via a `::before`. On
+            mobile the panel's `p-8` (2rem) padding doesn't leave the
+            heading row enough room — the uppercase tracking-widest
+            "Your Crown at Risk" text crowds the chip and the two
+            visually collide. Bumping the top padding only on the
+            personalised variant (and only below `md:`) drops the
+            heading underneath the chip with breathing room. */}
         <div
-          className={`gold-panel ${personalised ? 'personal-stake' : ''} relative overflow-hidden p-8 md:p-10`}
+          className={`gold-panel ${
+            personalised
+              ? 'personal-stake pt-14 md:pt-10'
+              : ''
+          } relative overflow-hidden p-8 md:p-10`}
         >
           <Image
             src={HERO_CROWN_AT_RISK.src}
@@ -2045,7 +2057,19 @@ function DethronedPanelView({
             aria-hidden="true"
             className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 via-transparent to-red-600/10 pointer-events-none"
           />
-          <div className="relative grid grid-cols-1 md:grid-cols-[1fr_auto] gap-8 items-center p-6 sm:p-8 md:p-10">
+          {/* Bug #79 — when `.personal-stake` is applied, its `::before`
+              "FOR YOU" pill is anchored at `top:0.75rem; right:0.75rem`.
+              The default `p-6` on mobile leaves the eyebrow + Won%
+              chip row crowding it. Bumping the top padding when
+              personalised gives the chip row breathing room beneath
+              the FOR YOU pill. */}
+          <div
+            className={`relative grid grid-cols-1 md:grid-cols-[1fr_auto] gap-8 items-center ${
+              personalised
+                ? 'p-6 pt-12 sm:p-8 sm:pt-12 md:p-10'
+                : 'p-6 sm:p-8 md:p-10'
+            }`}
+          >
             <div>
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-yellow-400/40 bg-black/60 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.3em] text-yellow-400">
