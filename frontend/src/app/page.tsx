@@ -309,10 +309,18 @@ function HeroComposite() {
         <div aria-hidden="true" className="absolute inset-x-0 top-0 z-20 h-[5%] bg-black/85" />
         <div aria-hidden="true" className="absolute inset-x-0 bottom-0 z-20 h-[5%] bg-black/85" />
 
-        {/* Cinematic vignette — keeps focus on the singers + fire spine. */}
+        {/* Cinematic vignette — keeps focus on the singers + fire spine.
+            Bug #75 — the original (and the earlier "fix it only below
+            sm") radial darkened the corners enough that the four
+            corners visually read as faded / hollowed-out in Safari
+            (both iPhone and desktop). The cinematic feel comes from
+            the letterbox bands + cone glow + grain + sweep stack
+            already; the radial doesn't need to do the heavy lifting.
+            Dropped the responsive split and tuned to a much gentler
+            radial that works at every viewport. */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 z-20 bg-[radial-gradient(ellipse_at_center,transparent_45%,rgba(0,0,0,0.6)_100%)]"
+          className="pointer-events-none absolute inset-0 z-20 bg-[radial-gradient(ellipse_at_center,transparent_65%,rgba(0,0,0,0.2)_100%)]"
         />
 
         {/* Fine film grain — editorial polish. */}
