@@ -193,14 +193,31 @@ export default function AdminUsersPage() {
             </tbody>
           </table>
           {hasMore && (
-            <div className="flex justify-center mt-6 mb-12">
+            <div className="flex justify-center mt-8 mb-12">
+              {/* Bug #70 — see admin/performances/page.tsx for context. */}
               <button
                 type="button"
                 onClick={loadMore}
                 disabled={loadingMore}
-                className="px-5 py-2.5 bg-stage-800 border border-stage-700 hover:border-spotlight/40 font-bold rounded-md transition-colors disabled:opacity-50"
+                className="group inline-flex items-center gap-2 px-7 py-3 bg-stage-900 border-2 border-spotlight/60 text-spotlight font-bold uppercase tracking-widest text-xs rounded-md shadow-md shadow-spotlight/10 hover:bg-spotlight/10 hover:border-spotlight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spotlight focus-visible:ring-offset-2 focus-visible:ring-offset-stage-950 disabled:opacity-50"
               >
                 {loadingMore ? 'Loading…' : 'Load more'}
+                {!loadingMore && (
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                    className="transition-transform group-hover:translate-y-0.5"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                )}
               </button>
             </div>
           )}

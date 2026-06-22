@@ -9,6 +9,7 @@ import { ChallengeSubmission } from './challenge-submission.entity';
 import { BattlesService } from './battles.service';
 import { Video } from '../videos/video.entity';
 import { User } from '../users/user.entity';
+import { Song } from '../songs/song.entity';
 import { SongsService } from '../songs/songs.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeService } from '../realtime/realtime.service';
@@ -58,6 +59,13 @@ describe('BattlesService (critical paths)', () => {
    * dataSource.transaction(cb) — we just invoke the callback with a
    * fake `manager` whose getRepository() returns the same mocks.
    */
+  // Bug #67 — finalizeWinner now calls `syncChampionTitle` which counts
+  // the user's currently-held song crowns via `manager.getRepository(Song)`
+  // and writes back a championTitle. Give the fake manager a Song repo
+  // stub so the transaction-scoped count() works in tests; default it
+  // to "no crowns owned" so the writeback path becomes a no-op unless a
+  // test overrides it.
+  const songRepo: any = { count: jest.fn().mockResolvedValue(0) };
   const fakeManager: any = {
     getRepository: jest.fn((entity: any) => {
       if (entity === Battle) return battleRepo;
@@ -68,6 +76,7 @@ describe('BattlesService (critical paths)', () => {
       // status inside the transaction so the partial unique index is
       // released for the next challenger.
       if (entity === ChallengeSubmission) return challengeSubmissionsRepo;
+      if (entity === Song) return songRepo;
       throw new Error(`No mock for ${entity?.name ?? entity}`);
     }),
   };
