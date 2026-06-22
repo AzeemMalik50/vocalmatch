@@ -69,12 +69,35 @@ export default function AdminChallengesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
 
+  // Bug #66 — after marking a Pending row as Selected / Rejected, the
+  // row used to be updated in place via `setItems(prev.map(...))`. Its
+  // new status no longer matched the active tab filter, but because the
+  // mapper preserved the row it kept rendering on the Pending tab
+  // until a refresh. Replace the in-place map with a tab-aware
+  // reconcile: if the new status no longer fits the current filter,
+  // drop the row entirely; otherwise update in place (the "all" view
+  // and a future "stay on the current status" case still work).
+  const reconcileAfterStatusChange = useCallback(
+    (updated: AdminChallengeDto) => {
+      setItems((prev) => {
+        if (filter === 'all') {
+          return prev.map((c) => (c.id === updated.id ? updated : c));
+        }
+        if (updated.status !== filter) {
+          return prev.filter((c) => c.id !== updated.id);
+        }
+        return prev.map((c) => (c.id === updated.id ? updated : c));
+      });
+    },
+    [filter],
+  );
+
   const handleSelect = async (id: string) => {
     setWorking(id);
     setError(null);
     try {
       const updated = await api.adminSelectChallenge(id);
-      setItems((prev) => prev.map((c) => (c.id === id ? updated : c)));
+      reconcileAfterStatusChange(updated);
     } catch (e: any) {
       setError(e.message || 'Could not select challenge');
     } finally {
@@ -94,7 +117,7 @@ export default function AdminChallengesPage() {
     setError(null);
     try {
       const updated = await api.adminRejectChallenge(id);
-      setItems((prev) => prev.map((c) => (c.id === id ? updated : c)));
+      reconcileAfterStatusChange(updated);
     } catch (e: any) {
       setError(e.message || 'Could not reject challenge');
     } finally {

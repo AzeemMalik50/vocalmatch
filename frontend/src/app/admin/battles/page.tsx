@@ -411,9 +411,23 @@ function ResolveTieControl({
     setError(null);
     try {
       await api.resolveTie(battleId, performanceId);
+      // Bug #68 — `setPicking(null)` lived only in the catch branch,
+      // so on a successful resolve the local "picking" flag stayed
+      // truthy forever, keeping both winner buttons disabled and the
+      // UI pinned in a faux-loading state. The parent's `onResolved`
+      // refetches the list, but the component does not always
+      // unmount before the user reads the stuck buttons (the
+      // skeleton swap depends on render timing, and on the All / Live
+      // tabs the row stays mounted because the battle is now
+      // `completed`, just with a different action column). Close the
+      // control + clear `picking` explicitly on success so the
+      // disabled state can't persist regardless of what the parent
+      // chooses to do.
+      setOpen(false);
       onResolved();
     } catch (e: any) {
       setError(e.message || 'Could not resolve tie');
+    } finally {
       setPicking(null);
     }
   };

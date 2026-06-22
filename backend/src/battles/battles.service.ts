@@ -12,6 +12,7 @@ import { Vote } from './vote.entity';
 import { ChallengeSubmission } from './challenge-submission.entity';
 import { Video } from '../videos/video.entity';
 import { User } from '../users/user.entity';
+import { Song } from '../songs/song.entity';
 import { SongsService } from '../songs/songs.service';
 import { CreateBattleDto, ResolveTieDto } from './battles.dto';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -544,6 +545,27 @@ export class BattlesService {
         sameChampion,
       });
 
+      // Bug #67 — `User.championTitle` is read all over the app (the
+      // "★ Champion" badge on performance cards, the winner snapshot
+      // on battle DTOs, etc.) but nothing ever wrote to it. So a user
+      // who'd won multiple battles still appeared with no champion
+      // status. The QA report: "champion status only updates when a
+      // user wins or loses a battle for the song featured in the
+      // section — should reflect overall standing."
+      //
+      // Keep championTitle in sync with reality on every finalize:
+      // count how many songs each side currently champions. ≥ 1 →
+      // 'Champion'; 0 → clear. The winner just gained this song's
+      // crown (so they'll be ≥ 1). The loser either:
+      //   - was the previous champion of this song (now lost it, may
+      //     or may not still champion other songs), or
+      //   - was a non-champion challenger (count unchanged).
+      // Querying covers both cases uniformly.
+      await this.syncChampionTitle(manager, winnerPerformance.uploaderId);
+      if (loserPerformance) {
+        await this.syncChampionTitle(manager, loserPerformance.uploaderId);
+      }
+
       this.logger.log(
         `Battle ${battle.id} completed — winner ${winnerPerformance.uploaderId} ` +
           `(${battle.voteCountA} vs ${battle.voteCountB})`,
@@ -617,6 +639,36 @@ export class BattlesService {
 
       return battle;
     });
+  }
+
+  /**
+   * Bug #67 — keep `User.championTitle` in sync with how many song
+   * crowns the user currently holds. Called for both the winner and
+   * the loser after a battle finalizes. Runs inside the finalize
+   * transaction so the title state always matches the song writeback.
+   *
+   * Semantics: the user is a "Champion" when they currently hold at
+   * least one song's championship; otherwise the title is cleared.
+   * This matches what the UI surfaces — a `championTitle` of
+   * "Champion" means "this person currently owns at least one crown
+   * somewhere on the platform," regardless of which specific song
+   * the viewer is looking at.
+   */
+  private async syncChampionTitle(
+    manager: import('typeorm').EntityManager,
+    userId: string,
+  ) {
+    const crowns = await manager.getRepository(Song).count({
+      where: { currentChampionUserId: userId },
+    });
+    const desired = crowns > 0 ? 'Champion' : null;
+    const user = await manager
+      .getRepository(User)
+      .findOne({ where: { id: userId } });
+    if (!user) return;
+    if (user.championTitle === desired) return;
+    user.championTitle = desired;
+    await manager.getRepository(User).save(user);
   }
 
   /**

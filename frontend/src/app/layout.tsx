@@ -5,6 +5,7 @@ import { AuthProvider } from '@/lib/auth-context';
 import { ThemeProvider } from '@/lib/theme-context';
 import { ConfirmProvider } from '@/lib/confirm-context';
 import ScrollResetOnReload from '@/components/ScrollResetOnReload';
+import SuppressExtensionErrors from '@/components/SuppressExtensionErrors';
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, '') ||
@@ -92,6 +93,7 @@ export default function RootLayout({
       className={`${bebasNeue.variable} ${allura.variable} ${inter.variable}`}
     >
       <body className="vm-force-dark stage-bg vignette min-h-screen">
+        <SuppressExtensionErrors />
         <ScrollResetOnReload />
         <ThemeProvider>
           <AuthProvider>

@@ -32,7 +32,7 @@ export default function AdminPerformancesPage() {
   const confirm = useConfirm();
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Debounce search. The placeholder advertises "@uploader" support so
+  // Debounce search. The placeholder advertises "@username" support so
   // we strip a leading "@" before sending — the backend stores usernames
   // without the prefix and matching against "@foo" returned nothing.
   useEffect(() => {
@@ -161,7 +161,7 @@ export default function AdminPerformancesPage() {
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search title, song, or @uploader"
+          placeholder="Search title, song, or @username"
           className="flex-1 min-w-[200px] px-3 py-2 bg-stage-900 border border-stage-700 rounded-md text-sm focus:outline-none focus:border-spotlight transition-colors"
         />
         <label className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold cursor-pointer">
@@ -256,14 +256,35 @@ export default function AdminPerformancesPage() {
       )}
 
       {hasMore && (
-        <div className="flex justify-center mt-6">
+        <div className="flex justify-center mt-8 mb-4">
+          {/* Bug #70 — the previous styling (bg-stage-800 + border-stage-700)
+              was nearly invisible against the dark dashboard chrome.
+              Bumped to a spotlight-bordered secondary action with a
+              chevron-down icon, stronger padding, focus ring, and
+              hover fill so it reads as a clear "load more below" CTA. */}
           <button
             type="button"
             onClick={() => load(false)}
             disabled={loading}
-            className="px-5 py-2.5 bg-stage-800 border border-stage-700 hover:border-spotlight/40 font-bold rounded-md transition-colors disabled:opacity-50"
+            className="group inline-flex items-center gap-2 px-7 py-3 bg-stage-900 border-2 border-spotlight/60 text-spotlight font-bold uppercase tracking-widest text-xs rounded-md shadow-md shadow-spotlight/10 hover:bg-spotlight/10 hover:border-spotlight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spotlight focus-visible:ring-offset-2 focus-visible:ring-offset-stage-950 disabled:opacity-50"
           >
             {loading ? 'Loading…' : 'Load more'}
+            {!loading && (
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                className="transition-transform group-hover:translate-y-0.5"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            )}
           </button>
         </div>
       )}

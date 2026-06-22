@@ -333,16 +333,84 @@ html, body {
    reads as a film still rather than a stock photo in a rounded box. */
 
 .hero-frame {
-  border: 1px solid rgba(var(--c-gold) / 0.45);
+  /* Bug #75/76/77 — historically there was a real `border: 1px solid …`
+     here, but Safari/WebKit clips absolutely-positioned children
+     (Next.js `<Image fill>` lands at `position:absolute; inset:0`)
+     to the padding-box instead of the border-box inside an
+     `overflow:hidden` + `border-radius` container, so the image
+     painted over the gold border at the four corners and the
+     border vanished there. Earlier attempts (WebKit mask trick,
+     keeping the border AND adding an overlay) either still chopped
+     corners in Safari or doubled the line in Chrome/Firefox.
+     Single source of truth now: don't draw a real `border` at all
+     — render the gold edge via the `::after` pseudo-element below,
+     which paints on top of every interior layer (image, letterbox,
+     vignette, grain, sweep, badges at z < 50) in every browser,
+     so it can't be clipped away. */
   box-shadow:
     0 0 0 1px rgba(var(--c-gold) / 0.1),
     0 30px 80px -20px rgba(var(--c-spotlight) / 0.35),
     0 0 40px rgba(var(--c-spotlight) / 0.12);
+  /* Forces a fresh stacking context so the `.hero-grain` child's
+     `mix-blend-mode: overlay` composites against the image inside
+     this frame only, not against whatever sits behind the section
+     — Safari was darkening the corners of the frame because the
+     blend reached outside the rounded clip in WebKit. */
+  isolation: isolate;
+  /* Bug #78 — the Ken Burns image (.hero-kenburns) uses
+     `will-change: transform` + a scale() animation, which promotes
+     it to its own compositing layer in Safari. WebKit then fails
+     to apply the parent's `overflow:hidden` + `border-radius`
+     clip to that promoted child, so the scaled image bleeds past
+     the four rounded corners. Promoting the frame itself to a
+     compositing layer (translateZ(0) is the smallest no-op that
+     does this) aligns parent + child on the same layer so the
+     clip is honored. */
+  transform: translateZ(0);
+  /* Belt-and-braces: `clip-path` is honored by WebKit even when
+     overflow + border-radius isn't, and it works at the
+     compositor level so transformed/promoted children can't
+     escape it. The `inset(0 round 1rem)` matches the visible
+     `rounded-2xl` shape exactly. Modern WebKit needs the
+     unprefixed property; older versions take -webkit-. */
+  -webkit-clip-path: inset(0 round 1rem);
+  clip-path: inset(0 round 1rem);
+}
+
+.hero-frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(var(--c-gold) / 0.45);
+  border-radius: inherit;
+  pointer-events: none;
+  /* Paint above all interior layers (badges sit at z-40, vignette
+     and grain at z-20/z-30) but stay below external chrome like
+     the crown emblem (z-50 on the outer composite). */
+  z-index: 50;
 }
 
 .hero-kenburns {
   animation: heroKenBurns 14s ease-in-out infinite alternate;
   will-change: transform;
+  /* Bug #78 — second layer of defense for Safari's rounded-corner
+     bleed. Tailwind `rounded-2xl` = 1rem on the parent. Explicit
+     value (not `inherit`) because Next.js `<Image fill>` renders
+     the `<img>` inside a `<span>` wrapper, so the img would
+     inherit from the span (no border-radius) and not from
+     `.hero-frame`. With its own rounded corners the image clips
+     itself even if WebKit drops the parent's overflow clip on a
+     transformed compositing layer. No-op in Chrome/Firefox. */
+  border-radius: 1rem;
+}
+
+/* Round the Next.js `<Image fill>` wrapper too so the absolutely-
+   positioned span doesn't poke past the gold border in Safari. The
+   class targets any direct child span the framework injects — they
+   sit at `position:absolute; inset:0` and have `overflow:hidden`
+   themselves, but without a border-radius they're rectangles. */
+.hero-frame > span {
+  border-radius: 1rem;
 }
 @keyframes heroKenBurns {
   0%   { transform: scale(1) translateY(0); }

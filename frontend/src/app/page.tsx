@@ -309,10 +309,18 @@ function HeroComposite() {
         <div aria-hidden="true" className="absolute inset-x-0 top-0 z-20 h-[5%] bg-black/85" />
         <div aria-hidden="true" className="absolute inset-x-0 bottom-0 z-20 h-[5%] bg-black/85" />
 
-        {/* Cinematic vignette — keeps focus on the singers + fire spine. */}
+        {/* Cinematic vignette — keeps focus on the singers + fire spine.
+            Bug #75 — the original (and the earlier "fix it only below
+            sm") radial darkened the corners enough that the four
+            corners visually read as faded / hollowed-out in Safari
+            (both iPhone and desktop). The cinematic feel comes from
+            the letterbox bands + cone glow + grain + sweep stack
+            already; the radial doesn't need to do the heavy lifting.
+            Dropped the responsive split and tuned to a much gentler
+            radial that works at every viewport. */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 z-20 bg-[radial-gradient(ellipse_at_center,transparent_45%,rgba(0,0,0,0.6)_100%)]"
+          className="pointer-events-none absolute inset-0 z-20 bg-[radial-gradient(ellipse_at_center,transparent_65%,rgba(0,0,0,0.2)_100%)]"
         />
 
         {/* Fine film grain — editorial polish. */}
@@ -363,7 +371,15 @@ function HeroComposite() {
               aria-hidden="true"
               className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500"
             />
-            <span className="truncate text-[10px] font-bold uppercase tracking-[0.3em] text-gray-200">
+            {/* Bug #71 — on iPhone widths the wide `tracking-[0.3em]`
+                stretched the label far enough that it could break at
+                the space in "Tonight's Battle", showing on two lines.
+                `whitespace-nowrap` keeps it on a single line; the
+                outer `truncate` still collapses an overlong battle
+                title into an ellipsis when there isn't room. The
+                tracking tightens slightly under `sm:` so the chip
+                doesn't crowd the chevron on tiny screens. */}
+            <span className="truncate whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.3em] text-gray-200">
               Tonight&apos;s Battle
               {liveBattle.title ? (
                 <>
@@ -381,9 +397,12 @@ function HeroComposite() {
           <div className="hero-enter hero-enter-delay-3 absolute bottom-[8%] left-1/2 z-40 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-yellow-500/40 bg-black/75 px-4 py-1.5 backdrop-blur">
             <span
               aria-hidden="true"
-              className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500"
+              className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500"
             />
-            <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-gray-200">
+            {/* Bug #71 — `whitespace-nowrap` keeps the label on a
+                single line on iPhone widths where the wide tracking
+                otherwise broke at the space. */}
+            <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.3em] text-gray-200">
               Tonight&apos;s Battle
             </span>
           </div>
@@ -1765,8 +1784,20 @@ function CrownAtRiskPanelView({
   return (
     <section id="crown-at-risk" className="bg-background py-12 md:py-20">
       <div className="max-w-7xl mx-auto px-4">
+        {/* Bug #79 — the `.personal-stake` panel pins a "FOR YOU" pill
+            at `top: 0.75rem; right: 0.75rem` via a `::before`. On
+            mobile the panel's `p-8` (2rem) padding doesn't leave the
+            heading row enough room — the uppercase tracking-widest
+            "Your Crown at Risk" text crowds the chip and the two
+            visually collide. Bumping the top padding only on the
+            personalised variant (and only below `md:`) drops the
+            heading underneath the chip with breathing room. */}
         <div
-          className={`gold-panel ${personalised ? 'personal-stake' : ''} relative overflow-hidden p-8 md:p-10`}
+          className={`gold-panel ${
+            personalised
+              ? 'personal-stake pt-14 md:pt-10'
+              : ''
+          } relative overflow-hidden p-8 md:p-10`}
         >
           <Image
             src={HERO_CROWN_AT_RISK.src}
@@ -2026,7 +2057,19 @@ function DethronedPanelView({
             aria-hidden="true"
             className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 via-transparent to-red-600/10 pointer-events-none"
           />
-          <div className="relative grid grid-cols-1 md:grid-cols-[1fr_auto] gap-8 items-center p-6 sm:p-8 md:p-10">
+          {/* Bug #79 — when `.personal-stake` is applied, its `::before`
+              "FOR YOU" pill is anchored at `top:0.75rem; right:0.75rem`.
+              The default `p-6` on mobile leaves the eyebrow + Won%
+              chip row crowding it. Bumping the top padding when
+              personalised gives the chip row breathing room beneath
+              the FOR YOU pill. */}
+          <div
+            className={`relative grid grid-cols-1 md:grid-cols-[1fr_auto] gap-8 items-center ${
+              personalised
+                ? 'p-6 pt-12 sm:p-8 sm:pt-12 md:p-10'
+                : 'p-6 sm:p-8 md:p-10'
+            }`}
+          >
             <div>
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-yellow-400/40 bg-black/60 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.3em] text-yellow-400">

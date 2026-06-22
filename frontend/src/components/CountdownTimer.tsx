@@ -79,7 +79,7 @@ export default function CountdownTimer({ endsAt, onExpired, size = 'large' }: Pr
         {parts.expired
           ? 'Closed'
           : parts.days > 0
-            ? `${parts.days}d ${pad(parts.hours)}:${pad(parts.minutes)}:${pad(parts.seconds)}`
+            ? `${parts.days}d : ${pad(parts.hours)}:${pad(parts.minutes)}:${pad(parts.seconds)}`
             : `${pad(parts.hours)}:${pad(parts.minutes)}:${pad(parts.seconds)}`}
       </span>
     );
