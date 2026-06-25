@@ -1427,21 +1427,31 @@ function StageCarousel() {
             </div>
           </div>
 
+          {/* Bug #87 — arrow buttons used `-left-4 lg:-left-16` (anchored
+              outside the carousel, off-viewport on phones) and
+              `opacity-0 group-hover:opacity-100` (hover-only, which
+              doesn't exist on touch devices). Mobile users had no way
+              to navigate the carousel.
+              On mobile: arrows sit INSIDE the carousel edge with a
+              solid backdrop so they're tappable against any artwork,
+              always visible.
+              On `lg:`: original behavior — outside the carousel,
+              fade in on hover. */}
           <button
             type="button"
             onClick={() => scroll('left')}
             aria-label="Scroll left"
-            className="absolute -left-4 lg:-left-16 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition text-white hover:text-red-600"
+            className="absolute left-2 lg:-left-16 top-1/2 -translate-y-1/2 z-10 flex h-10 w-10 lg:h-auto lg:w-auto items-center justify-center rounded-full bg-black/70 lg:bg-transparent backdrop-blur lg:backdrop-blur-none border border-white/20 lg:border-0 text-white hover:text-red-600 lg:opacity-0 lg:group-hover:opacity-100 transition"
           >
-            <ChevronLeft className="w-8 h-8" />
+            <ChevronLeft className="w-6 h-6 lg:w-8 lg:h-8" />
           </button>
           <button
             type="button"
             onClick={() => scroll('right')}
             aria-label="Scroll right"
-            className="absolute -right-4 lg:-right-16 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition text-white hover:text-red-600"
+            className="absolute right-2 lg:-right-16 top-1/2 -translate-y-1/2 z-10 flex h-10 w-10 lg:h-auto lg:w-auto items-center justify-center rounded-full bg-black/70 lg:bg-transparent backdrop-blur lg:backdrop-blur-none border border-white/20 lg:border-0 text-white hover:text-red-600 lg:opacity-0 lg:group-hover:opacity-100 transition"
           >
-            <ChevronRight className="w-8 h-8" />
+            <ChevronRight className="w-6 h-6 lg:w-8 lg:h-8" />
           </button>
         </div>
       </div>
