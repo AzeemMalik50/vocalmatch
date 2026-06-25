@@ -1339,7 +1339,12 @@ function StageCarousel() {
   const scroll = (dir: 'left' | 'right') => {
     const el = document.getElementById('stage-scroll');
     if (!el) return;
-    el.scrollBy({ left: dir === 'left' ? -340 : 340, behavior: 'smooth' });
+    // Bug #89 — was hard-coded 340px (one desktop card + gap). Now
+    // card width varies with viewport (full-vw on mobile, 320px on
+    // sm+), so use the scroller's own visible width as the step —
+    // mobile gets one card per click, desktop gets ~one screenful.
+    const step = el.clientWidth;
+    el.scrollBy({ left: dir === 'left' ? -step : step, behavior: 'smooth' });
   };
 
   return (
@@ -1401,10 +1406,28 @@ function StageCarousel() {
           </div>
         </div>
 
-        <div className="relative group">
+        {/* Bug #91 — arrows are real flex siblings of the carousel, NOT
+            absolute overlays. Three-column row: [left arrow] [scroller]
+            [right arrow]. The carousel sits in its own column with
+            `min-w-0` so the flex item can actually shrink (without
+            this, flex items refuse to shrink below their content's
+            intrinsic width and overflow-x-auto would never kick in).
+            Cards inside the scroller don't overlap or get covered by
+            the arrows — the arrows have their own dedicated zone in
+            the row layout. */}
+        <div className="flex items-stretch gap-2 sm:gap-3">
+          <button
+            type="button"
+            onClick={() => scroll('left')}
+            aria-label="Scroll left"
+            className="shrink-0 self-center flex h-10 w-10 items-center justify-center rounded-full bg-stage-900 border border-stage-700 text-white hover:text-red-500 hover:border-red-500/50 shadow-lg transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+
           <div
             id="stage-scroll"
-            className="overflow-x-auto scrollbar-hide scroll-smooth"
+            className="flex-1 min-w-0 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
             <div className="flex gap-6 pb-4">
@@ -1412,7 +1435,7 @@ function StageCarousel() {
                 Array.from({ length: 5 }).map((_, i) => (
                   <div
                     key={i}
-                    className="flex-shrink-0 w-80 aspect-[16/12] rounded-xl skeleton"
+                    className="flex-shrink-0 w-full sm:w-80 aspect-[16/12] rounded-xl skeleton snap-start"
                   />
                 ))
               ) : videos.length === 0 ? (
@@ -1427,31 +1450,13 @@ function StageCarousel() {
             </div>
           </div>
 
-          {/* Bug #87 — arrow buttons used `-left-4 lg:-left-16` (anchored
-              outside the carousel, off-viewport on phones) and
-              `opacity-0 group-hover:opacity-100` (hover-only, which
-              doesn't exist on touch devices). Mobile users had no way
-              to navigate the carousel.
-              On mobile: arrows sit INSIDE the carousel edge with a
-              solid backdrop so they're tappable against any artwork,
-              always visible.
-              On `lg:`: original behavior — outside the carousel,
-              fade in on hover. */}
-          <button
-            type="button"
-            onClick={() => scroll('left')}
-            aria-label="Scroll left"
-            className="absolute left-2 lg:-left-16 top-1/2 -translate-y-1/2 z-10 flex h-10 w-10 lg:h-auto lg:w-auto items-center justify-center rounded-full bg-black/70 lg:bg-transparent backdrop-blur lg:backdrop-blur-none border border-white/20 lg:border-0 text-white hover:text-red-600 lg:opacity-0 lg:group-hover:opacity-100 transition"
-          >
-            <ChevronLeft className="w-6 h-6 lg:w-8 lg:h-8" />
-          </button>
           <button
             type="button"
             onClick={() => scroll('right')}
             aria-label="Scroll right"
-            className="absolute right-2 lg:-right-16 top-1/2 -translate-y-1/2 z-10 flex h-10 w-10 lg:h-auto lg:w-auto items-center justify-center rounded-full bg-black/70 lg:bg-transparent backdrop-blur lg:backdrop-blur-none border border-white/20 lg:border-0 text-white hover:text-red-600 lg:opacity-0 lg:group-hover:opacity-100 transition"
+            className="shrink-0 self-center flex h-10 w-10 items-center justify-center rounded-full bg-stage-900 border border-stage-700 text-white hover:text-red-500 hover:border-red-500/50 shadow-lg transition-colors"
           >
-            <ChevronRight className="w-6 h-6 lg:w-8 lg:h-8" />
+            <ChevronRight className="w-5 h-5" />
           </button>
         </div>
       </div>
@@ -1465,7 +1470,14 @@ function StageCard({ video }: { video: VideoDto }) {
   return (
     <Link
       href={`/v/${video.id}`}
-      className="flex-shrink-0 w-80 group/card hover:scale-105 transition-transform"
+      // Bug #91 — `w-full` makes one card take 100% of the carousel
+      // scroller's visible width (the flex-1 column between the two
+      // arrow buttons), so exactly one card is visible per swipe
+      // on mobile. From `sm:` upward, fall back to the fixed 320px
+      // so multiple cards fit on wider screens. `snap-start` works
+      // with `snap-x snap-mandatory` on the scroller to land each
+      // swipe on a card edge.
+      className="flex-shrink-0 w-full sm:w-80 snap-start group/card hover:scale-105 transition-transform"
     >
       <div className="relative bg-card/50 backdrop-blur border border-border rounded-xl overflow-hidden hover:border-red-600 transition">
         <div className="aspect-video bg-gradient-to-br from-red-600/30 to-red-900/30 relative flex items-center justify-center overflow-hidden">
