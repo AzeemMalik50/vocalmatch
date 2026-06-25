@@ -2558,28 +2558,34 @@ function ShareCard({
     }
   };
 
-  const copyToClipboard = async () => {
+  // Track which "copy-only" channel was just clicked so the button can
+  // briefly show a "Copied!" overlay. Bug #93 — TikTok and Instagram
+  // buttons used to open the platform home page in a new tab AND copy
+  // to clipboard silently, which misled users into thinking a share
+  // had happened (the home page tab made the copy invisible). They
+  // are now pure clipboard actions with visible feedback.
+  const [copiedKey, setCopiedKey] = useState<'tiktok' | 'instagram' | 'link' | null>(null);
+
+  const copyToClipboard = async (key: 'tiktok' | 'instagram' | 'link' = 'link') => {
     if (typeof navigator === 'undefined' || !navigator.clipboard) return;
     try {
       await navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 2000);
     } catch {
       /* swallow */
     }
   };
 
   // Real, working share intents. Twitter / Facebook have stable URL
-  // schemes; TikTok and Instagram don't expose web share endpoints, so
-  // for those we copy the post to the clipboard first, then open the
-  // platform so the user can paste straight in. Mobile users get the
-  // native share sheet via the top "Share" button instead.
+  // schemes; TikTok and Instagram DO NOT expose web share endpoints,
+  // so those buttons are copy-only with visible feedback (see Bug #93).
   const facebookHref = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
     shareUrl,
   )}&quote=${encodeURIComponent(shareText)}`;
   const xHref = `https://twitter.com/intent/tweet?text=${encodeURIComponent(
     shareText,
   )}&url=${encodeURIComponent(shareUrl)}`;
-  const instagramHref = 'https://www.instagram.com/';
-  const tiktokHref = 'https://www.tiktok.com/';
 
   return (
     <div className="gold-panel relative flex flex-col bg-black/60 p-5 backdrop-blur overflow-hidden">
@@ -2616,26 +2622,68 @@ function ShareCard({
             aria-label="Share to a platform"
             className="grid grid-cols-5 gap-1.5 border-t border-yellow-500/15 pt-3"
           >
-            <a
-              href={tiktokHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Copy and open TikTok"
-              onClick={copyToClipboard}
-              className="flex items-center justify-center rounded-md bg-white/5 py-2 text-white transition hover:bg-white/10"
+            {/* TikTok — copy-only with a small `Copy` corner badge so
+                the action is visually unambiguous on every device
+                (mobile has no hover for the tooltip). The platform
+                has no public web share intent URL; pressing this
+                puts the share text + link on the clipboard so the
+                user can paste into their post composer. */}
+            <button
+              type="button"
+              onClick={() => copyToClipboard('tiktok')}
+              aria-label={
+                copiedKey === 'tiktok'
+                  ? 'Link copied for TikTok'
+                  : 'Copy link to paste into TikTok'
+              }
+              title="Copy link to paste into TikTok"
+              className="relative flex items-center justify-center rounded-md bg-white/5 py-2 text-white transition hover:bg-white/10"
             >
-              <TikTokGlyph className="h-3.5 w-3.5" />
-            </a>
-            <a
-              href={instagramHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Copy and open Instagram"
-              onClick={copyToClipboard}
-              className="flex items-center justify-center rounded-md bg-white/5 py-2 text-white transition hover:bg-white/10"
+              {copiedKey === 'tiktok' ? (
+                <span className="text-[9px] font-bold uppercase tracking-widest text-emerald-300">
+                  Copied
+                </span>
+              ) : (
+                <>
+                  <TikTokGlyph className="h-3.5 w-3.5" />
+                  <span
+                    aria-hidden="true"
+                    className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-stage-950 border border-yellow-500/50 text-yellow-300"
+                  >
+                    <Copy className="h-2 w-2" />
+                  </span>
+                </>
+              )}
+            </button>
+            {/* Instagram — same story as TikTok. No web share endpoint;
+                pure copy-to-clipboard with the same visual badge. */}
+            <button
+              type="button"
+              onClick={() => copyToClipboard('instagram')}
+              aria-label={
+                copiedKey === 'instagram'
+                  ? 'Link copied for Instagram'
+                  : 'Copy link to paste into Instagram'
+              }
+              title="Copy link to paste into Instagram"
+              className="relative flex items-center justify-center rounded-md bg-white/5 py-2 text-white transition hover:bg-white/10"
             >
-              <InstagramGlyph className="h-3.5 w-3.5" />
-            </a>
+              {copiedKey === 'instagram' ? (
+                <span className="text-[9px] font-bold uppercase tracking-widest text-emerald-300">
+                  Copied
+                </span>
+              ) : (
+                <>
+                  <InstagramGlyph className="h-3.5 w-3.5" />
+                  <span
+                    aria-hidden="true"
+                    className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-stage-950 border border-yellow-500/50 text-yellow-300"
+                  >
+                    <Copy className="h-2 w-2" />
+                  </span>
+                </>
+              )}
+            </button>
             <a
               href={xHref}
               target="_blank"
@@ -2656,11 +2704,20 @@ function ShareCard({
             </a>
             <button
               type="button"
-              onClick={copyToClipboard}
-              aria-label="Copy share link"
+              onClick={() => copyToClipboard('link')}
+              aria-label={
+                copiedKey === 'link' ? 'Link copied' : 'Copy share link'
+              }
+              title="Copy share link"
               className="flex items-center justify-center rounded-md bg-white/5 py-2 text-white transition hover:bg-white/10"
             >
-              <Copy className="h-3.5 w-3.5" />
+              {copiedKey === 'link' ? (
+                <span className="text-[9px] font-bold uppercase tracking-widest text-emerald-300">
+                  Copied
+                </span>
+              ) : (
+                <Copy className="h-3.5 w-3.5" />
+              )}
             </button>
           </div>
         </div>
