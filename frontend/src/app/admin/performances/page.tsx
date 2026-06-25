@@ -381,7 +381,35 @@ function PerformanceRow({
             warning rows (unlinked-legacy yellow, no-song red) draw
             the eye. */}
         <div className="mt-2">
-          {perf.song ? (
+          {/* Bug #98 — four states now (was three):
+              - linked + active   → emerald (healthy)
+              - linked + retired  → amber + explicit "Song retired —
+                please reassign" so admin treats it as a triage item
+              - legacy songTitle text but no song record → yellow
+              - no song at all   → red */}
+          {perf.song && perf.song.status === 'retired' ? (
+            <div className="flex flex-col gap-1 max-w-full">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/20 border border-amber-400/60 max-w-full">
+                <Music
+                  aria-hidden="true"
+                  className="w-3.5 h-3.5 text-amber-300 shrink-0"
+                />
+                <span className="text-sm font-bold text-amber-50 truncate">
+                  {perf.song.title}
+                </span>
+                <span className="text-xs font-semibold text-amber-100/85 truncate">
+                  · {perf.song.artist}
+                </span>
+                <span className="text-[10px] uppercase tracking-widest text-amber-100 font-bold shrink-0">
+                  · Retired
+                </span>
+              </span>
+              <p className="text-[11px] text-amber-200/90 leading-snug">
+                ⚠ This song has been retired. Please reassign this
+                performance to an active Centerstage Song.
+              </p>
+            </div>
+          ) : perf.song ? (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/15 border border-emerald-400/50 max-w-full">
               <Music
                 aria-hidden="true"
