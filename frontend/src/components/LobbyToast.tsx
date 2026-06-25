@@ -51,7 +51,20 @@ export default function LobbyToast() {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 flex flex-col items-end gap-2 pointer-events-none">
+    // Bug #85 — was `fixed bottom-4 right-4` at all widths. On iPhone
+    // the browser chrome (Safari address bar + tab bar) eats ~80px
+    // off the bottom, which pushed the toast almost off-screen, and
+    // its right-anchored full-width look read as "leaning right /
+    // not centered." Pin to top-center on mobile (where push-style
+    // toasts conventionally land, clear of browser chrome), keep the
+    // original bottom-right anchor from `sm:` upward.
+    <div
+      className="
+        fixed z-50 flex flex-col gap-2 pointer-events-none
+        top-4 left-1/2 -translate-x-1/2 items-center
+        sm:top-auto sm:bottom-6 sm:right-6 sm:left-auto sm:translate-x-0 sm:items-end
+      "
+    >
       {toasts.map((t) => (
         <div
           key={t.id}

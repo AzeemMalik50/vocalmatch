@@ -9,6 +9,7 @@ import { useConfirm } from '@/lib/confirm-context';
 import { useLobby } from '@/lib/useLobby';
 import {
   api,
+  BattleDto,
   BattleSummaryDto,
   BattleStatus,
   BATTLE_STATUS_LABELS,
@@ -436,24 +437,43 @@ function ResolveTieControl({
   onResolved: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  // Bug #86 — the previous version used `Promise.all` on both video
+  // fetches, so if either performance had been soft-deleted the
+  // 404 rejected the whole load and the "Loading…" placeholder
+  // spun forever (the render branch `if (!a || !b) return Loading…`
+  // never resolved). Track the BATTLE itself separately, use
+  // `Promise.allSettled` for the videos so one 404 doesn't sink
+  // the other, and key the loading state on a `loaded` flag rather
+  // than the (potentially-null) video shapes. The pick handler now
+  // sources its performance id from the battle row directly, so
+  // admin can still resolve a tie even when one side's video is
+  // gone — they're just picking the surviving performance.
+  const [battle, setBattle] = useState<BattleDto | null>(null);
   const [a, setA] = useState<VideoDto | null>(null);
   const [b, setB] = useState<VideoDto | null>(null);
+  const [loaded, setLoaded] = useState(false);
   const [picking, setPicking] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const expand = async () => {
     setOpen(true);
     setError(null);
+    setLoaded(false);
     try {
-      const battle = await api.getBattle(battleId);
-      const [pa, pb] = await Promise.all([
-        api.getVideo(battle.performanceAId),
-        api.getVideo(battle.performanceBId),
+      const b = await api.getBattle(battleId);
+      setBattle(b);
+      const [paRes, pbRes] = await Promise.allSettled([
+        api.getVideo(b.performanceAId),
+        api.getVideo(b.performanceBId),
       ]);
-      setA(pa);
-      setB(pb);
+      setA(paRes.status === 'fulfilled' ? paRes.value : null);
+      setB(pbRes.status === 'fulfilled' ? pbRes.value : null);
     } catch (e: any) {
+      // Battle lookup itself failed — surface it, but don't strand
+      // the UI in Loading… forever.
       setError(e.message || 'Could not load battle');
+    } finally {
+      setLoaded(true);
     }
   };
 
@@ -497,28 +517,56 @@ function ResolveTieControl({
     );
   }
 
-  if (!a || !b) {
+  if (!loaded) {
     return <span className="text-xs text-haze">Loading…</span>;
   }
+
+  // Battle itself failed to load — show the error + a way to retry/dismiss.
+  if (!battle) {
+    return (
+      <div className="flex flex-col gap-2 w-full">
+        <p className="text-xs text-red-400">
+          {error ?? 'Could not load battle.'}
+        </p>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="self-start px-3 py-1.5 text-xs font-bold rounded-md bg-stage-800 text-haze border border-stage-700"
+        >
+          Close
+        </button>
+      </div>
+    );
+  }
+
+  // For each side, label by uploader if the video loaded; fall back to a
+  // "Side X (deleted)" label when the video 404'd. Admin can still pick
+  // the surviving performance as winner.
+  const labelA = a?.uploader?.username
+    ? `@${a.uploader.username} wins`
+    : 'Side A (deleted) wins';
+  const labelB = b?.uploader?.username
+    ? `@${b.uploader.username} wins`
+    : 'Side B (deleted) wins';
 
   return (
     <div className="flex flex-col gap-2 w-full">
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          onClick={() => pick(a.id)}
+          onClick={() => pick(battle.performanceAId)}
           disabled={!!picking}
           className="px-3 py-1.5 text-xs font-bold rounded-md bg-spotlight text-white disabled:opacity-50"
         >
-          @{a.uploader?.username} wins
+          {labelA}
         </button>
         <button
           type="button"
-          onClick={() => pick(b.id)}
+          onClick={() => pick(battle.performanceBId)}
           disabled={!!picking}
           className="px-3 py-1.5 text-xs font-bold rounded-md bg-gold text-stage-950 disabled:opacity-50"
         >
-          @{b.uploader?.username} wins
+          {labelB}
         </button>
         <button
           type="button"
@@ -528,6 +576,12 @@ function ResolveTieControl({
           Cancel
         </button>
       </div>
+      {(!a || !b) && (
+        <p className="text-[11px] text-yellow-300">
+          One performance has been deleted; you can still pick a winner —
+          the surviving side will take the crown.
+        </p>
+      )}
       {error && <p className="text-xs text-red-400">{error}</p>}
     </div>
   );
