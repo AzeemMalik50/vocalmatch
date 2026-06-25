@@ -178,10 +178,23 @@ export class SongsService {
 
   /**
    * The "marquee" song for the homepage — the song whose defending champion
-   * has the longest active streak. Returns null when no active song has a
+   * is most impressive *right now*. Returns null when no active song has a
    * current champion (early-state platforms). Bundles champion user info +
    * risk score so the homepage CrownAtRiskPanel + ChampionSection can render
    * from a single request.
+   *
+   * Bug #81 — previously sorted on `currentChampionStreak DESC` (per-song
+   * only). A user with a 2-defense crown on one song could outrank a
+   * user on a 5-battle career win streak across multiple songs, which
+   * felt wrong: the platform-wide "Defending Champion" should celebrate
+   * the most-on-fire person, not the most-stubbornly-defended one song.
+   * New ranking, primary → tiebreak:
+   *   1. Champion's career `currentStreak` (joined from users) — the
+   *      user winning more consecutive battles overall ranks higher.
+   *   2. Per-song `currentChampionStreak` — among users with the same
+   *      career streak, prefer the song they've held longest.
+   *   3. Song id (deterministic tiebreak for a stable choice when both
+   *      streaks tie — avoids flickering between equal entries).
    */
   async getFeatured(): Promise<{
     song: Song;
@@ -191,10 +204,13 @@ export class SongsService {
   } | null> {
     const song = await this.songs
       .createQueryBuilder('s')
+      .leftJoin('users', 'u', 'u.id = s."currentChampionUserId"')
       .where('s.status = :status', { status: 'active' })
       .andWhere('s.currentChampionUserId IS NOT NULL')
       .andWhere('s.currentChampionStreak >= 1')
-      .orderBy('s.currentChampionStreak', 'DESC')
+      .orderBy('u."currentStreak"', 'DESC')
+      .addOrderBy('s.currentChampionStreak', 'DESC')
+      .addOrderBy('s.id', 'ASC')
       .getOne();
     if (!song) return null;
 

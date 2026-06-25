@@ -303,6 +303,35 @@ export interface PersonalDethronementDto extends DethronementDto {
   yourRole: 'former-champion' | 'voted-for-loser';
 }
 
+/**
+ * Bug #83 — winner of a battle that was promoted from a Red Phone
+ * challenge. Surfaces retentions + first crowns + dethronements that
+ * the standard Dethroned panel filters out. `outcome` discriminates:
+ *   - `taken`    → the winner took the crown from a different user;
+ *                  `formerChampion` is set.
+ *   - `retained` → the defending champion held off the challenger.
+ *   - `crowned`  → first-ever crown on the song.
+ */
+export interface RedPhoneWinnerDto {
+  battleId: string;
+  songId: string;
+  songTitle: string | null;
+  songArtist: string | null;
+  crownedAt: string | null;
+  winnerVotePercent: number;
+  outcome: 'taken' | 'retained' | 'crowned';
+  winner: {
+    userId: string;
+    username: string;
+    avatarUrl: string | null;
+  } | null;
+  formerChampion: {
+    userId: string;
+    username: string;
+    avatarUrl: string | null;
+  } | null;
+}
+
 export type BattleStatus =
   | 'live'
   | 'needs_decision'
@@ -377,6 +406,13 @@ export interface BattleSummaryDto {
   winnerPerformanceId: string | null;
   createdAt: string;
   closedAt: string | null;
+  /**
+   * True when this battle was promoted from a Red Phone challenge
+   * (some ChallengeSubmission row has `resultingBattleId = this.id`).
+   * Drives the "Red Phone" badge and the source filter on the
+   * admin battles list.
+   */
+  fromChallenge: boolean;
 }
 
 export interface AdminUserDto {
@@ -647,6 +683,8 @@ export const api = {
     request<FeaturedSongRiskDto | null>('/songs/featured/risk'),
   getRecentDethronements: (limit = 5) =>
     request<DethronementDto[]>(`/battles/dethronements/recent?limit=${limit}`),
+  getRecentRedPhoneWinners: (limit = 1) =>
+    request<RedPhoneWinnerDto[]>(`/battles/red-phone-winners?limit=${limit}`),
   getMyAtRiskCrowns: () =>
     request<AtRiskCrownDto[]>('/users/me/at-risk-crowns'),
   getMyRecentDethronements: () =>
@@ -664,6 +702,8 @@ export const api = {
     params: {
       status?: BattleStatus;
       songId?: string;
+      /** Filter by how the battle was created. See backend findAll for semantics. */
+      source?: 'challenge' | 'manual';
       limit?: number;
       offset?: number;
     } = {},
@@ -671,6 +711,7 @@ export const api = {
     const qs = new URLSearchParams();
     if (params.status) qs.set('status', params.status);
     if (params.songId) qs.set('songId', params.songId);
+    if (params.source) qs.set('source', params.source);
     if (params.limit != null) qs.set('limit', String(params.limit));
     if (params.offset != null) qs.set('offset', String(params.offset));
     const suffix = qs.toString() ? `?${qs}` : '';

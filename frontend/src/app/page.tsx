@@ -38,6 +38,7 @@ import {
   FeaturedSongRiskDto,
   GENRE_OPTIONS,
   PersonalDethronementDto,
+  RedPhoneWinnerDto,
   RiskLevel,
   SongDto,
   SongRisk,
@@ -93,6 +94,7 @@ export default function HomePage() {
       <Reveal><ChallengeFlow user={user} /></Reveal>
       <Reveal><ChampionSection /></Reveal>
       <Reveal><DethronedPanel /></Reveal>
+      <Reveal><RedPhoneWinnerPanel /></Reveal>
       <Reveal><HowItWorks /></Reveal>
       <Reveal><StageCarousel /></Reveal>
       <Reveal><WinnersCarousel /></Reveal>
@@ -1037,16 +1039,43 @@ function FlowStep({
 // ─── 4. Champion Section ─────────────────────────────────────────────
 
 function ChampionSection() {
+  const { user } = useAuth();
   const [featured, setFeatured] = useState<FeaturedSongRiskDto | null>(null);
+  const [personalised, setPersonalised] = useState(false);
 
+  // Bug #80 — historically this always called `getFeaturedRisk()`,
+  // which returns the marquee champion (the song with the longest
+  // current streak ANYWHERE on the platform). After a user won a
+  // battle they'd still see somebody else as "Defending Champion"
+  // because that other person's streak was still longer. Personalise
+  // the section: if the signed-in viewer is currently a champion of
+  // any song, surface their championship here. Falls back to the
+  // platform marquee for anonymous visitors and for users who
+  // aren't currently champions.
   const refetch = useCallback(async () => {
     try {
+      if (user) {
+        const mine = await api.getMyAtRiskCrowns().catch(() => []);
+        const ownCrowns = mine.filter((c) => c.mode === 'champion');
+        if (ownCrowns.length > 0) {
+          const top = ownCrowns[0];
+          setFeatured({
+            song: top.song,
+            champion: top.champion,
+            titleDefenses: top.titleDefenses,
+            risk: top.risk,
+          });
+          setPersonalised(true);
+          return;
+        }
+      }
       const f = await api.getFeaturedRisk();
       setFeatured(f);
+      setPersonalised(false);
     } catch {
       // Non-fatal
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     void refetch();
@@ -1096,7 +1125,7 @@ function ChampionSection() {
           <div className="space-y-6">
             <div>
               <p className="text-yellow-500 font-bold text-sm mb-2 uppercase tracking-widest">
-                Defending Champion
+                {personalised ? 'You are the Defending Champion' : 'Defending Champion'}
               </p>
               <div className="flex items-center gap-4 mb-2">
                 {champion?.avatarUrl && (
@@ -1115,9 +1144,26 @@ function ChampionSection() {
               <div className="flex items-center gap-2">
                 <Crown className="w-5 h-5 text-yellow-500" />
                 <p className="text-yellow-500 font-bold uppercase tracking-widest">
-                  Official Voice of the Song
+                  Official Voice of{' '}
+                  <span className="text-yellow-300">
+                    {song.title}
+                  </span>
                 </p>
               </div>
+              {/* Bug #81 — the section used to label the user as
+                  "Official Voice of the Song" without ever saying
+                  WHICH song. When the marquee champion (longest
+                  streak overall) is different from the freshest
+                  crown change shown in the Dethroned panel, viewers
+                  couldn't tell that the two are on different songs
+                  and assumed the data was wrong. Surface the song
+                  title (and artist when present) so the section is
+                  unambiguous about which crown it's celebrating. */}
+              {song.artist && (
+                <p className="text-xs text-haze/60 mt-1">
+                  by {song.artist}
+                </p>
+              )}
             </div>
 
             <p className="text-gray-300 text-lg">
@@ -2181,6 +2227,170 @@ function DethronedPanelView({
                 sizes="(max-width: 768px) 160px, 224px"
                 className="relative z-10 object-cover"
               />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── 10b. Red Phone winner panel ────────────────────────────────────
+//
+// Bug #83 — distinct from the Dethroned panel above: this surfaces the
+// most-recent winner of a Red-Phone-promoted battle regardless of
+// whether the crown changed hands. A successful defense by the
+// reigning champion against a challenger is shown here (the Dethroned
+// panel hides it because the crown didn't move). Falls silent when
+// there are no Red Phone battles yet.
+
+function RedPhoneWinnerPanel() {
+  const [winner, setWinner] = useState<RedPhoneWinnerDto | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  const refetch = useCallback(async () => {
+    try {
+      const items = await api.getRecentRedPhoneWinners(1);
+      setWinner(items[0] ?? null);
+    } catch {
+      setWinner(null);
+    } finally {
+      setLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refetch();
+  }, [refetch]);
+
+  // Auto-refresh on any battle lifecycle event so the panel keeps
+  // current as new Red Phone battles close.
+  useLobby((e) => {
+    if (e.change === 'closed') void refetch();
+  });
+
+  if (!loaded || !winner) return null;
+
+  const when = winner.crownedAt ? formatRelativeTime(winner.crownedAt) : null;
+  const outcomeLabel =
+    winner.outcome === 'taken'
+      ? 'Took the crown'
+      : winner.outcome === 'retained'
+        ? 'Defended the crown'
+        : 'First crown';
+  const headline =
+    winner.outcome === 'taken'
+      ? `${winner.winner?.username ? '@' + winner.winner.username : 'A new voice'} just won a Red Phone battle.`
+      : winner.outcome === 'retained'
+        ? `${winner.winner?.username ? '@' + winner.winner.username : 'The defender'} held off a Red Phone challenge.`
+        : `${winner.winner?.username ? '@' + winner.winner.username : 'A new voice'} just claimed a Red Phone song.`;
+
+  return (
+    <section id="red-phone-winner" className="bg-background py-12 md:py-20">
+      <div className="max-w-7xl mx-auto px-4">
+        <div className="relative overflow-hidden rounded-2xl border border-red-500/40 bg-gradient-to-br from-red-950/40 via-stage-900/60 to-stage-950/60 backdrop-blur">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-red-600/25 blur-3xl"
+          />
+          <div className="relative grid grid-cols-1 md:grid-cols-[1fr_auto] gap-6 md:gap-8 items-center p-6 sm:p-8 md:p-10">
+            <div>
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-red-400/50 bg-black/60 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.3em] text-red-300">
+                  📞 Red Phone
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-red-400/40 bg-black/50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.3em] text-red-200/80">
+                  {outcomeLabel}
+                </span>
+                {when && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.3em] text-gray-300">
+                    {when}
+                  </span>
+                )}
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-red-400/40 bg-black/60 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.3em] text-red-200 tabular-nums">
+                  Won {winner.winnerVotePercent}%
+                </span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-2 text-balance">
+                {headline}
+              </h2>
+              {winner.songTitle && (
+                <p className="text-gray-300 mb-6">
+                  on{' '}
+                  <span className="text-red-300 font-bold">
+                    {winner.songTitle}
+                  </span>
+                  {winner.songArtist && (
+                    <span className="text-gray-400"> · {winner.songArtist}</span>
+                  )}
+                </p>
+              )}
+              <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+                {winner.winner && (
+                  <Link
+                    href={`/u/${winner.winner.username}`}
+                    className="inline-flex items-center gap-2 hover:opacity-90"
+                  >
+                    {winner.winner.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={winner.winner.avatarUrl}
+                        alt=""
+                        className="h-10 w-10 rounded-full object-cover border-2 border-red-400/50"
+                      />
+                    ) : (
+                      <div className="h-10 w-10 rounded-full bg-stage-800 border-2 border-red-400/50 flex items-center justify-center font-bold text-haze">
+                        {winner.winner.username[0]?.toUpperCase() ?? '?'}
+                      </div>
+                    )}
+                    <div className="leading-tight">
+                      <p className="text-xs uppercase tracking-widest text-red-200/70 font-bold">
+                        Winner
+                      </p>
+                      <p className="text-base font-bold text-white">
+                        @{winner.winner.username}
+                      </p>
+                    </div>
+                  </Link>
+                )}
+                {winner.formerChampion && (
+                  <>
+                    <span aria-hidden="true" className="hidden sm:inline text-haze">
+                      →
+                    </span>
+                    <div className="inline-flex items-center gap-2 opacity-70">
+                      {winner.formerChampion.avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={winner.formerChampion.avatarUrl}
+                          alt=""
+                          className="h-9 w-9 rounded-full object-cover border border-stage-700 grayscale"
+                        />
+                      ) : (
+                        <div className="h-9 w-9 rounded-full bg-stage-800 border border-stage-700 flex items-center justify-center font-bold text-haze">
+                          {winner.formerChampion.username[0]?.toUpperCase() ?? '?'}
+                        </div>
+                      )}
+                      <div className="leading-tight">
+                        <p className="text-xs uppercase tracking-widest text-haze/60 font-bold">
+                          Former
+                        </p>
+                        <p className="text-sm text-haze line-through">
+                          @{winner.formerChampion.username}
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href={`/battle/${winner.battleId}`}
+                  className="inline-flex items-center gap-2 px-5 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-md transition-colors"
+                >
+                  ▶ Watch the battle
+                </Link>
+              </div>
             </div>
           </div>
         </div>

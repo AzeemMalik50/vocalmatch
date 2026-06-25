@@ -16,6 +16,12 @@ import {
 } from '@/lib/api';
 
 type FilterStatus = BattleStatus | 'all';
+/**
+ * Bug #82 — separate filter axis for "where did this battle come from?"
+ * Independent of the status filter so admin can ask things like "show
+ * me all completed Red Phone battles" or "show me live manual ones."
+ */
+type SourceFilter = 'all' | 'challenge' | 'manual';
 
 const FILTERS: { value: FilterStatus; label: string }[] = [
   { value: 'live', label: 'Live' },
@@ -23,6 +29,12 @@ const FILTERS: { value: FilterStatus; label: string }[] = [
   { value: 'completed', label: 'Completed' },
   { value: 'cancelled', label: 'Cancelled' },
   { value: 'all', label: 'All' },
+];
+
+const SOURCE_FILTERS: { value: SourceFilter; label: string }[] = [
+  { value: 'all', label: 'Any source' },
+  { value: 'challenge', label: '📞 Red Phone' },
+  { value: 'manual', label: 'Manual' },
 ];
 
 const PAGE_SIZE = 20;
@@ -53,6 +65,7 @@ function AdminBattlesPageInner() {
   const [filter, setFilter] = useState<FilterStatus>(
     focusId ? 'needs_decision' : 'live',
   );
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
   const [items, setItems] = useState<BattleSummaryDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -92,11 +105,12 @@ function AdminBattlesPageInner() {
     }
   }, [focusId, loading, items]);
 
-  const load = async (status: FilterStatus) => {
+  const load = async (status: FilterStatus, source: SourceFilter) => {
     setLoading(true);
     try {
       const resp = await api.listBattles({
         status: status === 'all' ? undefined : status,
+        source: source === 'all' ? undefined : source,
         limit: PAGE_SIZE,
         offset: 0,
       });
@@ -114,6 +128,7 @@ function AdminBattlesPageInner() {
     try {
       const resp = await api.listBattles({
         status: filter === 'all' ? undefined : filter,
+        source: sourceFilter === 'all' ? undefined : sourceFilter,
         limit: PAGE_SIZE,
         offset: nextOffset,
       });
@@ -126,13 +141,14 @@ function AdminBattlesPageInner() {
   };
 
   useEffect(() => {
-    load(filter);
-  }, [filter]);
+    load(filter, sourceFilter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, sourceFilter]);
 
   // Real-time refresh — any battle lifecycle (create / cancel / close /
   // tie) re-fetches the current filter view so the list never goes stale.
   useLobby(() => {
-    void load(filter);
+    void load(filter, sourceFilter);
   });
 
   const handleClose = async (id: string) => {
@@ -145,7 +161,7 @@ function AdminBattlesPageInner() {
     setWorking(id);
     try {
       await api.closeBattle(id);
-      await load(filter);
+      await load(filter, sourceFilter);
     } finally {
       setWorking(null);
     }
@@ -164,7 +180,7 @@ function AdminBattlesPageInner() {
     setWorking(id);
     try {
       await api.cancelBattle(id);
-      await load(filter);
+      await load(filter, sourceFilter);
     } finally {
       setWorking(null);
     }
@@ -186,7 +202,7 @@ function AdminBattlesPageInner() {
       </div>
 
       {/* Filter pills */}
-      <div className="flex flex-wrap gap-2 mb-6">
+      <div className="flex flex-wrap gap-2 mb-3">
         {FILTERS.map((f) => (
           <button
             key={f.value}
@@ -195,6 +211,29 @@ function AdminBattlesPageInner() {
             className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-colors ${
               filter === f.value
                 ? 'bg-spotlight text-white'
+                : 'bg-stage-900 border border-stage-700 text-haze hover:text-white'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Source filter — second axis. Combines with the status filter
+          above, so e.g. (Completed) × (Red Phone) shows completed
+          Red-Phone-promoted battles only. */}
+      <div className="flex flex-wrap items-center gap-2 mb-6">
+        <span className="text-[10px] uppercase tracking-widest font-bold text-haze/60 mr-1">
+          Source:
+        </span>
+        {SOURCE_FILTERS.map((f) => (
+          <button
+            key={f.value}
+            type="button"
+            onClick={() => setSourceFilter(f.value)}
+            className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+              sourceFilter === f.value
+                ? 'bg-yellow-500/25 text-yellow-100 border border-yellow-300/60'
                 : 'bg-stage-900 border border-stage-700 text-haze hover:text-white'
             }`}
           >
@@ -230,7 +269,7 @@ function AdminBattlesPageInner() {
                     busy={working === b.id}
                     onClose={() => handleClose(b.id)}
                     onCancel={() => handleCancel(b.id)}
-                    onResolved={() => load(filter)}
+                    onResolved={() => load(filter, sourceFilter)}
                   />
                 </li>
               );
@@ -281,8 +320,20 @@ function BattleRow({
       />
       <div className="relative z-0 flex flex-wrap items-start justify-between gap-3 pointer-events-none">
         <div className="min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <StatusBadge status={battle.status} />
+            {/* Bug #82 — visual marker so admin can scan-spot which
+                battles originated from a Red Phone challenge promotion
+                vs. a direct admin create. Pairs with the source filter
+                above. */}
+            {battle.fromChallenge && (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] uppercase tracking-widest font-bold rounded border bg-yellow-500/15 text-yellow-200 border-yellow-400/40"
+                title="Promoted from a Red Phone challenge"
+              >
+                📞 Red Phone
+              </span>
+            )}
             <span className="text-xs text-haze tabular-nums">
               {new Date(battle.createdAt).toLocaleDateString()}
             </span>

@@ -110,15 +110,42 @@ export class UserStakesService {
   async findMyRecentDethronements(
     userId: string,
   ): Promise<PersonalDethronementDto[]> {
-    // Champion mode: dethronements where the *previous* winner was the caller.
+    // Champion mode: dethronements where the *previous* winner was the
+    // caller. We pull a wider window than we'll return so the "newer
+    // win supersedes older loss" filter below can compare against
+    // everything in the user's recent activity.
     const championLosses = await this.battlesService.findRecentDethronements(
-      3,
+      20,
       ({ previous, current }) =>
         previous.winnerUserId === userId && current.winnerUserId !== userId,
     );
 
-    if (championLosses.length > 0) {
-      return championLosses.map((d) => ({
+    // Bug #80 — `findRecentDethronements` correctly returns the most
+    // recent crown change per song (Bug #52 fix). But on the user's
+    // personal feed, an old "Your reign just ended" panel from
+    // (e.g.) song A still showed even after the user had since won
+    // a new battle on song B days later — the dethronement on A is
+    // technically still the latest transition on A, but emotionally
+    // it's stale next to a fresher win. Look up the user's most
+    // recent crown-taking across ALL songs and suppress any
+    // dethronement older than it; the freshest event wins.
+    const recentTakings = await this.battlesService.findRecentDethronements(
+      20,
+      ({ current }) => current.winnerUserId === userId,
+    );
+    const mostRecentWinAt = recentTakings.length
+      ? recentTakings[0].dethronedAt.getTime()
+      : null;
+
+    const fresh =
+      mostRecentWinAt === null
+        ? championLosses
+        : championLosses.filter(
+            (d) => d.dethronedAt.getTime() > mostRecentWinAt,
+          );
+
+    if (fresh.length > 0) {
+      return fresh.slice(0, 3).map((d) => ({
         ...d,
         mode: 'champion' as const,
         yourRole: 'former-champion' as const,

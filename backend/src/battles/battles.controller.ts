@@ -47,11 +47,13 @@ export class BattlesController {
   })
   @ApiQuery({ name: 'status', required: false, enum: ['scheduled', 'live', 'needs_admin_decision', 'completed', 'cancelled'] })
   @ApiQuery({ name: 'songId', required: false, type: String })
+  @ApiQuery({ name: 'source', required: false, enum: ['challenge', 'manual'], description: 'Filter by how the battle was created: `challenge` = promoted from a Red Phone submission; `manual` = admin-created without a linked challenge.' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'offset', required: false, type: Number })
   async list(
     @Query('status') status?: BattleStatus,
     @Query('songId') songId?: string,
+    @Query('source') source?: 'challenge' | 'manual',
     @Query('limit') limitRaw?: string,
     @Query('offset') offsetRaw?: string,
   ) {
@@ -60,6 +62,7 @@ export class BattlesController {
     const { items, hasMore, nextOffset } = await this.battles.findAll({
       status,
       songId,
+      source,
       limit,
       offset,
     });
@@ -67,7 +70,7 @@ export class BattlesController {
     // data (title, status, songId), not vote counts. The detail endpoint is
     // where the per-user vote-percentage gate matters.
     return {
-      items: items.map((b) => ({
+      items: items.map(({ battle: b, fromChallenge }) => ({
         id: b.id,
         songId: b.songId,
         title: b.title,
@@ -79,6 +82,7 @@ export class BattlesController {
         createdAt: b.createdAt,
         closedAt: b.closedAt,
         winnerPerformanceId: b.winnerPerformanceId,
+        fromChallenge,
       })),
       hasMore,
       nextOffset,
@@ -95,6 +99,18 @@ export class BattlesController {
   async dethronements(@Query('limit') limitRaw?: string) {
     const limit = limitRaw ? parseInt(limitRaw, 10) || 5 : 5;
     return this.battles.findRecentDethronements(Math.min(limit, 50));
+  }
+
+  @Get('red-phone-winners')
+  @ApiOperation({
+    summary: 'Recent Red Phone challenge winners',
+    description:
+      'Most-recent completed battles that originated from a Red Phone challenge submission, regardless of whether the winner retained or took the crown. Each item bundles the song, the winner (username + avatarUrl), the crowning timestamp, the winner vote-percentage, and an `outcome` discriminator ("taken" | "retained" | "crowned"). For "taken" outcomes the previous champion is included as `formerChampion`. Used by the homepage "Red Phone winner" panel.',
+  })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async redPhoneWinners(@Query('limit') limitRaw?: string) {
+    const limit = limitRaw ? parseInt(limitRaw, 10) || 5 : 5;
+    return this.battles.findRecentChallengeWinners(Math.min(limit, 20));
   }
 
   @Get(':id')
