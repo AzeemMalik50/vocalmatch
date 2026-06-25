@@ -18,6 +18,26 @@
   appearance: textfield;
 }
 
+/* Bug #94 — native `<select>` dropdowns (e.g. The Stage filters on the
+   homepage: Newest / Voice Type / Genre) rendered with the OS's
+   default LIGHT-mode option panel even though the rest of the app is
+   dark-themed. The `colorScheme: dark` on <html> is supposed to
+   propagate to native form controls, but Tailwind's preflight (which
+   resets `appearance` on selects) and various browsers don't always
+   honor the inheritance. Re-asserting `color-scheme: dark` directly
+   on selects and their options tells the browser to render the
+   dropdown PANEL in dark mode; we additionally set explicit
+   background + color on options because Chrome desktop honors those
+   on the popup once color-scheme is dark. */
+select,
+select option {
+  color-scheme: dark;
+}
+select option {
+  background-color: rgb(15 15 18); /* stage-950 */
+  color: rgb(244 244 245); /* near-white */
+}
+
 :root {
   /* Phase 3 typography stack — cinematic + premium.
      - display: Bebas Neue (condensed sans, hero + section headlines)

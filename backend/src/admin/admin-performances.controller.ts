@@ -177,6 +177,13 @@ export class AdminPerformancesController {
                 id: songMap.get(v.songId)!.id,
                 title: songMap.get(v.songId)!.title,
                 artist: songMap.get(v.songId)!.artist,
+                // Bug #98 — expose the song's lifecycle status so the
+                // admin list can distinguish a performance linked to
+                // a RETIRED song from one linked to an active song.
+                // Without this the row's emerald "song linked"
+                // chip implied the link was healthy even when the
+                // underlying song had been retired in the catalog.
+                status: songMap.get(v.songId)!.status,
               }
             : null
           : null,
