@@ -230,9 +230,12 @@ describe('UserStakesService', () => {
 
     it('voter fallback: returns dethronements where caller voted for the loser', async () => {
       const userId = 'me';
-      // First call (with predicate, champion mode) returns none
+      // First call (with predicate, champion-loss lookup) returns none
       battlesService.findRecentDethronements.mockResolvedValueOnce([]);
-      // Second call (no predicate, fallback fetch) returns one
+      // Second call (with predicate, "recent-takings" supersede check
+      // added in Bug #80) returns none too
+      battlesService.findRecentDethronements.mockResolvedValueOnce([]);
+      // Third call (no predicate, voter fallback fetch) returns one
       battlesService.findRecentDethronements.mockResolvedValueOnce([
         {
           battleId: 'b-9',
@@ -259,10 +262,60 @@ describe('UserStakesService', () => {
     });
 
     it('returns [] when user has neither champion losses nor losing votes', async () => {
+      // 1: championLosses lookup, 2: recent-takings (Bug #80) check,
+      // 3: voter fallback lookup. All empty.
+      battlesService.findRecentDethronements.mockResolvedValueOnce([]);
       battlesService.findRecentDethronements.mockResolvedValueOnce([]);
       battlesService.findRecentDethronements.mockResolvedValueOnce([]);
       voteRepo.find.mockResolvedValue([]);
       const out = await service.findMyRecentDethronements('me');
+      expect(out).toEqual([]);
+    });
+
+    it('Bug #80: suppresses a champion-loss superseded by a newer win on another song', async () => {
+      // User lost song A 4 days ago, then won song B today. The
+      // championLosses lookup returns the song-A dethronement. The
+      // recent-takings lookup returns the song-B win. Because the
+      // song-B win is newer, the song-A dethronement should be
+      // suppressed and the panel should fall through to the voter
+      // path (which also returns empty here, so the final result is []).
+      const userId = 'me';
+      const fourDaysAgo = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000);
+      const today = new Date();
+      battlesService.findRecentDethronements.mockResolvedValueOnce([
+        {
+          battleId: 'b-old-loss',
+          songId: 's-A',
+          songTitle: 'Alpha b',
+          songArtist: 'A',
+          dethronedAt: fourDaysAgo,
+          winnerVotePercent: 55,
+          winnerPerformanceId: 'perf-new',
+          loserPerformanceId: 'perf-old',
+          newChampion: { userId: 'rival', username: 'rival', avatarUrl: null },
+          formerChampion: { userId, username: 'me', avatarUrl: null },
+        },
+      ]);
+      battlesService.findRecentDethronements.mockResolvedValueOnce([
+        {
+          battleId: 'b-fresh-win',
+          songId: 's-B',
+          songTitle: 'Sing with me',
+          songArtist: 'B',
+          dethronedAt: today,
+          winnerVotePercent: 60,
+          winnerPerformanceId: 'perf-mine',
+          loserPerformanceId: 'perf-theirs',
+          newChampion: { userId, username: 'me', avatarUrl: null },
+          formerChampion: { userId: 'rival', username: 'rival', avatarUrl: null },
+        },
+      ]);
+      // Voter fallback returns nothing → final result is [].
+      battlesService.findRecentDethronements.mockResolvedValueOnce([]);
+      voteRepo.find.mockResolvedValue([]);
+
+      const out = await service.findMyRecentDethronements(userId);
+
       expect(out).toEqual([]);
     });
   });

@@ -203,6 +203,19 @@ export class BattlesService {
   async findAll(opts: {
     status?: BattleStatus;
     songId?: string;
+    /**
+     * Bug #82 — filter by how the battle was created:
+     *   - `'challenge'` → only battles promoted from a Red Phone
+     *     submission (i.e. some ChallengeSubmission row has
+     *     `resultingBattleId = battle.id`)
+     *   - `'manual'`    → only battles admin created directly
+     *     (no linked challenge)
+     *   - undefined     → no filter, return all
+     * Each returned item also carries a `fromChallenge: boolean`
+     * flag so the admin list UI can render a "Red Phone" pill on
+     * the affected rows without a per-row lookup.
+     */
+    source?: 'challenge' | 'manual';
     limit?: number;
     offset?: number;
   } = {}) {
@@ -216,11 +229,37 @@ export class BattlesService {
       .skip(offset);
     if (opts.status) qb.andWhere('b.status = :status', { status: opts.status });
     if (opts.songId) qb.andWhere('b.songId = :songId', { songId: opts.songId });
+    if (opts.source === 'challenge') {
+      qb.andWhere(
+        'EXISTS (SELECT 1 FROM challenge_submissions cs WHERE cs."resultingBattleId" = b.id)',
+      );
+    } else if (opts.source === 'manual') {
+      qb.andWhere(
+        'NOT EXISTS (SELECT 1 FROM challenge_submissions cs WHERE cs."resultingBattleId" = b.id)',
+      );
+    }
     const rows = await qb.getMany();
     const hasMore = rows.length > limit;
     const items = hasMore ? rows.slice(0, limit) : rows;
+
+    // Batch-fetch the set of challenge-linked battle ids for this page
+    // so each row can be tagged without N+1 queries.
+    const fromChallengeIds = new Set<string>();
+    if (items.length > 0) {
+      const ids = items.map((b) => b.id);
+      const linkedSubs = await this.challengeSubmissions
+        .createQueryBuilder('cs')
+        .select('cs."resultingBattleId"', 'battleId')
+        .where('cs."resultingBattleId" IN (:...ids)', { ids })
+        .getRawMany<{ battleId: string }>();
+      for (const r of linkedSubs) fromChallengeIds.add(r.battleId);
+    }
+
     return {
-      items,
+      items: items.map((b) => ({
+        battle: b,
+        fromChallenge: fromChallengeIds.has(b.id),
+      })),
       hasMore,
       nextOffset: hasMore ? offset + limit : null,
     };
@@ -807,6 +846,123 @@ export class BattlesService {
               avatarUrl: formerChamp.avatarUrl,
             }
           : null,
+      };
+    });
+  }
+
+  /**
+   * Bug #83 — the Dethroned panel only surfaces actual crown changes
+   * (current.winnerUserId !== previous.winnerUserId), which is correct
+   * for "DETHRONED!" copy but hides the case where a Red Phone
+   * challenger battle ends in a champion RETENTION (the defending
+   * champion successfully held off the challenger). The homepage
+   * should still celebrate that — it's a Red Phone moment.
+   *
+   * Returns the most-recent completed battles that were promoted from
+   * a Red Phone challenge submission, regardless of whether the
+   * winner is new or retained. Joins challenge_submissions to enforce
+   * "originated from a challenge."
+   */
+  async findRecentChallengeWinners(limit: number) {
+    const battles = await this.battles
+      .createQueryBuilder('b')
+      .innerJoin('challenge_submissions', 'cs', 'cs."resultingBattleId" = b.id')
+      .where('b.status = :status', { status: 'completed' })
+      .andWhere('b.winnerUserId IS NOT NULL')
+      .orderBy('b.closedAt', 'DESC')
+      .take(Math.min(Math.max(limit, 1), 20))
+      .getMany();
+
+    if (battles.length === 0) return [];
+
+    // Detect retention vs new-crown per battle in one shot: pull the
+    // immediately-preceding completed battle on each song.
+    const songIds = Array.from(new Set(battles.map((b) => b.songId)));
+    const previousBySong = new Map<string, Battle>();
+    const allRecent = await this.battles.find({
+      where: { status: 'completed', songId: In(songIds) },
+      order: { closedAt: 'DESC' },
+    });
+    const grouped = new Map<string, Battle[]>();
+    for (const b of allRecent) {
+      const arr = grouped.get(b.songId) ?? [];
+      arr.push(b);
+      grouped.set(b.songId, arr);
+    }
+    // For each battle we care about, find the entry immediately after
+    // it (in DESC order) on the same song — that's the previous winner.
+    for (const target of battles) {
+      const songBattles = grouped.get(target.songId) ?? [];
+      const idx = songBattles.findIndex((b) => b.id === target.id);
+      const prev = idx >= 0 ? songBattles[idx + 1] : undefined;
+      if (prev) previousBySong.set(target.id, prev);
+    }
+
+    const userIds = new Set<string>();
+    for (const b of battles) {
+      if (b.winnerUserId) userIds.add(b.winnerUserId);
+      const prev = previousBySong.get(b.id);
+      if (prev?.winnerUserId) userIds.add(prev.winnerUserId);
+    }
+    const [users, songs] = await Promise.all([
+      this.users.find({ where: { id: In([...userIds]) } }),
+      Promise.all(
+        songIds.map((id) => this.songs.findOne(id).catch(() => null)),
+      ),
+    ]);
+    const userMap = new Map(users.map((u) => [u.id, u]));
+    const songMap = new Map(
+      songs
+        .filter((s): s is NonNullable<typeof s> => !!s)
+        .map((s) => [s.id, s]),
+    );
+
+    return battles.map((b) => {
+      const winner = b.winnerUserId ? userMap.get(b.winnerUserId) : undefined;
+      const prev = previousBySong.get(b.id);
+      const challenger =
+        prev?.winnerUserId && prev.winnerUserId !== b.winnerUserId
+          ? userMap.get(prev.winnerUserId)
+          : undefined;
+      const song = songMap.get(b.songId);
+      const total = b.voteCountA + b.voteCountB;
+      const winnerVotes =
+        b.winnerPerformanceId === b.performanceAId
+          ? b.voteCountA
+          : b.voteCountB;
+      const winnerVotePercent =
+        total === 0 ? 0 : Math.round((winnerVotes / total) * 100);
+      const outcome: 'retained' | 'taken' | 'crowned' =
+        !prev || !prev.winnerUserId
+          ? 'crowned' // first crown on the song
+          : prev.winnerUserId === b.winnerUserId
+            ? 'retained'
+            : 'taken';
+      return {
+        battleId: b.id,
+        songId: b.songId,
+        songTitle: song?.title ?? null,
+        songArtist: song?.artist ?? null,
+        crownedAt: b.closedAt,
+        winnerVotePercent,
+        outcome,
+        winner: winner
+          ? {
+              userId: winner.id,
+              username: winner.username,
+              avatarUrl: winner.avatarUrl,
+            }
+          : null,
+        // Only set when the crown actually changed hands (outcome='taken').
+        // For retentions there's no "former" — same person held it.
+        formerChampion:
+          outcome === 'taken' && challenger
+            ? {
+                userId: challenger.id,
+                username: challenger.username,
+                avatarUrl: challenger.avatarUrl,
+              }
+            : null,
       };
     });
   }
