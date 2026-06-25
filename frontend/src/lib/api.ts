@@ -482,7 +482,14 @@ export interface AdminPerformanceDto {
   title: string;
   songTitle: string | null;
   songId: string | null;
-  song: { id: string; title: string; artist: string } | null;
+  song: {
+    id: string;
+    title: string;
+    artist: string;
+    /** Bug #98 — present so the admin list can mark performances linked
+     *  to retired songs differently from active links. */
+    status: 'active' | 'retired';
+  } | null;
   thumbnailUrl: string | null;
   category: 'solo' | 'battle_entry' | 'challenge_entry';
   visibility: 'public' | 'unlisted' | 'private';

@@ -108,6 +108,11 @@ export default function AdminPerformancesPage() {
                         id: s.id,
                         title: s.title,
                         artist: s.artist,
+                        // Bug #98 — carry `status` through the
+                        // optimistic patch so the row's chip can
+                        // immediately show the new active /
+                        // retired state after a reassign.
+                        status: s.status,
                       }))[0] ?? null
                   : null,
               }
