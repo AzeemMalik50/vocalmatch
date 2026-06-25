@@ -5,6 +5,7 @@ import { AuthProvider } from '@/lib/auth-context';
 import { ThemeProvider } from '@/lib/theme-context';
 import { ConfirmProvider } from '@/lib/confirm-context';
 import ScrollResetOnReload from '@/components/ScrollResetOnReload';
+import ScrollResetOnNavigate from '@/components/ScrollResetOnNavigate';
 import SuppressExtensionErrors from '@/components/SuppressExtensionErrors';
 
 const SITE_URL =
@@ -95,6 +96,7 @@ export default function RootLayout({
       <body className="vm-force-dark stage-bg vignette min-h-screen">
         <SuppressExtensionErrors />
         <ScrollResetOnReload />
+        <ScrollResetOnNavigate />
         <ThemeProvider>
           <AuthProvider>
             <ConfirmProvider>{children}</ConfirmProvider>
