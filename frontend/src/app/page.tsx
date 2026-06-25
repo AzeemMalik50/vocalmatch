@@ -1867,32 +1867,40 @@ function CrownAtRiskPanelView({
               <p className="text-gray-400 text-sm uppercase tracking-widest mb-6">
                 {subtitle}
               </p>
-              <div className="flex items-center gap-6 mb-4">
+              {/* Bug #84 — was `flex items-center gap-6` with no
+                  wrap, so on iPhone the three stat blocks (with
+                  text-4xl values) couldn't fit on one line and the
+                  rightmost got clipped past the panel edge. Switched
+                  to `flex-wrap` with column gap separate from row
+                  gap, shrunk the value font below `sm:`, and hid the
+                  `·` separators on mobile (they don't make sense
+                  once the items wrap to a new line). */}
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-4 mb-4">
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">
                     Crown Risk
                   </p>
-                  <p className={`text-4xl font-black ${tone.text}`}>
+                  <p className={`text-3xl sm:text-4xl font-black ${tone.text}`}>
                     {risk.riskLevel}
                   </p>
                 </div>
-                <div className="text-gray-500 text-3xl" aria-hidden="true">·</div>
+                <div className="hidden sm:block text-gray-500 text-3xl" aria-hidden="true">·</div>
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">
                     Pending Challengers
                   </p>
-                  <p className="text-4xl font-black text-white tabular-nums">
+                  <p className="text-3xl sm:text-4xl font-black text-white tabular-nums">
                     {risk.pendingChallengers}
                   </p>
                 </div>
                 {risk.lastBattleMarginPercent !== null && (
                   <>
-                    <div className="text-gray-500 text-3xl" aria-hidden="true">·</div>
+                    <div className="hidden sm:block text-gray-500 text-3xl" aria-hidden="true">·</div>
                     <div>
                       <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">
                         Last Margin
                       </p>
-                      <p className="text-4xl font-black text-white tabular-nums">
+                      <p className="text-3xl sm:text-4xl font-black text-white tabular-nums">
                         {risk.lastBattleMarginPercent}%
                       </p>
                     </div>
