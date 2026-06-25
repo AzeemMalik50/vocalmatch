@@ -29,6 +29,7 @@ import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import LobbyToast from '@/components/LobbyToast';
 import CountdownTimer from '@/components/CountdownTimer';
+import DarkSelect from '@/components/DarkSelect';
 import {
   api,
   AtRiskCrownDto,
@@ -1366,42 +1367,43 @@ function StageCarousel() {
               placeholder="Search title, song, or @username"
               className="flex-1 bg-muted/50 border border-border rounded-lg px-4 py-3 text-foreground placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-red-600"
             />
+            {/* Bug #95 — were native <select>s; Safari ignored the
+                `color-scheme: dark` rule on the OS-rendered option
+                panel, so the dropdown stayed light on macOS / iOS.
+                Replaced with `DarkSelect` whose panel we control
+                directly. Same one-pick semantics, consistent dark
+                styling on every browser. */}
             <div className="flex gap-2 flex-wrap">
-              <select
+              <DarkSelect
                 value={sort}
-                onChange={(e) => setSort(e.target.value as VideoSort)}
-                className="bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-red-600"
-              >
-                {Object.entries(SORT_LABELS).map(([v, label]) => (
-                  <option key={v} value={v}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-              <select
+                onChange={(v) => setSort(v as VideoSort)}
+                options={Object.entries(SORT_LABELS).map(([v, label]) => ({
+                  value: v,
+                  label,
+                }))}
+                ariaLabel="Sort performances"
+              />
+              <DarkSelect
                 value={voiceType}
-                onChange={(e) => setVoiceType(e.target.value as VoiceType | '')}
-                className="bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-red-600"
-              >
-                <option value="">All Voice Types</option>
-                {Object.entries(VOICE_TYPE_LABELS).map(([v, label]) => (
-                  <option key={v} value={v}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-              <select
+                onChange={(v) => setVoiceType(v as VoiceType | '')}
+                options={[
+                  { value: '', label: 'All Voice Types' },
+                  ...Object.entries(VOICE_TYPE_LABELS).map(([v, label]) => ({
+                    value: v,
+                    label,
+                  })),
+                ]}
+                ariaLabel="Filter by voice type"
+              />
+              <DarkSelect
                 value={genre}
-                onChange={(e) => setGenre(e.target.value)}
-                className="bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-red-600"
-              >
-                <option value="">All Genres</option>
-                {GENRE_OPTIONS.map((g) => (
-                  <option key={g} value={g}>
-                    {g}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => setGenre(v)}
+                options={[
+                  { value: '', label: 'All Genres' },
+                  ...GENRE_OPTIONS.map((g) => ({ value: g, label: g })),
+                ]}
+                ariaLabel="Filter by genre"
+              />
             </div>
           </div>
         </div>
