@@ -66,22 +66,33 @@ export default function LobbyToast() {
       "
     >
       {toasts.map((t) => (
+        // Bug #101 — was `rounded-full` (only looks right when content
+        // fits one line) + `items-center` (off-centers the icon
+        // when text wraps to multiple lines). On iPhone widths the
+        // text "A new battle just opened — vote now" wraps to 2-3
+        // lines, which made the pill look unbalanced. Switched to
+        // `rounded-2xl` (handles wrapping cleanly), `items-start`
+        // (icon stays aligned with the first line), and tightened
+        // padding + line-height for a more balanced shape.
         <div
           key={t.id}
-          className="pointer-events-auto bg-stage-900/95 backdrop-blur border border-spotlight/40 rounded-full px-4 py-2.5 shadow-2xl flex items-center gap-2 max-w-[calc(100vw-2rem)] animate-[slideUp_0.25s_ease-out]"
+          className="pointer-events-auto bg-stage-900/95 backdrop-blur border border-spotlight/40 rounded-2xl px-3.5 py-2.5 shadow-2xl flex items-start gap-2.5 max-w-[calc(100vw-2rem)] sm:max-w-sm animate-[slideUp_0.25s_ease-out]"
         >
-          <span className="text-base" aria-hidden="true">
+          <span
+            className="text-base leading-none mt-0.5 shrink-0"
+            aria-hidden="true"
+          >
             {t.icon}
           </span>
           {t.href ? (
             <Link
               href={t.href}
-              className="text-sm font-bold hover:text-spotlight transition-colors"
+              className="text-sm font-semibold leading-snug hover:text-spotlight transition-colors"
             >
               {t.text}
             </Link>
           ) : (
-            <span className="text-sm font-bold">{t.text}</span>
+            <span className="text-sm font-semibold leading-snug">{t.text}</span>
           )}
         </div>
       ))}

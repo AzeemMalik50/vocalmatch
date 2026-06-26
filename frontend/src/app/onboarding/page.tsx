@@ -165,14 +165,17 @@ export default function OnboardingPage() {
             hint="Helps the Main Stage match you with comparable performers."
             optional
           >
+            {/* Bug #99 — the shared `<Select>` component already injects a
+                disabled placeholder `<option>` when the `placeholder`
+                prop is set. Passing an explicit `{ value: '', label:
+                'Select your range' }` in `options` rendered the same
+                line twice in the dropdown. Drop the explicit entry —
+                placeholder alone covers it. */}
             <Select
               value={voiceType}
               onChange={(v) => setVoiceType(v as VoiceType)}
               placeholder="Select your range"
-              options={[
-                { value: '', label: 'Select your range' },
-                ...VOICE_OPTIONS,
-              ]}
+              options={VOICE_OPTIONS}
             />
           </Field>
 
