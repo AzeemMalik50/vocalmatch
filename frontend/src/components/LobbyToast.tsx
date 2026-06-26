@@ -58,25 +58,29 @@ export default function LobbyToast() {
     // not centered." Pin to top-center on mobile (where push-style
     // toasts conventionally land, clear of browser chrome), keep the
     // original bottom-right anchor from `sm:` upward.
+    // Bug #102 — was `left-1/2 -translate-x-1/2 items-center`, which
+    // sized the container to the toast's content width (so the
+    // toast hugged its text on mobile and never spanned the
+    // viewport). Switch to `inset-x-4` (edge-to-edge with 1rem
+    // gutters) + `items-stretch` so toasts fill the available
+    // mobile width. Desktop layout (bottom-right, content-width)
+    // restored from `sm:` upward.
     <div
       className="
         fixed z-50 flex flex-col gap-2 pointer-events-none
-        top-4 left-1/2 -translate-x-1/2 items-center
-        sm:top-auto sm:bottom-6 sm:right-6 sm:left-auto sm:translate-x-0 sm:items-end
+        top-4 inset-x-4 items-stretch
+        sm:top-auto sm:bottom-6 sm:right-6 sm:left-auto sm:inset-x-auto sm:items-end
       "
     >
       {toasts.map((t) => (
-        // Bug #101 — was `rounded-full` (only looks right when content
-        // fits one line) + `items-center` (off-centers the icon
-        // when text wraps to multiple lines). On iPhone widths the
-        // text "A new battle just opened — vote now" wraps to 2-3
-        // lines, which made the pill look unbalanced. Switched to
-        // `rounded-2xl` (handles wrapping cleanly), `items-start`
-        // (icon stays aligned with the first line), and tightened
-        // padding + line-height for a more balanced shape.
+        // Rounded-2xl (handles wrapping cleanly), items-start (icon
+        // stays aligned with the first line), tightened padding +
+        // line-height. `w-full` makes each toast fill the mobile
+        // container; `sm:w-auto sm:max-w-sm` reverts to content
+        // width capped at `max-w-sm` on desktop.
         <div
           key={t.id}
-          className="pointer-events-auto bg-stage-900/95 backdrop-blur border border-spotlight/40 rounded-2xl px-3.5 py-2.5 shadow-2xl flex items-start gap-2.5 max-w-[calc(100vw-2rem)] sm:max-w-sm animate-[slideUp_0.25s_ease-out]"
+          className="pointer-events-auto bg-stage-900/95 backdrop-blur border border-spotlight/40 rounded-2xl px-3.5 py-2.5 shadow-2xl flex items-start gap-2.5 w-full sm:w-auto sm:max-w-sm animate-[slideUp_0.25s_ease-out]"
         >
           <span
             className="text-base leading-none mt-0.5 shrink-0"
