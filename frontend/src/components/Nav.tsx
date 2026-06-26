@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import Logo from './Logo';
 import NotificationBell from './NotificationBell';
@@ -10,6 +10,8 @@ import NotificationBell from './NotificationBell';
 export default function Nav() {
   const { user, logout, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  const isHome = pathname === '/';
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -37,7 +39,7 @@ export default function Nav() {
     <header className="sticky top-0 z-30 border-b border-stage-700/60 backdrop-blur-md bg-stage-950/80">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
         <Link href="/" className="hover:opacity-90 transition-opacity shrink-0">
-          <Logo />
+          <Logo size={isHome ? 'lg' : 'md'} />
         </Link>
 
         <nav className="flex items-center gap-1.5 sm:gap-3 text-sm shrink-0">
