@@ -23,6 +23,8 @@ import { Battle } from './battles/battle.entity';
 import { Vote } from './battles/vote.entity';
 import { ChallengeSubmission } from './battles/challenge-submission.entity';
 import { Notification } from './notifications/notification.entity';
+import { LegalPage } from './legal/legal-page.entity';
+import { LegalPageVersion } from './legal/legal-page-version.entity';
 
 const entities = [
   User,
@@ -33,6 +35,8 @@ const entities = [
   Vote,
   ChallengeSubmission,
   Notification,
+  LegalPage,
+  LegalPageVersion,
 ];
 
 @Module({
