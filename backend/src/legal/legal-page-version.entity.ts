@@ -7,6 +7,8 @@ import {
   Unique,
 } from 'typeorm';
 
+// Versions are immutable history rows — no @UpdateDateColumn by design.
+// Edits create a new version, never mutate an old one.
 @Entity('legal_page_versions')
 @Unique('uq_legal_page_versions_page_version', ['pageId', 'versionNumber'])
 export class LegalPageVersion {

@@ -148,6 +148,50 @@ export const GENRE_OPTIONS = [
   'Acoustic',
 ];
 
+// ─── Legal DTOs ─────────────────────────────────────────────────────
+
+export interface LegalPageSummaryDto {
+  slug: string;
+  title: string;
+}
+
+export interface PublicLegalPageDto {
+  slug: string;
+  title: string;
+  bodyMarkdown: string;
+  versionNumber: number;
+  publishedAt: string;
+}
+
+export interface LegalVersionMetaDto {
+  versionNumber: number;
+  publishedAt: string;
+  publishedById: string | null;
+}
+
+export interface AdminLegalPageListItemDto {
+  id: string;
+  slug: string;
+  title: string;
+  currentVersion: LegalVersionMetaDto | null;
+  updatedAt: string;
+}
+
+export interface AdminLegalPageDto {
+  id: string;
+  slug: string;
+  title: string;
+  currentVersion:
+    | (LegalVersionMetaDto & { id: string; bodyMarkdown: string })
+    | null;
+  history: (LegalVersionMetaDto & { id: string })[];
+}
+
+export interface AdminLegalUpdateDto {
+  title: string;
+  bodyMarkdown: string;
+}
+
 export type VideoVisibility = 'public' | 'unlisted' | 'private';
 export type VideoSort = 'newest' | 'most_viewed' | 'trending';
 
@@ -861,4 +905,32 @@ export const api = {
     request<{ ok: true }>(`/notifications/${id}/read`, { method: 'PATCH' }),
   markAllNotificationsRead: () =>
     request<{ ok: true }>('/notifications/read-all', { method: 'PATCH' }),
+
+  // ─── Legal pages (public) ────────────────────────────────────────
+  listLegalPages: () => request<LegalPageSummaryDto[]>('/legal/pages'),
+  getLegalPage: (slug: string) =>
+    request<PublicLegalPageDto>(`/legal/pages/${encodeURIComponent(slug)}`),
+
+  // ─── Legal pages (admin) ─────────────────────────────────────────
+  adminListLegalPages: () =>
+    request<AdminLegalPageListItemDto[]>('/admin/legal/pages'),
+  adminGetLegalPage: (slug: string) =>
+    request<AdminLegalPageDto>(
+      `/admin/legal/pages/${encodeURIComponent(slug)}`,
+    ),
+  adminGetLegalVersion: (slug: string, versionNumber: number) =>
+    request<LegalVersionMetaDto & { id: string; bodyMarkdown: string }>(
+      `/admin/legal/pages/${encodeURIComponent(slug)}/versions/${versionNumber}`,
+    ),
+  adminUpdateLegalPage: (slug: string, body: AdminLegalUpdateDto) =>
+    request<{
+      id: string;
+      versionNumber: number;
+      bodyMarkdown: string;
+      publishedAt: string;
+      publishedById: string | null;
+    }>(`/admin/legal/pages/${encodeURIComponent(slug)}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
 };

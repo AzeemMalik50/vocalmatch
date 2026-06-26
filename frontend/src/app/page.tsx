@@ -26,7 +26,6 @@ import {
   Zap,
 } from 'lucide-react';
 import Nav from '@/components/Nav';
-import Footer from '@/components/Footer';
 import LobbyToast from '@/components/LobbyToast';
 import CountdownTimer from '@/components/CountdownTimer';
 import DarkSelect from '@/components/DarkSelect';
@@ -101,7 +100,6 @@ export default function HomePage() {
       <Reveal><WinnersCarousel /></Reveal>
       <Reveal><ShareCardsRow /></Reveal>
       <Reveal><CTAFooter user={user} /></Reveal>
-      <Footer />
       {/* Floating real-time toast — pops in for ~4s whenever the lobby SSE
           pushes a battle lifecycle event (created / closed / cancelled /
           tied). Anonymous-friendly. */}

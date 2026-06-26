@@ -13,7 +13,7 @@ export class LegalPage {
   id: string;
 
   @Index({ unique: true })
-  @Column()
+  @Column({ length: 64 })
   slug: string;
 
   @Column({ length: 200 })

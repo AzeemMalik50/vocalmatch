@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
-import Footer from '@/components/Footer';
 import { Spinner, SkeletonBlock } from '@/components/Loaders';
 import { VideoDto, api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
@@ -221,8 +220,6 @@ export default function VideoDetailPage() {
           </>
         )}
       </main>
-
-      <Footer />
     </>
   );
 }

@@ -4,7 +4,6 @@ import { ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Nav from './Nav';
-import Footer from './Footer';
 import { StageLoader } from './Loaders';
 import { useAuth } from '@/lib/auth-context';
 
@@ -20,6 +19,7 @@ const TABS: { href: string; label: string }[] = [
   { href: '/admin/songs', label: 'Songs' },
   { href: '/admin/performances', label: 'Performances' },
   { href: '/admin/users', label: 'People' },
+  { href: '/admin/legal', label: 'Legal' },
 ];
 
 /**
@@ -53,7 +53,6 @@ export default function AdminShell({ children }: Props) {
         <main className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
           <StageLoader message="Checking admin access…" />
         </main>
-        <Footer />
       </>
     );
   }
@@ -90,7 +89,6 @@ export default function AdminShell({ children }: Props) {
         </div>
       </div>
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">{children}</main>
-      <Footer />
     </>
   );
 }

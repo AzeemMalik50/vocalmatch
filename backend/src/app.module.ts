@@ -13,6 +13,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { AdminModule } from './admin/admin.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { StatsModule } from './stats/stats.module';
+import { LegalModule } from './legal/legal.module';
 
 // ─── Entities (registered with TypeORM at the root) ───────────────
 import { User } from './users/user.entity';
@@ -75,6 +76,7 @@ const entities = [
     NotificationsModule,
     RealtimeModule,
     StatsModule,
+    LegalModule,
   ],
 })
 export class AppModule {}

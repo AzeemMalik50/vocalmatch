@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import Nav from '@/components/Nav';
-import Footer from '@/components/Footer';
 import CountdownTimer from '@/components/CountdownTimer';
 import BattleVotePanel from '@/components/BattleVotePanel';
 import { BattlePageSkeleton, PerformancePaneSkeleton, StageLoader } from '@/components/Loaders';
@@ -204,7 +203,6 @@ export default function BattlePage() {
             Back to the stage
           </Link>
         </main>
-        <Footer />
       </>
     );
   }
@@ -216,7 +214,6 @@ export default function BattlePage() {
         <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 md:py-12">
           <BattlePageSkeleton />
         </main>
-        <Footer />
       </>
     );
   }
@@ -380,7 +377,6 @@ export default function BattlePage() {
           </Link>
         </div>
       </main>
-      <Footer />
     </>
   );
 }
