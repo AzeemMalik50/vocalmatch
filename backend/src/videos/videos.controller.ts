@@ -3,7 +3,6 @@ import {
   Body,
   Controller,
   Delete,
-  FileTypeValidator,
   Get,
   MaxFileSizeValidator,
   Param,
@@ -41,9 +40,17 @@ import { VideosService, VideoSort } from './videos.service';
 import { VideoCategory, VideoVisibility } from './video.entity';
 import { BattlesService } from '../battles/battles.service';
 import { LegalService } from '../legal/legal.service';
+import { assertMagicMime } from '../common/magic-mime.validator';
+import { sanitizeFilename } from '../common/sanitize-filename';
 
 const SORTS: VideoSort[] = ['newest', 'most_viewed', 'trending'];
 const VISIBILITIES: VideoVisibility[] = ['public', 'unlisted', 'private'];
+
+const VIDEO_MIME_ALLOWLIST = [
+  'video/mp4',
+  'video/quicktime',
+  'video/webm',
+] as const;
 
 class CreateVideoDto {
   @IsString() @MinLength(1) @MaxLength(120)
@@ -207,13 +214,14 @@ export class VideosController {
       new ParseFilePipe({
         validators: [
           new MaxFileSizeValidator({ maxSize: 100 * 1024 * 1024 }),
-          new FileTypeValidator({ fileType: /video\/.*/ }),
         ],
       }),
     )
     file: Express.Multer.File,
   ) {
     if (!file) throw new BadRequestException('No file uploaded');
+    await assertMagicMime(file.buffer, VIDEO_MIME_ALLOWLIST);
+    file.originalname = sanitizeFilename(file.originalname);
     const versions = await this.legal.getCurrentVersionIds(['terms']);
     const tags = (dto.tags ?? '')
       .split(',')
