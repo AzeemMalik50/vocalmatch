@@ -36,6 +36,7 @@ import {
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Throttle } from '@nestjs/throttler';
 import { VideosService, VideoSort } from './videos.service';
 import { VideoCategory, VideoVisibility } from './video.entity';
 import { BattlesService } from '../battles/battles.service';
@@ -172,6 +173,7 @@ export class VideosController {
     };
   }
 
+  @Throttle({ short: { limit: 5, ttl: 60_000 } })
   @Post()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('bearer')

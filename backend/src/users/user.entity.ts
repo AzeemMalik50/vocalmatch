@@ -116,4 +116,13 @@ export class User {
 
   @Column({ type: 'timestamptz', nullable: true })
   legalAcceptedAt: Date | null;
+
+  // ─── Brute-force lockout (B1) ──────────────────────────────────
+  // Incremented on every failed login. Reset to 0 on a successful
+  // login. When it reaches 5, lockoutUntil is set to now + 15 min.
+  @Column({ default: 0 })
+  failedLoginCount: number;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  lockoutUntil: Date | null;
 }

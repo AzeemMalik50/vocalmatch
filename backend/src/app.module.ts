@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
 // ─── Domain modules ───────────────────────────────────────────────
 import { AuthModule } from './auth/auth.module';
@@ -44,6 +46,11 @@ const entities = [
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(), // enables @Cron in BattlesScheduler
+    ThrottlerModule.forRoot([
+      { name: 'short',  ttl: 1_000,     limit: 10 },
+      { name: 'medium', ttl: 60_000,    limit: 100 },
+      { name: 'long',   ttl: 3_600_000, limit: 1000 },
+    ]),
     TypeOrmModule.forRoot(
       process.env.DATABASE_URL
         ? {
@@ -77,6 +84,9 @@ const entities = [
     RealtimeModule,
     StatsModule,
     LegalModule,
+  ],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule {}

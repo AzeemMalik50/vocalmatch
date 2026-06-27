@@ -2,8 +2,10 @@ import {
   Body,
   Controller,
   Get,
+  NotFoundException,
   Param,
   Patch,
+  Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -19,6 +21,7 @@ import { IsBoolean, IsOptional } from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from './admin.guard';
 import { User } from '../users/user.entity';
+import { SkipThrottle } from '@nestjs/throttler';
 
 class UpdateUserFlagsDto {
   @IsOptional() @IsBoolean()
@@ -34,6 +37,7 @@ class UpdateUserFlagsDto {
  */
 @ApiTags('Admin – Users')
 @ApiBearerAuth('bearer')
+@SkipThrottle()
 @Controller('admin/users')
 @UseGuards(JwtAuthGuard, AdminGuard)
 export class AdminController {
@@ -108,6 +112,26 @@ export class AdminController {
       id: user.id,
       isAdmin: user.isAdmin,
       isSongwriter: user.isSongwriter,
+    };
+  }
+
+  @Post(':id/unlock')
+  @ApiOperation({
+    summary: 'Admin — clear brute-force lockout for a user',
+    description:
+      'Resets failedLoginCount to 0 and clears lockoutUntil. ' +
+      'Allows the user to log in immediately.',
+  })
+  async unlock(@Param('id') id: string) {
+    const user = await this.users.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('User not found');
+    user.failedLoginCount = 0;
+    user.lockoutUntil = null;
+    await this.users.save(user);
+    return {
+      unlocked: true,
+      userId: user.id,
+      at: new Date().toISOString(),
     };
   }
 }

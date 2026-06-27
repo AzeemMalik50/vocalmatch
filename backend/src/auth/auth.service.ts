@@ -5,6 +5,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { LockedException } from './locked.exception';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -83,8 +84,32 @@ export class AuthService {
       })
       .getOne();
     if (!user) throw new UnauthorizedException('Invalid credentials');
+
+    // Check lockout BEFORE bcrypt — don't leak whether the password is
+    // correct via a slow vs fast response. Throws 423.
+    if (user.lockoutUntil && user.lockoutUntil > new Date()) {
+      throw new LockedException(
+        `Account locked until ${user.lockoutUntil.toISOString()}. Try again later.`,
+      );
+    }
+
     const ok = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!ok) throw new UnauthorizedException('Invalid credentials');
+    if (!ok) {
+      user.failedLoginCount = (user.failedLoginCount ?? 0) + 1;
+      if (user.failedLoginCount >= 5) {
+        user.lockoutUntil = new Date(Date.now() + 15 * 60_000);
+      }
+      await this.users.save(user);
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Success — reset both fields if they're nonzero / set.
+    if (user.failedLoginCount > 0 || user.lockoutUntil !== null) {
+      user.failedLoginCount = 0;
+      user.lockoutUntil = null;
+      await this.users.save(user);
+    }
+
     return this.tokenize(user);
   }
 

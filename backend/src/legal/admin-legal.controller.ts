@@ -16,6 +16,7 @@ import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from '../admin/admin.guard';
 import { LegalService } from './legal.service';
+import { SkipThrottle } from '@nestjs/throttler';
 
 const MAX_BODY = 50 * 1024;
 
@@ -35,6 +36,7 @@ export class UpdateLegalPageDto {
 
 @ApiTags('Admin – Legal')
 @ApiBearerAuth('bearer')
+@SkipThrottle()
 @Controller('admin/legal')
 @UseGuards(JwtAuthGuard, AdminGuard)
 export class AdminLegalController {

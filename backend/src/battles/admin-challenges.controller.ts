@@ -26,6 +26,7 @@ import {
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from '../admin/admin.guard';
 import { ChallengesService } from './challenges.service';
+import { SkipThrottle } from '@nestjs/throttler';
 import { ChallengeStatus } from './challenge-submission.entity';
 
 class CreateBattleFromChallengeDto {
@@ -58,6 +59,7 @@ class CreateBattleFromChallengeDto {
  */
 @ApiTags('Admin – Challenges')
 @ApiBearerAuth('bearer')
+@SkipThrottle()
 @Controller()
 @UseGuards(JwtAuthGuard, AdminGuard)
 export class AdminChallengesController {

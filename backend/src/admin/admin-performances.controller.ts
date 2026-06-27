@@ -21,6 +21,7 @@ import { IsOptional, IsUUID } from 'class-validator';
 import { In, IsNull, Repository } from 'typeorm';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from './admin.guard';
+import { SkipThrottle } from '@nestjs/throttler';
 import { Video } from '../videos/video.entity';
 import { User } from '../users/user.entity';
 import { Song } from '../songs/song.entity';
@@ -39,6 +40,7 @@ class AssignSongDto {
  */
 @ApiTags('Admin – Performances')
 @ApiBearerAuth('bearer')
+@SkipThrottle()
 @Controller('admin/performances')
 @UseGuards(JwtAuthGuard, AdminGuard)
 export class AdminPerformancesController {

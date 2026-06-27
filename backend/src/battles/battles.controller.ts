@@ -19,6 +19,7 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from '../admin/admin.guard';
+import { Throttle } from '@nestjs/throttler';
 import { BattlesService } from './battles.service';
 import { BattleStatus } from './battle.entity';
 import { User } from '../users/user.entity';
@@ -154,6 +155,7 @@ export class BattlesController {
 
   // ─── Voting ─────────────────────────────────────────────────────
 
+  @Throttle({ short: { limit: 30, ttl: 60_000 } })
   @Post(':id/vote')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('bearer')

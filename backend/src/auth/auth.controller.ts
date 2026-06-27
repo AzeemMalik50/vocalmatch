@@ -23,12 +23,17 @@ import {
   SignupDto,
 } from './auth.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
+  @Throttle({
+    short: { limit: 1, ttl: 10_000 },
+    long: { limit: 10, ttl: 3_600_000 },
+  })
   @Post('signup')
   @ApiOperation({
     summary: 'Create a new account',
@@ -42,6 +47,7 @@ export class AuthController {
     return this.auth.signup(dto);
   }
 
+  @Throttle({ short: { limit: 5, ttl: 60_000 } })
   @Post('login')
   @HttpCode(200)
   @ApiOperation({
@@ -56,6 +62,7 @@ export class AuthController {
     return this.auth.login(dto);
   }
 
+  @Throttle({ short: { limit: 3, ttl: 60_000 } })
   @Patch('email')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('bearer')
@@ -67,6 +74,7 @@ export class AuthController {
     return this.auth.changeEmail(req.user.userId, dto);
   }
 
+  @Throttle({ short: { limit: 3, ttl: 60_000 } })
   @Patch('password')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('bearer')
