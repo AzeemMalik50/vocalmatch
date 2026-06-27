@@ -20,6 +20,7 @@ const TABS: { href: string; label: string }[] = [
   { href: '/admin/performances', label: 'Performances' },
   { href: '/admin/users', label: 'People' },
   { href: '/admin/legal', label: 'Legal' },
+  { href: '/admin/audit', label: 'Audit' },
 ];
 
 /**

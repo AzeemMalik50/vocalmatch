@@ -4,6 +4,7 @@ import { LegalService } from './legal.service';
 import { validate } from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from '../admin/admin.guard';
+import { AdminAuditInterceptor } from '../admin/admin-audit.interceptor';
 
 describe('AdminLegalController', () => {
   let controller: AdminLegalController;
@@ -24,6 +25,8 @@ describe('AdminLegalController', () => {
       .useValue({ canActivate: () => true })
       .overrideGuard(AdminGuard)
       .useValue({ canActivate: () => true })
+      .overrideInterceptor(AdminAuditInterceptor)
+      .useValue({ intercept: (_ctx: any, next: any) => next.handle() })
       .compile();
     controller = moduleRef.get(AdminLegalController);
   });

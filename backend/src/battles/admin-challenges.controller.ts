@@ -7,7 +7,10 @@ import {
   Query,
   Req,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { AdminAuditInterceptor } from '../admin/admin-audit.interceptor';
+import { AuditAction } from '../admin/audit-action.decorator';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -60,6 +63,7 @@ class CreateBattleFromChallengeDto {
 @ApiTags('Admin – Challenges')
 @ApiBearerAuth('bearer')
 @SkipThrottle()
+@UseInterceptors(AdminAuditInterceptor)
 @Controller()
 @UseGuards(JwtAuthGuard, AdminGuard)
 export class AdminChallengesController {
@@ -100,6 +104,7 @@ export class AdminChallengesController {
     return { items: enriched, hasMore, nextOffset };
   }
 
+  @AuditAction('challenge.select', { targetType: 'challenge' })
   @Post('admin/challenges/:id/select')
   @ApiOperation({
     summary: 'Admin — select a challenger',
@@ -111,6 +116,7 @@ export class AdminChallengesController {
     return this.challenges.toAdminPublic(row);
   }
 
+  @AuditAction('challenge.reject', { targetType: 'challenge' })
   @Post('admin/challenges/:id/reject')
   @ApiOperation({
     summary: 'Admin — reject a challenger',
@@ -122,11 +128,12 @@ export class AdminChallengesController {
     return this.challenges.toAdminPublic(row);
   }
 
+  @AuditAction('battle.promote_from_challenge', { targetType: 'challenge' })
   @Post('admin/battles/from-challenge/:id')
   @ApiOperation({
     summary: 'Admin — promote a selected challenge into a live battle',
     description:
-      'Creates a new battle pairing the song’s current champion performance (side A) against the challenger’s performance (side B). Goes through the normal battles pipeline so same-song / different-uploader / one-live-per-song invariants still apply.',
+      "Creates a new battle pairing the song's current champion performance (side A) against the challenger's performance (side B). Goes through the normal battles pipeline so same-song / different-uploader / one-live-per-song invariants still apply.",
   })
   async createBattle(
     @Req() req: any,

@@ -6,6 +6,8 @@ import { Song } from '../songs/song.entity';
 import { Vote } from '../battles/vote.entity';
 import { Battle } from '../battles/battle.entity';
 import { AdminGuard } from './admin.guard';
+import { AdminAuditLog } from './admin-audit-log.entity';
+import { AdminAuditInterceptor } from './admin-audit.interceptor';
 import { AdminController } from './admin.controller';
 import { AdminPerformancesController } from './admin-performances.controller';
 import { AuthModule } from '../auth/auth.module';
@@ -17,9 +19,9 @@ import { AuthModule } from '../auth/auth.module';
  *   - AdminPerformancesController hosts /admin/performances (list, assign song, soft-delete)
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Video, Song, Vote, Battle]), forwardRef(() => AuthModule)],
+  imports: [TypeOrmModule.forFeature([User, Video, Song, Vote, Battle, AdminAuditLog]), forwardRef(() => AuthModule)],
   controllers: [AdminController, AdminPerformancesController],
-  providers: [AdminGuard],
-  exports: [AdminGuard, TypeOrmModule],
+  providers: [AdminGuard, AdminAuditInterceptor],
+  exports: [AdminGuard, AdminAuditInterceptor, TypeOrmModule],
 })
 export class AdminModule {}

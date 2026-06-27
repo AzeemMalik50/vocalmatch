@@ -192,6 +192,23 @@ export interface AdminLegalUpdateDto {
   bodyMarkdown: string;
 }
 
+export interface AdminAuditLogEntryDto {
+  id: string;
+  at: string;
+  adminUserId: string;
+  adminUsername: string | null;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  payloadSnapshot: Record<string, unknown> | null;
+}
+
+export interface AdminAuditLogListDto {
+  items: AdminAuditLogEntryDto[];
+  hasMore: boolean;
+  nextOffset: number | null;
+}
+
 export type VideoVisibility = 'public' | 'unlisted' | 'private';
 export type VideoSort = 'newest' | 'most_viewed' | 'trending';
 
@@ -951,4 +968,26 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(body),
     }),
+
+  // ─── Admin: Audit log ────────────────────────────────────────────
+  adminListAuditLog: (params: {
+    limit?: number;
+    offset?: number;
+    adminUserId?: string;
+    action?: string;
+    targetType?: string;
+    targetId?: string;
+  } = {}) => {
+    const q = new URLSearchParams();
+    if (params.limit) q.set('limit', String(params.limit));
+    if (params.offset) q.set('offset', String(params.offset));
+    if (params.adminUserId) q.set('adminUserId', params.adminUserId);
+    if (params.action) q.set('action', params.action);
+    if (params.targetType) q.set('targetType', params.targetType);
+    if (params.targetId) q.set('targetId', params.targetId);
+    const qs = q.toString();
+    return request<AdminAuditLogListDto>(
+      `/admin/users/audit-log${qs ? `?${qs}` : ''}`,
+    );
+  },
 };

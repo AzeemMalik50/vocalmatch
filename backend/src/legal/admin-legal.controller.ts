@@ -6,7 +6,10 @@ import {
   Put,
   Req,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { AdminAuditInterceptor } from '../admin/admin-audit.interceptor';
+import { AuditAction } from '../admin/audit-action.decorator';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -37,6 +40,7 @@ export class UpdateLegalPageDto {
 @ApiTags('Admin – Legal')
 @ApiBearerAuth('bearer')
 @SkipThrottle()
+@UseInterceptors(AdminAuditInterceptor)
 @Controller('admin/legal')
 @UseGuards(JwtAuthGuard, AdminGuard)
 export class AdminLegalController {
@@ -63,6 +67,10 @@ export class AdminLegalController {
     return this.legal.getAdminVersion(slug, parseInt(versionNumber, 10));
   }
 
+  @AuditAction('legal.page.publish', {
+    targetType: 'legal_page',
+    targetParam: 'slug',
+  })
   @Put('pages/:slug')
   @ApiOperation({ summary: 'Publish a new version (immutable). Becomes current.' })
   async update(

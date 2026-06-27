@@ -9,7 +9,10 @@ import {
   Patch,
   Query,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { AdminAuditInterceptor } from './admin-audit.interceptor';
+import { AuditAction } from './audit-action.decorator';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   ApiBearerAuth,
@@ -41,6 +44,7 @@ class AssignSongDto {
 @ApiTags('Admin – Performances')
 @ApiBearerAuth('bearer')
 @SkipThrottle()
+@UseInterceptors(AdminAuditInterceptor)
 @Controller('admin/performances')
 @UseGuards(JwtAuthGuard, AdminGuard)
 export class AdminPerformancesController {
@@ -210,10 +214,11 @@ export class AdminPerformancesController {
     };
   }
 
+  @AuditAction('performance.update', { targetType: 'performance' })
   @Patch(':id')
   @ApiOperation({
     summary: 'Admin — assign or clear the song link on a performance',
-    description: 'Admin only. Pass `songId=null` to clear a stale link, or a UUID to assign. The performance’s `songTitle` is synced to match.',
+    description: "Admin only. Pass `songId=null` to clear a stale link, or a UUID to assign. The performance's `songTitle` is synced to match.",
   })
   async assignSong(@Param('id') id: string, @Body() dto: AssignSongDto) {
     const video = await this.videos.findOne({ where: { id } });
@@ -270,6 +275,7 @@ export class AdminPerformancesController {
     return { id: video.id, songId: video.songId, songTitle: video.songTitle };
   }
 
+  @AuditAction('performance.delete', { targetType: 'performance' })
   @Delete(':id')
   @ApiOperation({
     summary: 'Admin — soft-delete a performance',

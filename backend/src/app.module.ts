@@ -28,6 +28,7 @@ import { ChallengeSubmission } from './battles/challenge-submission.entity';
 import { Notification } from './notifications/notification.entity';
 import { LegalPage } from './legal/legal-page.entity';
 import { LegalPageVersion } from './legal/legal-page-version.entity';
+import { AdminAuditLog } from './admin/admin-audit-log.entity';
 
 const entities = [
   User,
@@ -40,6 +41,7 @@ const entities = [
   Notification,
   LegalPage,
   LegalPageVersion,
+  AdminAuditLog,
 ];
 
 @Module({
