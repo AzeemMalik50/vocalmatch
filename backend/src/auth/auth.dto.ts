@@ -1,4 +1,4 @@
-import { Equals, IsBoolean, IsEmail, IsString, Matches, MinLength } from 'class-validator';
+import { Equals, IsBoolean, IsEmail, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
 export class SignupDto {
   @IsEmail()
@@ -12,7 +12,7 @@ export class SignupDto {
   username: string;
 
   @IsString()
-  @MinLength(6)
+  @MinLength(8)
   password: string;
 
   @IsBoolean()
@@ -51,11 +51,27 @@ export class ChangePasswordDto {
   currentPassword: string;
 
   @IsString()
-  @MinLength(6)
+  @MinLength(8)
   newPassword: string;
 }
 
 export class DeleteAccountDto {
   @IsString()
   currentPassword: string;
+}
+
+export class ForgotPasswordDto {
+  @IsEmail()
+  email: string;
+}
+
+export class ResetPasswordDto {
+  @IsString()
+  @MinLength(64)
+  @MaxLength(64)
+  token: string;
+
+  @IsString()
+  @MinLength(8)
+  newPassword: string;
 }

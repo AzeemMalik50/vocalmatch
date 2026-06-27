@@ -19,7 +19,9 @@ import {
   ChangeEmailDto,
   ChangePasswordDto,
   DeleteAccountDto,
+  ForgotPasswordDto,
   LoginDto,
+  ResetPasswordDto,
   SignupDto,
 } from './auth.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -41,7 +43,7 @@ export class AuthController {
       'Public signup. Returns the new user profile and a JWT in `token`. ' +
       'Username must be unique; email is normalized to lowercase.',
   })
-  @ApiResponse({ status: 201, description: 'Account created — returns `{ user, token }`.' })
+  @ApiResponse({ status: 201, description: 'Account created -- returns `{ user, token }`.' })
   @ApiResponse({ status: 409, description: 'Email or username already taken.' })
   signup(@Body() dto: SignupDto) {
     return this.auth.signup(dto);
@@ -67,7 +69,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('bearer')
   @ApiOperation({
-    summary: 'Change the signed-in user’s email',
+    summary: "Change the signed-in user's email",
     description: 'Requires the current password for confirmation.',
   })
   changeEmail(@Req() req: any, @Body() dto: ChangeEmailDto) {
@@ -79,7 +81,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('bearer')
   @ApiOperation({
-    summary: 'Change the signed-in user’s password',
+    summary: "Change the signed-in user's password",
     description:
       'Bumps the token version so any other active sessions are invalidated ' +
       'on their next request.',
@@ -92,7 +94,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('bearer')
   @ApiOperation({
-    summary: 'Delete the signed-in user’s account',
+    summary: "Delete the signed-in user's account",
     description:
       'Hard-deletes the user record; videos are soft-deleted so historical ' +
       'battles remain auditable.',
@@ -105,12 +107,41 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('bearer')
   @ApiOperation({
-    summary: 'Invalidate all of this user’s active sessions',
+    summary: "Invalidate all of this user's active sessions",
     description:
       'Bumps the token version. All previously issued JWTs (including the ' +
       'one used to call this endpoint) stop validating on the next request.',
   })
   signOutEverywhere(@Req() req: any) {
     return this.auth.signOutEverywhere(req.user.userId);
+  }
+
+  @Throttle({
+    short: { limit: 1, ttl: 60_000 },
+    long: { limit: 5, ttl: 3_600_000 },
+  })
+  @Post('forgot-password')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Request a password-reset link',
+    description:
+      'Public. Always returns 200 -- does not reveal whether the email is registered. ' +
+      'If the email matches a user, a reset link is sent.',
+  })
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.auth.forgotPassword(dto);
+  }
+
+  @Throttle({ short: { limit: 5, ttl: 60_000 } })
+  @Post('reset-password')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Reset password with a one-time token',
+    description:
+      'Public. Token expires 1 hour after issuance. On success the user must ' +
+      'sign in with the new password -- existing sessions are invalidated.',
+  })
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.auth.resetPassword(dto);
   }
 }

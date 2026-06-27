@@ -125,4 +125,14 @@ export class User {
 
   @Column({ type: 'timestamptz', nullable: true })
   lockoutUntil: Date | null;
+
+  // ─── Password reset (B2) ────────────────────────────────────────
+  // Set by POST /auth/forgot-password, cleared by POST /auth/reset-password.
+  // The raw token is never stored — only its sha256 hash. Expires 1 hour
+  // after issuance.
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  passwordResetTokenHash: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  passwordResetExpiresAt: Date | null;
 }

@@ -1,12 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
-import { UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { LockedException } from './locked.exception';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../users/user.entity';
 import { AuthService } from './auth.service';
 import { LegalService } from '../legal/legal.service';
+import { MailerService } from '../mailer/mailer.service';
 
 describe('AuthService.signup acceptance plumbing', () => {
   let service: AuthService;
@@ -35,6 +36,8 @@ describe('AuthService.signup acceptance plumbing', () => {
     })),
   };
 
+  const mailer: any = { sendPasswordResetEmail: jest.fn(async () => undefined) };
+
   beforeEach(async () => {
     usersData.length = 0;
     jest.clearAllMocks();
@@ -48,6 +51,7 @@ describe('AuthService.signup acceptance plumbing', () => {
         { provide: getRepositoryToken(User), useValue: userRepo },
         { provide: JwtService, useValue: jwt },
         { provide: LegalService, useValue: legal },
+        { provide: MailerService, useValue: mailer },
       ],
     }).compile();
     service = moduleRef.get(AuthService);
@@ -116,6 +120,8 @@ describe('AuthService.login lockout', () => {
     })),
   };
 
+  const mailer: any = { sendPasswordResetEmail: jest.fn(async () => undefined) };
+
   const seedUser = async (overrides: Partial<any> = {}) => {
     const hash = await bcrypt.hash('correct-password', 10);
     usersState.length = 0;
@@ -138,6 +144,7 @@ describe('AuthService.login lockout', () => {
         { provide: getRepositoryToken(User), useValue: userRepo },
         { provide: JwtService, useValue: jwt },
         { provide: LegalService, useValue: legal },
+        { provide: MailerService, useValue: mailer },
       ],
     }).compile();
     service = moduleRef.get(AuthService);
@@ -194,5 +201,154 @@ describe('AuthService.login lockout', () => {
     expect(out.token).toBe('fake.jwt');
     expect(usersState[0].failedLoginCount).toBe(0);
     expect(usersState[0].lockoutUntil).toBeNull();
+  });
+});
+
+describe('AuthService password reset', () => {
+  let service: AuthService;
+  const usersState: any[] = [];
+
+  const userRepo: any = {
+    findOne: jest.fn(async ({ where }: any) => {
+      if (where.email) {
+        return usersState.find((u) => u.email === where.email) ?? null;
+      }
+      if (where.passwordResetTokenHash) {
+        return (
+          usersState.find(
+            (u) =>
+              u.passwordResetTokenHash === where.passwordResetTokenHash &&
+              u.passwordResetExpiresAt &&
+              u.passwordResetExpiresAt > new Date(),
+          ) ?? null
+        );
+      }
+      return null;
+    }),
+    save: jest.fn(async (row: any) => {
+      const i = usersState.findIndex((u) => u.id === row.id);
+      if (i >= 0) usersState[i] = { ...usersState[i], ...row };
+      return row;
+    }),
+    createQueryBuilder: jest.fn(() => ({
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getOne: jest.fn(async () => null),
+    })),
+    create: jest.fn((row: any) => row),
+  };
+
+  const jwt: any = { sign: jest.fn(() => 'fake.jwt') };
+
+  const legal: any = {
+    getCurrentVersionIds: jest.fn(async () => ({
+      terms: 'v-terms-1',
+      privacy: 'v-privacy-1',
+    })),
+  };
+
+  const mailer: any = { sendPasswordResetEmail: jest.fn(async () => undefined) };
+
+  beforeEach(async () => {
+    usersState.length = 0;
+    jest.clearAllMocks();
+    process.env.FRONTEND_RESET_URL = 'https://vocalmatch.com/reset-password';
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        AuthService,
+        { provide: getRepositoryToken(User), useValue: userRepo },
+        { provide: JwtService, useValue: jwt },
+        { provide: LegalService, useValue: legal },
+        { provide: MailerService, useValue: mailer },
+      ],
+    }).compile();
+    service = moduleRef.get(AuthService);
+  });
+
+  describe('forgotPassword', () => {
+    it('writes hash + expiry and sends email for an existing user', async () => {
+      usersState.push({
+        id: 'u-1',
+        email: 'a@b.com',
+        username: 'tester',
+        passwordHash: 'hash',
+        passwordResetTokenHash: null,
+        passwordResetExpiresAt: null,
+        tokenVersion: 0,
+      });
+      const out = await service.forgotPassword({ email: 'a@b.com' } as any);
+      expect(out).toEqual({ sent: true });
+      expect(usersState[0].passwordResetTokenHash).toMatch(/^[a-f0-9]{64}$/);
+      expect(usersState[0].passwordResetExpiresAt).toBeInstanceOf(Date);
+      const ms = usersState[0].passwordResetExpiresAt.getTime() - Date.now();
+      expect(ms).toBeGreaterThan(59 * 60 * 1000);
+      expect(ms).toBeLessThanOrEqual(61 * 60 * 1000);
+      expect(mailer.sendPasswordResetEmail).toHaveBeenCalledTimes(1);
+      const [toEmail, url] = mailer.sendPasswordResetEmail.mock.calls[0];
+      expect(toEmail).toBe('a@b.com');
+      expect(url).toMatch(/^https:\/\/vocalmatch\.com\/reset-password\?token=[a-f0-9]{64}$/);
+    });
+
+    it('is a silent no-op for an unknown email', async () => {
+      const out = await service.forgotPassword({ email: 'nobody@nope.com' } as any);
+      expect(out).toEqual({ sent: true });
+      expect(mailer.sendPasswordResetEmail).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('resetPassword', () => {
+    it('updates passwordHash, clears reset fields, and bumps tokenVersion on a valid token', async () => {
+      const crypto = require('crypto');
+      const token = 'a'.repeat(64);
+      const hash = crypto.createHash('sha256').update(token).digest('hex');
+      usersState.push({
+        id: 'u-1',
+        email: 'a@b.com',
+        username: 'tester',
+        passwordHash: 'old',
+        passwordResetTokenHash: hash,
+        passwordResetExpiresAt: new Date(Date.now() + 30 * 60_000),
+        tokenVersion: 3,
+      });
+      const out = await service.resetPassword({
+        token,
+        newPassword: 'newpassword123',
+      } as any);
+      expect(out).toEqual({ reset: true });
+      expect(usersState[0].passwordHash).not.toBe('old');
+      expect(usersState[0].passwordResetTokenHash).toBeNull();
+      expect(usersState[0].passwordResetExpiresAt).toBeNull();
+      expect(usersState[0].tokenVersion).toBe(4);
+    });
+
+    it('rejects an expired token', async () => {
+      const crypto = require('crypto');
+      const token = 'b'.repeat(64);
+      const hash = crypto.createHash('sha256').update(token).digest('hex');
+      usersState.push({
+        id: 'u-1',
+        email: 'a@b.com',
+        username: 'tester',
+        passwordHash: 'old',
+        passwordResetTokenHash: hash,
+        passwordResetExpiresAt: new Date(Date.now() - 1000),
+        tokenVersion: 0,
+      });
+      await expect(
+        service.resetPassword({
+          token,
+          newPassword: 'newpassword123',
+        } as any),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejects an unknown / tampered token', async () => {
+      await expect(
+        service.resetPassword({
+          token: 'c'.repeat(64),
+          newPassword: 'newpassword123',
+        } as any),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
   });
 });

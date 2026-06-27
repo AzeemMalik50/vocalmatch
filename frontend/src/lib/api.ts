@@ -646,6 +646,18 @@ export const api = {
   signOutEverywhere: () =>
     request<AuthResponse>('/auth/sign-out-everywhere', { method: 'POST' }),
 
+  forgotPassword: (body: { email: string }) =>
+    request<{ sent: boolean }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  resetPassword: (body: { token: string; newPassword: string }) =>
+    request<{ reset: boolean }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
   me: () => request<PublicUser>('/users/me'),
 
   getProfile: (username: string) =>

@@ -7,6 +7,7 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { User } from '../users/user.entity';
 import { LegalModule } from '../legal/legal.module';
+import { MailerModule } from '../mailer/mailer.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { LegalModule } from '../legal/legal.module';
       signOptions: { expiresIn: process.env.JWT_EXPIRES_IN || '30d' },
     }),
     forwardRef(() => LegalModule),
+    MailerModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

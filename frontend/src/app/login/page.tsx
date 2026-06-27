@@ -51,6 +51,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = safeNext(searchParams?.get('next') ?? null);
+  const justReset = searchParams?.get('reset') === '1';
   // `identifier` is either an email OR a username — the backend looks
   // the user up against both columns. Keeping the variable named for
   // its UX semantics, even though the auth-context API still passes
@@ -77,6 +78,11 @@ function LoginForm() {
 
   return (
     <>
+      {justReset && (
+        <div className="mb-5 rounded-md border border-green-500/40 bg-green-500/10 text-green-200 px-3 py-2 text-sm">
+          Password reset. Sign in with your new password.
+        </div>
+      )}
       <form onSubmit={submit} className="space-y-5">
         <Field label="Email or username">
           {/* type=text (was type=email) so the browser's native
@@ -112,6 +118,12 @@ function LoginForm() {
             </button>
           </div>
         </Field>
+
+        <p className="text-xs text-right">
+          <Link href="/forgot-password" className="text-spotlight hover:underline">
+            Forgot password?
+          </Link>
+        </p>
 
         {err && (
           <div className="text-sm text-red-300 bg-red-950/40 border border-red-900/40 rounded-md px-4 py-3">

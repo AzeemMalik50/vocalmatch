@@ -10,13 +10,17 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 import { User } from '../users/user.entity';
 import { LegalService } from '../legal/legal.service';
+import { MailerService } from '../mailer/mailer.service';
 import {
   ChangeEmailDto,
   ChangePasswordDto,
   DeleteAccountDto,
+  ForgotPasswordDto,
   LoginDto,
+  ResetPasswordDto,
   SignupDto,
 } from './auth.dto';
 
@@ -26,6 +30,7 @@ export class AuthService {
     @InjectRepository(User) private readonly users: Repository<User>,
     private readonly jwt: JwtService,
     private readonly legal: LegalService,
+    private readonly mailer: MailerService,
   ) {}
 
   async signup(dto: SignupDto) {
@@ -56,7 +61,7 @@ export class AuthService {
       'privacy',
     ]);
 
-    const passwordHash = await bcrypt.hash(dto.password, 10);
+    const passwordHash = await bcrypt.hash(dto.password, 12);
     const user = this.users.create({
       email: lcEmail,
       username: dto.username,
@@ -133,6 +138,7 @@ export class AuthService {
     if (taken) throw new ConflictException('Email already in use');
 
     user.email = lcNew;
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
     await this.users.save(user);
     return { ok: true, email: lcNew };
   }
@@ -148,7 +154,7 @@ export class AuthService {
       throw new BadRequestException('New password must be different');
     }
 
-    user.passwordHash = await bcrypt.hash(dto.newPassword, 10);
+    user.passwordHash = await bcrypt.hash(dto.newPassword, 12);
     // Invalidate every existing session except this one
     user.tokenVersion = (user.tokenVersion ?? 0) + 1;
     await this.users.save(user);
@@ -186,6 +192,53 @@ export class AuthService {
     if (!user) return null;
     if ((user.tokenVersion ?? 0) !== (tokenVersion ?? 0)) return null;
     return user;
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const lcEmail = dto.email.toLowerCase();
+    const user = await this.users.findOne({ where: { email: lcEmail } });
+    if (!user) {
+      // Don't reveal whether the address belongs to a real account.
+      return { sent: true };
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const hash = crypto.createHash('sha256').update(token).digest('hex');
+    user.passwordResetTokenHash = hash;
+    user.passwordResetExpiresAt = new Date(Date.now() + 60 * 60_000);
+    await this.users.save(user);
+
+    const base =
+      process.env.FRONTEND_RESET_URL ?? 'http://localhost:3000/reset-password';
+    const resetUrl = `${base}?token=${token}`;
+    await this.mailer.sendPasswordResetEmail(user.email, resetUrl);
+
+    return { sent: true };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const hash = crypto
+      .createHash('sha256')
+      .update(dto.token)
+      .digest('hex');
+    const user = await this.users.findOne({
+      where: { passwordResetTokenHash: hash },
+    });
+    if (
+      !user ||
+      !user.passwordResetExpiresAt ||
+      user.passwordResetExpiresAt <= new Date()
+    ) {
+      throw new BadRequestException('Invalid or expired reset link');
+    }
+
+    user.passwordHash = await bcrypt.hash(dto.newPassword, 12);
+    user.passwordResetTokenHash = null;
+    user.passwordResetExpiresAt = null;
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+    await this.users.save(user);
+
+    return { reset: true };
   }
 
   private tokenize(user: User) {
