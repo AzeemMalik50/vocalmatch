@@ -103,4 +103,17 @@ export class User {
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
+
+  // ─── Legal acceptance (A2) ──────────────────────────────────────
+  // Null for users created before A2 (grandfathered). New signups
+  // populate all three in a single transaction with the live
+  // currentVersionId of each legal page at signup time.
+  @Column({ type: 'uuid', nullable: true })
+  acceptedTermsVersionId: string | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  acceptedPrivacyVersionId: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  legalAcceptedAt: Date | null;
 }

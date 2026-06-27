@@ -200,4 +200,47 @@ describe('LegalService', () => {
       ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
+
+  describe('getCurrentVersionIds', () => {
+    it('returns a map of slug → currentVersionId for known slugs', async () => {
+      pages.push({
+        id: 'p-1',
+        slug: 'terms',
+        title: 'Terms',
+        currentVersionId: 'v-1',
+      });
+      pages.push({
+        id: 'p-2',
+        slug: 'privacy',
+        title: 'Privacy',
+        currentVersionId: 'v-2',
+      });
+      const out = await service.getCurrentVersionIds(['terms', 'privacy']);
+      expect(out).toEqual({ terms: 'v-1', privacy: 'v-2' });
+    });
+
+    it('throws NotFound if any requested slug is missing', async () => {
+      pages.push({
+        id: 'p-1',
+        slug: 'terms',
+        title: 'Terms',
+        currentVersionId: 'v-1',
+      });
+      await expect(
+        service.getCurrentVersionIds(['terms', 'privacy']),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws NotFound if a slug exists but has no current version', async () => {
+      pages.push({
+        id: 'p-1',
+        slug: 'terms',
+        title: 'Terms',
+        currentVersionId: null,
+      });
+      await expect(
+        service.getCurrentVersionIds(['terms']),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
 });

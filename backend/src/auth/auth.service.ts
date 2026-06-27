@@ -10,6 +10,7 @@ import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../users/user.entity';
+import { LegalService } from '../legal/legal.service';
 import {
   ChangeEmailDto,
   ChangePasswordDto,
@@ -23,6 +24,7 @@ export class AuthService {
   constructor(
     @InjectRepository(User) private readonly users: Repository<User>,
     private readonly jwt: JwtService,
+    private readonly legal: LegalService,
   ) {}
 
   async signup(dto: SignupDto) {
@@ -45,11 +47,22 @@ export class AuthService {
       );
     }
 
+    // Capture which version of ToS + Privacy the user accepted. Throws if
+    // either seed is missing — surfaces a deploy issue immediately rather
+    // than silently storing nulls.
+    const versions = await this.legal.getCurrentVersionIds([
+      'terms',
+      'privacy',
+    ]);
+
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const user = this.users.create({
       email: lcEmail,
       username: dto.username,
       passwordHash,
+      acceptedTermsVersionId: versions.terms,
+      acceptedPrivacyVersionId: versions.privacy,
+      legalAcceptedAt: new Date(),
     });
     await this.users.save(user);
 

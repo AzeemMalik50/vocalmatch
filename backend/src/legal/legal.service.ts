@@ -73,6 +73,28 @@ export class LegalService {
       .map((p) => ({ slug: p.slug, title: p.title }));
   }
 
+  /**
+   * Look up the live currentVersionId for each requested slug in one query.
+   * Throws if any slug is missing or has no current version. Used by signup
+   * and upload to capture exactly which legal version a user accepted.
+   */
+  async getCurrentVersionIds(slugs: string[]): Promise<Record<string, string>> {
+    if (slugs.length === 0) return {};
+    const rows = await this.pages.find();
+    const bySlug = new Map(rows.map((r) => [r.slug, r]));
+    const out: Record<string, string> = {};
+    for (const slug of slugs) {
+      const row = bySlug.get(slug);
+      if (!row || !row.currentVersionId) {
+        throw new NotFoundException(
+          `Legal page '${slug}' has no current version`,
+        );
+      }
+      out[slug] = row.currentVersionId;
+    }
+    return out;
+  }
+
   async getPublicPage(slug: string): Promise<PublicLegalPageDto> {
     const cached = this.cache.get(slug);
     if (cached && cached.expiresAt > Date.now()) return cached.value;

@@ -1,4 +1,4 @@
-import { IsEmail, IsString, Matches, MinLength } from 'class-validator';
+import { Equals, IsBoolean, IsEmail, IsString, Matches, MinLength } from 'class-validator';
 
 export class SignupDto {
   @IsEmail()
@@ -14,6 +14,14 @@ export class SignupDto {
   @IsString()
   @MinLength(6)
   password: string;
+
+  @IsBoolean()
+  @Equals(true, { message: 'You must agree to the Terms of Service' })
+  acceptedTerms: boolean;
+
+  @IsBoolean()
+  @Equals(true, { message: 'You must agree to the Privacy Policy' })
+  acceptedPrivacy: boolean;
 }
 
 export class LoginDto {

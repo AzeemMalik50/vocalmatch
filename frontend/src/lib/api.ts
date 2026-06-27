@@ -607,7 +607,13 @@ export interface VideoListParams {
 export const api = {
   getStats: () => request<PublicStats>('/stats'),
 
-  signup: (body: { email: string; username: string; password: string }) =>
+  signup: (body: {
+    email: string;
+    username: string;
+    password: string;
+    acceptedTerms: boolean;
+    acceptedPrivacy: boolean;
+  }) =>
     request<AuthResponse>('/auth/signup', {
       method: 'POST',
       body: JSON.stringify(body),

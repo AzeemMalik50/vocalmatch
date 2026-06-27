@@ -25,6 +25,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import {
+  Equals,
+  IsBoolean,
   IsIn,
   IsOptional,
   IsString,
@@ -32,10 +34,12 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/jwt-auth.guard';
 import { VideosService, VideoSort } from './videos.service';
 import { VideoCategory, VideoVisibility } from './video.entity';
 import { BattlesService } from '../battles/battles.service';
+import { LegalService } from '../legal/legal.service';
 
 const SORTS: VideoSort[] = ['newest', 'most_viewed', 'trending'];
 const VISIBILITIES: VideoVisibility[] = ['public', 'unlisted', 'private'];
@@ -63,6 +67,16 @@ class CreateVideoDto {
   @IsOptional() @IsString() @MaxLength(500)
   // Comma-separated string from FormData; service parses
   tags?: string;
+
+  // FormData fields arrive as strings. Transform 'true' → true, anything
+  // else → false so @Equals(true) rejects missing/false correctly.
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  @Equals(true, {
+    message:
+      'You must acknowledge ownership and grant the platform license to upload',
+  })
+  uploadAcknowledged: boolean;
 }
 
 @ApiTags('Videos')
@@ -71,6 +85,7 @@ export class VideosController {
   constructor(
     private readonly videos: VideosService,
     private readonly battles: BattlesService,
+    private readonly legal: LegalService,
   ) {}
 
   @Get()
@@ -197,6 +212,7 @@ export class VideosController {
     file: Express.Multer.File,
   ) {
     if (!file) throw new BadRequestException('No file uploaded');
+    const versions = await this.legal.getCurrentVersionIds(['terms']);
     const tags = (dto.tags ?? '')
       .split(',')
       .map((t) => t.trim().toLowerCase().replace(/^#/, ''))
@@ -213,6 +229,8 @@ export class VideosController {
       category: dto.category ?? 'solo',
       visibility: dto.visibility ?? 'public',
       tags,
+      uploadAckTermsVersionId: versions.terms,
+      uploadAckAt: new Date(),
     });
     return this.videos.toPublic(created);
   }

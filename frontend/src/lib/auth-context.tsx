@@ -18,6 +18,8 @@ interface AuthContextValue {
     email: string,
     username: string,
     password: string,
+    acceptedTerms: boolean,
+    acceptedPrivacy: boolean,
   ) => Promise<AuthUser>;
   logout: () => void;
   refresh: () => Promise<void>;
@@ -57,8 +59,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return user;
   };
 
-  const signup = async (email: string, username: string, password: string) => {
-    const { token, user } = await api.signup({ email, username, password });
+  const signup = async (
+    email: string,
+    username: string,
+    password: string,
+    acceptedTerms: boolean,
+    acceptedPrivacy: boolean,
+  ) => {
+    const { token, user } = await api.signup({
+      email,
+      username,
+      password,
+      acceptedTerms,
+      acceptedPrivacy,
+    });
     // Newly signed-up users haven't completed profile by default
     const enriched: AuthUser = { ...user, profileCompleted: false };
     persist(token, enriched);

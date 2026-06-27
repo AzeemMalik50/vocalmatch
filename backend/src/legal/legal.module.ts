@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule, getDataSourceToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { LegalPage } from './legal-page.entity';
@@ -12,7 +12,7 @@ import { AuthModule } from '../auth/auth.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([LegalPage, LegalPageVersion]),
-    AuthModule, // provides JwtAuthGuard
+    forwardRef(() => AuthModule), // provides JwtAuthGuard; forwardRef breaks AuthModule↔LegalModule cycle
     AdminModule, // provides AdminGuard
   ],
   controllers: [LegalController, AdminLegalController],
@@ -24,5 +24,6 @@ import { AuthModule } from '../auth/auth.module';
       inject: [getDataSourceToken()],
     },
   ],
+  exports: [LegalService],
 })
 export class LegalModule {}

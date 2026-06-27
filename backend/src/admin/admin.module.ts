@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '../users/user.entity';
 import { Video } from '../videos/video.entity';
@@ -17,7 +17,7 @@ import { AuthModule } from '../auth/auth.module';
  *   - AdminPerformancesController hosts /admin/performances (list, assign song, soft-delete)
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Video, Song, Vote, Battle]), AuthModule],
+  imports: [TypeOrmModule.forFeature([User, Video, Song, Vote, Battle]), forwardRef(() => AuthModule)],
   controllers: [AdminController, AdminPerformancesController],
   providers: [AdminGuard],
   exports: [AdminGuard, TypeOrmModule],
