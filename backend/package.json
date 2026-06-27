@@ -11,7 +11,8 @@
     "seed:sample": "ts-node --transpile-only src/scripts/seed-sample.ts",
     "seed:legal": "ts-node --transpile-only src/scripts/seed-legal.ts",
     "fix:phase-2a": "ts-node --transpile-only src/scripts/phase-2a-fixes.ts",
-    "test": "jest"
+    "test": "jest",
+    "check:secrets": "bash scripts/check-secrets.sh"
   },
   "jest": {
     "moduleFileExtensions": [
@@ -40,6 +41,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "cloudinary": "^1.41.1",
+    "helmet": "^7.2.0",
     "multer": "^1.4.5-lts.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
