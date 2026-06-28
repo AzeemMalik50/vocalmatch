@@ -550,8 +550,14 @@ function ResolveTieControl({
     : 'Side B (deleted) wins';
 
   return (
-    <div className="flex flex-col gap-2 w-full">
-      <div className="flex flex-wrap gap-2">
+    // Right-aligned column so the action buttons sit flush with the
+    // right edge of the battle row's action area, matching the
+    // placement of every other admin row's controls. The
+    // deleted-performance info message and error feedback right-align
+    // too so the whole block reads as a single right-anchored stack
+    // rather than letting the message visually "push" the buttons left.
+    <div className="flex flex-col gap-2 w-full items-end">
+      <div className="flex flex-wrap gap-2 justify-end">
         <button
           type="button"
           onClick={() => pick(battle.performanceAId)}
@@ -577,12 +583,12 @@ function ResolveTieControl({
         </button>
       </div>
       {(!a || !b) && (
-        <p className="text-[11px] text-yellow-300">
+        <p className="text-[11px] text-yellow-300 text-right max-w-2xl">
           One performance has been deleted; you can still pick a winner —
           the surviving side will take the crown.
         </p>
       )}
-      {error && <p className="text-xs text-red-400">{error}</p>}
+      {error && <p className="text-xs text-red-400 text-right">{error}</p>}
     </div>
   );
 }
