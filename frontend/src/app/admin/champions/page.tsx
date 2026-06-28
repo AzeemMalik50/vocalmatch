@@ -170,8 +170,8 @@ function ChampionRow({
   const songStreak = song.currentChampionStreak ?? 0;
   const streak = careerStreak;
   return (
-    <li className="bg-stage-900 border border-gold/30 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
-      <div className="flex items-center gap-3 min-w-0 flex-1">
+    <li className="bg-stage-900 border border-gold/30 rounded-xl p-4 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center sm:justify-between gap-3 sm:gap-4">
+      <div className="flex items-center gap-3 min-w-0 w-full sm:w-auto sm:flex-1">
         {champion?.avatarUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
@@ -185,7 +185,7 @@ function ChampionRow({
           </div>
         )}
         <div className="min-w-0 flex-1 space-y-1.5">
-          <p className="font-display font-bold text-lg leading-tight">
+          <p className="font-display font-bold text-lg leading-tight break-words">
             {champion ? (
               <Link
                 href={`/u/${champion.username}`}
@@ -215,7 +215,7 @@ function ChampionRow({
           </span>
         </div>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex flex-wrap items-center gap-2 shrink-0 w-full sm:w-auto sm:justify-end">
         {streak >= 2 && (
           <span
             className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold uppercase tracking-widest bg-gold/15 text-gold border border-gold/30 rounded"
@@ -231,7 +231,7 @@ function ChampionRow({
         )}
         <Link
           href={`/admin/songs`}
-          className="text-xs font-bold text-haze hover:text-white"
+          className="text-xs font-bold text-haze hover:text-white ml-auto sm:ml-0"
         >
           Manage song
         </Link>
