@@ -382,6 +382,32 @@ export class ChallengesService {
       );
     }
 
+    // Bug fix — both performances must still be available at promote
+    // time. `battlesService.create` only catches truly missing rows
+    // via findOne; a SOFT-deleted performance (deletedAt set) sneaks
+    // past because the row still exists. We catch each side with a
+    // distinct message so the admin knows exactly what to address —
+    // previously only the Challenger side was effectively flagged
+    // (via downstream uniqueness checks), and a deleted Champion
+    // performance silently promoted into a live battle no-one could
+    // play.
+    const [championPerf, challengerVideo] = await Promise.all([
+      this.videos.findOne({
+        where: { id: song.currentChampionPerformanceId },
+      }),
+      this.videos.findOne({ where: { id: sub.videoId } }),
+    ]);
+    if (!championPerf || championPerf.deletedAt) {
+      throw new BadRequestException(
+        "The Champion's performance has been deleted and is no longer available. A new champion must be established before this challenge can be promoted.",
+      );
+    }
+    if (!challengerVideo || challengerVideo.deletedAt) {
+      throw new BadRequestException(
+        "The Challenger's performance has been deleted and is no longer available. Reject this challenge and ask the challenger to re-upload.",
+      );
+    }
+
     // Prefer an explicit `votingClosesAt` (matches the regular POST /battles
     // contract); otherwise compute from `hours`, falling back to 48h.
     let votingClosesAt: string;

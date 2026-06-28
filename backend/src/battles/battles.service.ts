@@ -113,6 +113,20 @@ export class BattlesService {
       this.videos.findOne({ where: { id: dto.performanceBId } }),
     ]);
     if (!a || !b) throw new NotFoundException('Performance not found');
+    // Soft-delete is just a deletedAt column flag — findOne still
+    // returns the row. Reject either side explicitly so a deleted
+    // video can't be promoted into a live battle (which would otherwise
+    // produce an "unplayable" battle that admins can't resolve cleanly).
+    if (a.deletedAt) {
+      throw new BadRequestException(
+        'Performance A has been deleted and cannot be used in a new battle',
+      );
+    }
+    if (b.deletedAt) {
+      throw new BadRequestException(
+        'Performance B has been deleted and cannot be used in a new battle',
+      );
+    }
     if (a.uploaderId === b.uploaderId) {
       throw new BadRequestException(
         'Both performances are by the same user — feels rigged',
