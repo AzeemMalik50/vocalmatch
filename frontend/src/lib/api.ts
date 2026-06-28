@@ -148,6 +148,13 @@ export const GENRE_OPTIONS = [
   'Acoustic',
 ];
 
+// ─── Security DTOs ──────────────────────────────────────────────────
+
+export interface TurnstileConfigDto {
+  enabled: boolean;
+  siteKey: string | null;
+}
+
 // ─── Legal DTOs ─────────────────────────────────────────────────────
 
 export interface LegalPageSummaryDto {
@@ -624,19 +631,23 @@ export interface VideoListParams {
 export const api = {
   getStats: () => request<PublicStats>('/stats'),
 
+  getTurnstileConfig: () =>
+    request<TurnstileConfigDto>('/security/turnstile-config'),
+
   signup: (body: {
     email: string;
     username: string;
     password: string;
     acceptedTerms: boolean;
     acceptedPrivacy: boolean;
+    turnstileToken?: string;
   }) =>
     request<AuthResponse>('/auth/signup', {
       method: 'POST',
       body: JSON.stringify(body),
     }),
 
-  login: (body: { email: string; password: string }) =>
+  login: (body: { email: string; password: string; turnstileToken?: string }) =>
     request<AuthResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(body),
@@ -663,7 +674,7 @@ export const api = {
   signOutEverywhere: () =>
     request<AuthResponse>('/auth/sign-out-everywhere', { method: 'POST' }),
 
-  forgotPassword: (body: { email: string }) =>
+  forgotPassword: (body: { email: string; turnstileToken?: string }) =>
     request<{ sent: boolean }>('/auth/forgot-password', {
       method: 'POST',
       body: JSON.stringify(body),

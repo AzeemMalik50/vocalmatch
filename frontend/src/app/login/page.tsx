@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Nav from '@/components/Nav';
 import { Button, Field, TextInput } from '@/components/forms';
 import { useAuth } from '@/lib/auth-context';
+import TurnstileWidget from '@/components/TurnstileWidget';
 
 /**
  * Pick a safe redirect target from `?next=`. Restricts to same-origin paths
@@ -61,16 +62,27 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [requiresTurnstile, setRequiresTurnstile] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
     setLoading(true);
     try {
-      await login(identifier, password);
+      await login(identifier, password, turnstileToken ?? undefined);
       router.push(next);
     } catch (e: any) {
-      setErr(e.message);
+      const msg = e?.message ?? '';
+      if (/Bot challenge required/i.test(msg)) {
+        setRequiresTurnstile(true);
+        setTurnstileToken(null);
+        setTurnstileResetKey((k) => k + 1);
+        setErr('Please complete the bot challenge below and try again.');
+      } else {
+        setErr(msg || 'Login failed');
+      }
     } finally {
       setLoading(false);
     }
@@ -131,7 +143,20 @@ function LoginForm() {
           </div>
         )}
 
-        <Button type="submit" size="lg" fullWidth loading={loading}>
+        {requiresTurnstile && (
+          <TurnstileWidget
+            onToken={setTurnstileToken}
+            resetKey={turnstileResetKey}
+          />
+        )}
+
+        <Button
+          type="submit"
+          size="lg"
+          fullWidth
+          loading={loading}
+          disabled={loading || (requiresTurnstile && turnstileToken === null)}
+        >
           Sign in →
         </Button>
       </form>

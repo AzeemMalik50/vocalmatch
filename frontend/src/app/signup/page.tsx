@@ -7,6 +7,7 @@ import Nav from '@/components/Nav';
 import Logo from '@/components/Logo';
 import { Button, Field, StepIndicator, TextInput } from '@/components/forms';
 import { useAuth } from '@/lib/auth-context';
+import TurnstileWidget from '@/components/TurnstileWidget';
 
 export default function SignupPage() {
   const { signup } = useAuth();
@@ -19,6 +20,7 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   // Live username validation
   const usernameValid =
@@ -52,7 +54,7 @@ export default function SignupPage() {
     }
     setLoading(true);
     try {
-      await signup(email, username, password, acceptedTerms, acceptedPrivacy);
+      await signup(email, username, password, acceptedTerms, acceptedPrivacy, turnstileToken ?? undefined);
       router.push('/onboarding');
     } catch (e: any) {
       setErr(e.message);
@@ -219,12 +221,14 @@ export default function SignupPage() {
             </span>
           </label>
 
+          <TurnstileWidget onToken={setTurnstileToken} />
+
           <Button
             type="submit"
             size="lg"
             fullWidth
             loading={loading}
-            disabled={loading || !acceptedTerms || !acceptedPrivacy}
+            disabled={loading || !acceptedTerms || !acceptedPrivacy || turnstileToken === null}
           >
             Continue →
           </Button>

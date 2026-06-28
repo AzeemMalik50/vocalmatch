@@ -45,8 +45,8 @@ export class AuthController {
   })
   @ApiResponse({ status: 201, description: 'Account created -- returns `{ user, token }`.' })
   @ApiResponse({ status: 409, description: 'Email or username already taken.' })
-  signup(@Body() dto: SignupDto) {
-    return this.auth.signup(dto);
+  signup(@Req() req: any, @Body() dto: SignupDto) {
+    return this.auth.signup(dto, req.ip);
   }
 
   @Throttle({ short: { limit: 5, ttl: 60_000 } })
@@ -60,8 +60,8 @@ export class AuthController {
   })
   @ApiResponse({ status: 200, description: 'Login OK.' })
   @ApiResponse({ status: 401, description: 'Invalid credentials.' })
-  login(@Body() dto: LoginDto) {
-    return this.auth.login(dto);
+  login(@Req() req: any, @Body() dto: LoginDto) {
+    return this.auth.login(dto, req.ip);
   }
 
   @Throttle({ short: { limit: 3, ttl: 60_000 } })
@@ -128,8 +128,8 @@ export class AuthController {
       'Public. Always returns 200 -- does not reveal whether the email is registered. ' +
       'If the email matches a user, a reset link is sent.',
   })
-  forgotPassword(@Body() dto: ForgotPasswordDto) {
-    return this.auth.forgotPassword(dto);
+  forgotPassword(@Req() req: any, @Body() dto: ForgotPasswordDto) {
+    return this.auth.forgotPassword(dto, req.ip);
   }
 
   @Throttle({ short: { limit: 5, ttl: 60_000 } })

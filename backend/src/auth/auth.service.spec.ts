@@ -8,6 +8,7 @@ import { User } from '../users/user.entity';
 import { AuthService } from './auth.service';
 import { LegalService } from '../legal/legal.service';
 import { MailerService } from '../mailer/mailer.service';
+import { TurnstileService } from '../security/turnstile.service';
 
 describe('AuthService.signup acceptance plumbing', () => {
   let service: AuthService;
@@ -52,6 +53,7 @@ describe('AuthService.signup acceptance plumbing', () => {
         { provide: JwtService, useValue: jwt },
         { provide: LegalService, useValue: legal },
         { provide: MailerService, useValue: mailer },
+        { provide: TurnstileService, useValue: { verify: jest.fn(async () => true), isEnabled: false } },
       ],
     }).compile();
     service = moduleRef.get(AuthService);
@@ -145,6 +147,7 @@ describe('AuthService.login lockout', () => {
         { provide: JwtService, useValue: jwt },
         { provide: LegalService, useValue: legal },
         { provide: MailerService, useValue: mailer },
+        { provide: TurnstileService, useValue: { verify: jest.fn(async () => true), isEnabled: false } },
       ],
     }).compile();
     service = moduleRef.get(AuthService);
@@ -260,6 +263,7 @@ describe('AuthService password reset', () => {
         { provide: JwtService, useValue: jwt },
         { provide: LegalService, useValue: legal },
         { provide: MailerService, useValue: mailer },
+        { provide: TurnstileService, useValue: { verify: jest.fn(async () => true), isEnabled: false } },
       ],
     }).compile();
     service = moduleRef.get(AuthService);
@@ -350,5 +354,81 @@ describe('AuthService password reset', () => {
         } as any),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
+  });
+});
+
+describe('AuthService.login Turnstile gate', () => {
+  let service: AuthService;
+  const usersState: any[] = [];
+  const turnstile: any = { verify: jest.fn(), isEnabled: true };
+
+  const userRepo: any = {
+    createQueryBuilder: jest.fn(() => ({
+      where: jest.fn().mockReturnThis(),
+      getOne: jest.fn(async () => usersState[0] ?? null),
+    })),
+    save: jest.fn(async (row: any) => {
+      const i = usersState.findIndex((u) => u.id === row.id);
+      if (i >= 0) usersState[i] = { ...usersState[i], ...row };
+      else usersState.push(row);
+      return row;
+    }),
+    create: jest.fn((row: any) => row),
+    findOne: jest.fn(async ({ where }: any) =>
+      usersState.find((u) => u.id === where.id) ?? null,
+    ),
+  };
+  const jwt: any = { sign: jest.fn(() => 'fake.jwt') };
+  const legal: any = {
+    getCurrentVersionIds: jest.fn(async () => ({
+      terms: 'v-t',
+      privacy: 'v-p',
+    })),
+  };
+  const mailer: any = { sendPasswordResetEmail: jest.fn(async () => undefined) };
+
+  beforeEach(async () => {
+    usersState.length = 0;
+    jest.clearAllMocks();
+    turnstile.verify.mockReset();
+    const bcrypt = require('bcryptjs');
+    const hash = await bcrypt.hash('correctpwd', 10);
+    usersState.push({
+      id: 'u-1',
+      email: 'a@b.com',
+      username: 'tester',
+      passwordHash: hash,
+      failedLoginCount: 3,
+      lockoutUntil: null,
+      tokenVersion: 0,
+    });
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        AuthService,
+        { provide: getRepositoryToken(User), useValue: userRepo },
+        { provide: JwtService, useValue: jwt },
+        { provide: LegalService, useValue: legal },
+        { provide: MailerService, useValue: mailer },
+        { provide: TurnstileService, useValue: turnstile },
+      ],
+    }).compile();
+    service = moduleRef.get(AuthService);
+  });
+
+  it('requires Turnstile after 3 failed attempts; rejects when verify returns false', async () => {
+    turnstile.verify.mockResolvedValue(false);
+    await expect(
+      service.login({ email: 'a@b.com', password: 'correctpwd' } as any),
+    ).rejects.toThrow(/Bot challenge required/);
+    expect(turnstile.verify).toHaveBeenCalled();
+  });
+
+  it('proceeds past the Turnstile gate when verify returns true', async () => {
+    turnstile.verify.mockResolvedValue(true);
+    const out = await service.login(
+      { email: 'a@b.com', password: 'correctpwd', turnstileToken: 't' } as any,
+    );
+    expect(out.token).toBe('fake.jwt');
+    expect(turnstile.verify).toHaveBeenCalledWith('t', undefined);
   });
 });

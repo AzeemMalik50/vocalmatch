@@ -16,6 +16,7 @@ import { AdminModule } from './admin/admin.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { StatsModule } from './stats/stats.module';
 import { LegalModule } from './legal/legal.module';
+import { SecurityModule } from './security/security.module';
 
 // ─── Entities (registered with TypeORM at the root) ───────────────
 import { User } from './users/user.entity';
@@ -86,6 +87,7 @@ const entities = [
     RealtimeModule,
     StatsModule,
     LegalModule,
+    SecurityModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

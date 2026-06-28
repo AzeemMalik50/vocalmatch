@@ -1,4 +1,4 @@
-import { Equals, IsBoolean, IsEmail, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { Equals, IsBoolean, IsEmail, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
 export class SignupDto {
   @IsEmail()
@@ -22,6 +22,11 @@ export class SignupDto {
   @IsBoolean()
   @Equals(true, { message: 'You must agree to the Privacy Policy' })
   acceptedPrivacy: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  turnstileToken?: string;
 }
 
 export class LoginDto {
@@ -36,6 +41,11 @@ export class LoginDto {
 
   @IsString()
   password: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  turnstileToken?: string;
 }
 
 export class ChangeEmailDto {
@@ -63,6 +73,11 @@ export class DeleteAccountDto {
 export class ForgotPasswordDto {
   @IsEmail()
   email: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  turnstileToken?: string;
 }
 
 export class ResetPasswordDto {

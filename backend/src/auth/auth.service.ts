@@ -14,6 +14,7 @@ import * as crypto from 'crypto';
 import { User } from '../users/user.entity';
 import { LegalService } from '../legal/legal.service';
 import { MailerService } from '../mailer/mailer.service';
+import { TurnstileService } from '../security/turnstile.service';
 import {
   ChangeEmailDto,
   ChangePasswordDto,
@@ -31,9 +32,18 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly legal: LegalService,
     private readonly mailer: MailerService,
+    private readonly turnstile: TurnstileService,
   ) {}
 
-  async signup(dto: SignupDto) {
+  async signup(dto: SignupDto, remoteIp?: string) {
+    const turnstilePass = await this.turnstile.verify(
+      dto.turnstileToken,
+      remoteIp,
+    );
+    if (!turnstilePass) {
+      throw new BadRequestException('Bot challenge failed — refresh and try again');
+    }
+
     const lcEmail = dto.email.toLowerCase();
     const lcUsername = dto.username.toLowerCase();
 
@@ -75,7 +85,7 @@ export class AuthService {
     return this.tokenize(user);
   }
 
-  async login(dto: LoginDto) {
+  async login(dto: LoginDto, remoteIp?: string) {
     // The `email` field on LoginDto is a misnomer for backwards
     // compatibility — callers may send either an email address or a
     // username. Match against both columns case-insensitively in a
@@ -96,6 +106,21 @@ export class AuthService {
       throw new LockedException(
         `Account locked until ${user.lockoutUntil.toISOString()}. Try again later.`,
       );
+    }
+
+    // Adaptive Turnstile: only required after 3 consecutive failed
+    // attempts. Cheap user-experience win — legit users don't see the
+    // widget unless something is already off.
+    if ((user.failedLoginCount ?? 0) >= 3) {
+      const turnstilePass = await this.turnstile.verify(
+        dto.turnstileToken,
+        remoteIp,
+      );
+      if (!turnstilePass) {
+        throw new UnauthorizedException(
+          'Bot challenge required — refresh and try again',
+        );
+      }
     }
 
     const ok = await bcrypt.compare(dto.password, user.passwordHash);
@@ -194,7 +219,15 @@ export class AuthService {
     return user;
   }
 
-  async forgotPassword(dto: ForgotPasswordDto) {
+  async forgotPassword(dto: ForgotPasswordDto, remoteIp?: string) {
+    const turnstilePass = await this.turnstile.verify(
+      dto.turnstileToken,
+      remoteIp,
+    );
+    if (!turnstilePass) {
+      throw new BadRequestException('Bot challenge failed — refresh and try again');
+    }
+
     const lcEmail = dto.email.toLowerCase();
     const user = await this.users.findOne({ where: { email: lcEmail } });
     if (!user) {

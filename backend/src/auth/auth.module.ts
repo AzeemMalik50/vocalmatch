@@ -8,6 +8,7 @@ import { JwtStrategy } from './jwt.strategy';
 import { User } from '../users/user.entity';
 import { LegalModule } from '../legal/legal.module';
 import { MailerModule } from '../mailer/mailer.module';
+import { SecurityModule } from '../security/security.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { MailerModule } from '../mailer/mailer.module';
     }),
     forwardRef(() => LegalModule),
     MailerModule,
+    SecurityModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

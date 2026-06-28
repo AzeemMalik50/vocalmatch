@@ -6,19 +6,24 @@ import Link from 'next/link';
 import Nav from '@/components/Nav';
 import { Button, Field, TextInput } from '@/components/forms';
 import { api } from '@/lib/api';
+import TurnstileWidget from '@/components/TurnstileWidget';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
     setLoading(true);
     try {
-      await api.forgotPassword({ email: email.trim().toLowerCase() });
+      await api.forgotPassword({
+        email: email.trim().toLowerCase(),
+        turnstileToken: turnstileToken ?? undefined,
+      });
       setSubmitted(true);
     } catch (e: any) {
       setErr(e?.message ?? 'Something went wrong.');
@@ -62,7 +67,8 @@ export default function ForgotPasswordPage() {
                 required
               />
             </Field>
-            <Button type="submit" disabled={loading || !email}>
+            <TurnstileWidget onToken={setTurnstileToken} />
+            <Button type="submit" disabled={loading || !email || turnstileToken === null}>
               {loading ? 'Sending...' : 'Send reset link'}
             </Button>
             <p className="text-xs text-haze">
