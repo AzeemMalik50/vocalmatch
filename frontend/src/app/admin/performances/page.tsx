@@ -451,21 +451,24 @@ function PerformanceRow({
                 · {perf.song.artist}
               </span>
             </span>
-          ) : perf.songTitle ? (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-yellow-500/25 border border-yellow-300/70 max-w-full">
-              <Music
-                aria-hidden="true"
-                className="w-3.5 h-3.5 text-yellow-200 shrink-0"
-              />
-              <span className="text-sm font-bold text-yellow-50 truncate">
-                {perf.songTitle}
-              </span>
-              <span className="text-[10px] uppercase tracking-widest text-yellow-100 font-bold">
-                · Unlinked
-              </span>
-            </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-500/25 border border-red-400/70">
+            // No formal song link. Previously we forked into two chips
+            // here: a yellow "<songTitle> · UNLINKED" when the legacy
+            // free-text title existed, and a red "No song linked"
+            // otherwise. The split was misleading because the yellow
+            // chip showed a real song name that wasn't actually
+            // associated with anything — admins read it as a link.
+            // Collapsed into the single "No song linked" red chip; the
+            // legacy songTitle is preserved as a hover tooltip so the
+            // historical text isn't lost during triage.
+            <span
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-500/25 border border-red-400/70"
+              title={
+                perf.songTitle
+                  ? `Uploader originally tagged this as "${perf.songTitle}"`
+                  : undefined
+              }
+            >
               <Music
                 aria-hidden="true"
                 className="w-3.5 h-3.5 text-red-200 shrink-0"
