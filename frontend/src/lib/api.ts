@@ -32,6 +32,28 @@ export function buildStreamUrl(
   return `${API_URL}/stream?${params.toString()}`;
 }
 
+/**
+ * Build an <img>-ready URL for the backend QR endpoint. Not a fetch —
+ * the value is meant to land directly in `<img src=...>` so the
+ * browser caches the result for us.
+ */
+export function qrImageUrl(opts: {
+  url: string;
+  size?: number;
+  format?: 'png' | 'svg';
+  fgColor?: string;
+  bgColor?: string;
+  margin?: number;
+}): string {
+  const params = new URLSearchParams({ url: opts.url });
+  if (opts.size) params.set('size', String(opts.size));
+  if (opts.format) params.set('format', opts.format);
+  if (opts.fgColor) params.set('fgColor', opts.fgColor);
+  if (opts.bgColor) params.set('bgColor', opts.bgColor);
+  if (opts.margin !== undefined) params.set('margin', String(opts.margin));
+  return `${API_URL}/qr?${params.toString()}`;
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {},

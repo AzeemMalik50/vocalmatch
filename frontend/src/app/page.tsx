@@ -29,6 +29,7 @@ import Nav from '@/components/Nav';
 import LobbyToast from '@/components/LobbyToast';
 import CountdownTimer from '@/components/CountdownTimer';
 import DarkSelect from '@/components/DarkSelect';
+import InlineQrCard from '@/components/InlineQrCard';
 import {
   api,
   AtRiskCrownDto,
@@ -970,9 +971,33 @@ function ChallengeFlow({
           >
             Challenge Now →
           </Link>
+          <div className="mt-6 flex flex-col items-center gap-2">
+            <p className="text-[10px] uppercase tracking-[0.25em] text-haze/70">
+              Or scan to challenge
+            </p>
+            <InlineHomepageQr />
+          </div>
         </div>
       </div>
     </section>
+  );
+}
+
+function InlineHomepageQr() {
+  // Compute client-side after hydration so the QR encodes the actual
+  // current host (localhost in dev, vocalmatch.com in prod) rather than
+  // a hardcoded fallback that mismatches between SSR + CSR.
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    setUrl(`${window.location.origin}/upload?challenge=1`);
+  }, []);
+  if (!url) return null;
+  return (
+    <InlineQrCard
+      url={url}
+      title="Pick up the Red Phone"
+      label="Scan to challenge"
+    />
   );
 }
 

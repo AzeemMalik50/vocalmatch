@@ -21,6 +21,7 @@ const TABS: { href: string; label: string }[] = [
   { href: '/admin/users', label: 'People' },
   { href: '/admin/legal', label: 'Legal' },
   { href: '/admin/audit', label: 'Audit' },
+  { href: '/admin/qr', label: 'QR Codes' },
 ];
 
 /**

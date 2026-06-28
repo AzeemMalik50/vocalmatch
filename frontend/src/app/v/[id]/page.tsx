@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
+import QrShareModal from '@/components/QrShareModal';
+import InlineQrCard from '@/components/InlineQrCard';
 import { Spinner, SkeletonBlock } from '@/components/Loaders';
 import { VideoDto, api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
@@ -30,6 +32,11 @@ export default function VideoDetailPage() {
   const [err, setErr] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (id) setVideoUrl(`${window.location.origin}/v/${id}`);
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -205,21 +212,47 @@ export default function VideoDetailPage() {
                   <span>·</span>
                   <span>{new Date(video.createdAt).toLocaleDateString()}</span>
 
+                  <button
+                    onClick={() => setQrOpen(true)}
+                    className="ml-auto px-3 py-1 rounded-md border border-stage-700/60 text-haze hover:text-white text-xs transition-colors"
+                  >
+                    Share as QR
+                  </button>
+
                   {user && video.uploader?.id === user.id && (
                     <button
                       onClick={handleDelete}
                       disabled={deleting}
-                      className="ml-auto text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
+                      className="text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
                     >
                       {deleting ? 'Deleting…' : 'Delete'}
                     </button>
                   )}
                 </div>
+
+                {videoUrl && (
+                  <div className="pt-4">
+                    <InlineQrCard
+                      url={videoUrl}
+                      title="Share this performance"
+                      label="Scan to watch"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </>
         )}
       </main>
+
+      {videoUrl && (
+        <QrShareModal
+          open={qrOpen}
+          onClose={() => setQrOpen(false)}
+          url={videoUrl}
+          title="Share this performance"
+        />
+      )}
     </>
   );
 }
