@@ -582,12 +582,17 @@ function ResolveTieControl({
           Cancel
         </button>
       </div>
-      {(!a || !b) && (
+      {!a && !b ? (
+        <p className="text-[11px] text-yellow-300 text-right max-w-2xl">
+          Both performances have been deleted; you can still pick a winner
+          from either deleted side to release the streak update.
+        </p>
+      ) : (!a || !b) ? (
         <p className="text-[11px] text-yellow-300 text-right max-w-2xl">
           One performance has been deleted; you can still pick a winner —
           the surviving side will take the crown.
         </p>
-      )}
+      ) : null}
       {error && <p className="text-xs text-red-400 text-right">{error}</p>}
     </div>
   );
