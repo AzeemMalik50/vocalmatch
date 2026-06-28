@@ -49,13 +49,19 @@ export default function AdminChallengesPage() {
       if (reset) setLoading(true);
       else setLoadingMore(true);
       try {
+        // Read nextOffset off the closure — useCallback depends on it
+        // below so this value is always current.
         const nextOff = reset ? 0 : nextOffset;
         const resp = await api.adminListChallenges({
           status: filter === 'all' ? undefined : filter,
           limit: PAGE_SIZE,
           offset: nextOff,
         });
-        setItems(reset ? resp.items : [...items, ...resp.items]);
+        // Functional updater so we don't capture `items` in the closure.
+        // Without this, subsequent Load More clicks would spread an empty
+        // (stale) items array, replacing the on-screen rows with just the
+        // newly-fetched page.
+        setItems((prev) => (reset ? resp.items : [...prev, ...resp.items]));
         setHasMore(resp.hasMore);
         setNextOffset(resp.nextOffset ?? nextOff + PAGE_SIZE);
       } finally {
@@ -63,8 +69,11 @@ export default function AdminChallengesPage() {
         else setLoadingMore(false);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filter],
+    // nextOffset MUST be in the deps so paged "Load more" advances past
+    // the first page. The useEffect below pins to [filter] only and uses
+    // its own ESLint-disabled comment, so this change doesn't introduce
+    // an infinite re-fetch loop.
+    [filter, nextOffset],
   );
 
   useEffect(() => {
