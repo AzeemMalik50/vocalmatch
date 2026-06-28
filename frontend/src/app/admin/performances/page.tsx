@@ -313,13 +313,13 @@ function PerformanceRow({
   const [picking, setPicking] = useState(false);
   return (
     <li
-      className={`bg-stage-900 border rounded-xl p-4 flex flex-wrap items-start justify-between gap-3 ${
+      className={`bg-stage-900 border rounded-xl p-4 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-start sm:justify-between gap-3 ${
         perf.deletedAt
           ? 'border-red-500/30 opacity-60'
           : 'border-stage-700/60'
       }`}
     >
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 w-full sm:w-auto sm:flex-1">
         <div className="flex items-center gap-2 mb-1 flex-wrap">
           <p className="font-bold text-white">{perf.title}</p>
           {/* Deleted status stays in the title row since it changes the
