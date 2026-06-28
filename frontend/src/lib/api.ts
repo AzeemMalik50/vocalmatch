@@ -825,6 +825,12 @@ export const api = {
       source?: 'challenge' | 'manual';
       limit?: number;
       offset?: number;
+      /**
+       * Include the total matching count alongside the page. Costs one
+       * extra COUNT query — used by the admin dashboard stat cards so
+       * "Completed" reflects the real number, not just the first page.
+       */
+      withTotal?: boolean;
     } = {},
   ) => {
     const qs = new URLSearchParams();
@@ -833,11 +839,13 @@ export const api = {
     if (params.source) qs.set('source', params.source);
     if (params.limit != null) qs.set('limit', String(params.limit));
     if (params.offset != null) qs.set('offset', String(params.offset));
+    if (params.withTotal) qs.set('withTotal', 'true');
     const suffix = qs.toString() ? `?${qs}` : '';
     return request<{
       items: BattleSummaryDto[];
       hasMore: boolean;
       nextOffset: number | null;
+      total?: number;
     }>(`/battles${suffix}`);
   },
   getBattle: (id: string) => request<BattleDto>(`/battles/${id}`),

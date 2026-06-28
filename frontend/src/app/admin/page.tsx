@@ -23,16 +23,24 @@ export default function AdminOverviewPage() {
 
   const refetch = useCallback(async () => {
     try {
+      // `withTotal: true` makes the backend run a COUNT alongside the
+      // page query so the dashboard cards reflect the real number of
+      // matching battles rather than the first paginated page (default
+      // 50). Previously this dashboard reported 50 completed battles
+      // even when 84+ existed because items.length was capped by the
+      // page size. Active songs uses a high limit because /songs
+      // doesn't yet expose a withTotal hook; 200 (the backend cap)
+      // covers any realistic catalog.
       const [live, awaiting, completed, songsResp] = await Promise.all([
-        api.listBattles({ status: 'live' }),
-        api.listBattles({ status: 'needs_decision' }),
-        api.listBattles({ status: 'completed' }),
-        api.listSongs('all'),
+        api.listBattles({ status: 'live', withTotal: true }),
+        api.listBattles({ status: 'needs_decision', withTotal: true }),
+        api.listBattles({ status: 'completed', withTotal: true }),
+        api.listSongs({ status: 'all', limit: 200 }),
       ]);
       setStats({
-        liveBattles: live.items.length,
-        needsDecision: awaiting.items.length,
-        completedBattles: completed.items.length,
+        liveBattles: live.total ?? live.items.length,
+        needsDecision: awaiting.total ?? awaiting.items.length,
+        completedBattles: completed.total ?? completed.items.length,
         activeSongs: songsResp.items.filter((s) => s.status === 'active').length,
       });
       setRecentLive(live.items.slice(0, 5));

@@ -232,27 +232,50 @@ export class BattlesService {
     source?: 'challenge' | 'manual';
     limit?: number;
     offset?: number;
+    /**
+     * When true, return the total matching count alongside the page.
+     * Costs one extra COUNT(*) — opt-in because list / "Load more"
+     * calls don't need it, but the admin dashboard does (so the stat
+     * card actually reflects the real number of completed battles,
+     * not just the first paginated page).
+     */
+    withTotal?: boolean;
   } = {}) {
     const limit = Math.min(opts.limit ?? 50, 200);
     const offset = opts.offset ?? 0;
-    const qb = this.battles
-      .createQueryBuilder('b')
-      .orderBy('b.createdAt', 'DESC')
-      // +1 to detect whether more rows exist beyond this page, without a COUNT.
-      .take(limit + 1)
-      .skip(offset);
-    if (opts.status) qb.andWhere('b.status = :status', { status: opts.status });
-    if (opts.songId) qb.andWhere('b.songId = :songId', { songId: opts.songId });
-    if (opts.source === 'challenge') {
-      qb.andWhere(
-        'EXISTS (SELECT 1 FROM challenge_submissions cs WHERE cs."resultingBattleId" = b.id)',
-      );
-    } else if (opts.source === 'manual') {
-      qb.andWhere(
-        'NOT EXISTS (SELECT 1 FROM challenge_submissions cs WHERE cs."resultingBattleId" = b.id)',
-      );
-    }
-    const rows = await qb.getMany();
+
+    // Shared filter so the page query and the optional count query
+    // see the same WHERE.
+    const applyFilters = (qb: ReturnType<typeof this.battles.createQueryBuilder>) => {
+      if (opts.status) qb.andWhere('b.status = :status', { status: opts.status });
+      if (opts.songId) qb.andWhere('b.songId = :songId', { songId: opts.songId });
+      if (opts.source === 'challenge') {
+        qb.andWhere(
+          'EXISTS (SELECT 1 FROM challenge_submissions cs WHERE cs."resultingBattleId" = b.id)',
+        );
+      } else if (opts.source === 'manual') {
+        qb.andWhere(
+          'NOT EXISTS (SELECT 1 FROM challenge_submissions cs WHERE cs."resultingBattleId" = b.id)',
+        );
+      }
+      return qb;
+    };
+
+    const qb = applyFilters(
+      this.battles
+        .createQueryBuilder('b')
+        .orderBy('b.createdAt', 'DESC')
+        // +1 to detect whether more rows exist beyond this page, without a COUNT.
+        .take(limit + 1)
+        .skip(offset),
+    );
+
+    const [rows, total] = await Promise.all([
+      qb.getMany(),
+      opts.withTotal
+        ? applyFilters(this.battles.createQueryBuilder('b')).getCount()
+        : Promise.resolve<number | undefined>(undefined),
+    ]);
     const hasMore = rows.length > limit;
     const items = hasMore ? rows.slice(0, limit) : rows;
 
@@ -276,6 +299,7 @@ export class BattlesService {
       })),
       hasMore,
       nextOffset: hasMore ? offset + limit : null,
+      total,
     };
   }
 
