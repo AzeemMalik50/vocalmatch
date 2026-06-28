@@ -16,9 +16,12 @@ type FilterStatus = ChallengeStatus | 'all';
 // then was tightened to pending-only, which made it visually identical to
 // the dedicated "Pending" tab. Dropped the Open tab entirely; each tab now
 // maps to exactly one underlying state, and "All" is the no-filter view.
+// "Completed" added so finalized rows (selected → battle resolved) have a
+// dedicated lane rather than only surfacing in "All".
 const FILTERS: { value: FilterStatus; label: string }[] = [
   { value: 'pending', label: 'Pending' },
   { value: 'selected', label: 'Selected' },
+  { value: 'completed', label: 'Completed' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'all', label: 'All' },
 ];
