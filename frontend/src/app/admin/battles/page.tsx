@@ -558,19 +558,33 @@ function ResolveTieControl({
     // rather than letting the message visually "push" the buttons left.
     <div className="flex flex-col gap-2 w-full items-end">
       <div className="flex flex-wrap gap-2 justify-end">
+        {/* Disable a side when ONLY that side is deleted — admin must
+            pick the surviving performance as winner. When BOTH sides
+            are deleted, both remain selectable so admin can release
+            the streak update against either side. */}
         <button
           type="button"
           onClick={() => pick(battle.performanceAId)}
-          disabled={!!picking}
-          className="px-3 py-1.5 text-xs font-bold rounded-md bg-spotlight text-white disabled:opacity-50"
+          disabled={!!picking || (!a && !!b)}
+          title={
+            !a && !!b
+              ? 'Side A was deleted — pick the surviving side as winner.'
+              : undefined
+          }
+          className="px-3 py-1.5 text-xs font-bold rounded-md bg-spotlight text-white disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {labelA}
         </button>
         <button
           type="button"
           onClick={() => pick(battle.performanceBId)}
-          disabled={!!picking}
-          className="px-3 py-1.5 text-xs font-bold rounded-md bg-gold text-stage-950 disabled:opacity-50"
+          disabled={!!picking || (!b && !!a)}
+          title={
+            !b && !!a
+              ? 'Side B was deleted — pick the surviving side as winner.'
+              : undefined
+          }
+          className="px-3 py-1.5 text-xs font-bold rounded-md bg-gold text-stage-950 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {labelB}
         </button>
