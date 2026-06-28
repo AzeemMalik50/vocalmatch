@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import AdminShell from '@/components/AdminShell';
+import { StageLoader } from '@/components/Loaders';
 import { api, SongDto, VideoDto } from '@/lib/api';
 
 /**
@@ -15,9 +16,28 @@ import { api, SongDto, VideoDto } from '@/lib/api';
  *      (or, fallback, all uploads with matching songTitle)
  *   3. Pick performance A and performance B
  *   4. Optional title, voting window (default 48h)
+ *
+ * Supports deep-link preselect via `?songId=...` so the Champions page
+ * "Seed the first battle" CTA lands here with the right song already
+ * chosen — admin doesn't have to re-pick from the dropdown.
  */
 export default function AdminNewBattlePage() {
+  return (
+    <Suspense
+      fallback={
+        <AdminShell>
+          <StageLoader message="Loading…" />
+        </AdminShell>
+      }
+    >
+      <AdminNewBattleForm />
+    </Suspense>
+  );
+}
+
+function AdminNewBattleForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [songs, setSongs] = useState<SongDto[]>([]);
   const [songId, setSongId] = useState('');
   const [candidates, setCandidates] = useState<VideoDto[]>([]);
@@ -28,18 +48,62 @@ export default function AdminNewBattlePage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
+  // When a URL `?songId=` was supplied but that song isn't in the
+  // active list (retired, deleted, or just unknown), we surface a
+  // notice instead of silently leaving the dropdown empty.
+  const [inactiveSongNotice, setInactiveSongNotice] = useState<
+    { title: string; status: string } | null
+  >(null);
 
-  // Load active songs on mount
+  // Load active songs on mount.
+  //
+  // `limit: 200` (the backend cap) is intentional: the default page size
+  // is 50, which broke the `?songId=` preselect when the requested song
+  // happened to be on a later page (the find() returned undefined and
+  // the dropdown stayed empty). 200 covers every realistic admin
+  // catalog; we'll switch to true pagination here when the song count
+  // outgrows that.
   useEffect(() => {
     (async () => {
       try {
-        const resp = await api.listSongs('all');
+        const resp = await api.listSongs({ status: 'all', limit: 200 });
         setSongs(resp.items.filter((s) => s.status === 'active'));
       } catch (e: any) {
         setError(e.message);
       }
     })();
   }, []);
+
+  // Preselect songId from `?songId=...` once the active-songs list has
+  // loaded. Only fires once: if the user changes the dropdown manually
+  // later we don't keep yanking it back to the URL param. Validates
+  // against the active songs list — if the link points at a song that
+  // isn't active (retired or unknown), we fetch its detail just to
+  // surface a clear "X is no longer active, pick another below" notice
+  // rather than leaving the admin staring at an empty dropdown.
+  useEffect(() => {
+    if (songs.length === 0) return;
+    if (songId) return; // user already picked OR we already preselected
+    if (inactiveSongNotice) return; // already informed the user
+    const urlSongId = searchParams?.get('songId');
+    if (!urlSongId) return;
+    const match = songs.find((s) => s.id === urlSongId);
+    if (match) {
+      setSongId(urlSongId);
+      return;
+    }
+    // The linked song isn't in the active list. Look it up so the
+    // notice can name it. Worst case (e.g. song was hard-deleted), the
+    // fetch 404s and we fall back to a generic message.
+    (async () => {
+      try {
+        const song = await api.getSong(urlSongId);
+        setInactiveSongNotice({ title: song.title, status: song.status });
+      } catch {
+        setInactiveSongNotice({ title: 'The linked song', status: 'unavailable' });
+      }
+    })();
+  }, [songs, songId, searchParams, inactiveSongNotice]);
 
   // When the song changes, load eligible performances
   useEffect(() => {
@@ -114,6 +178,24 @@ export default function AdminNewBattlePage() {
       </p>
 
       <form onSubmit={submit} className="space-y-8 max-w-3xl">
+        {/* URL preselect failed because the linked song isn't active.
+            Surface a clear message so the admin knows why the dropdown
+            isn't preselected, naming the song when possible. */}
+        {inactiveSongNotice && (
+          <div className="rounded-md border border-yellow-500/40 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-100">
+            <p>
+              <span className="font-bold">
+                &ldquo;{inactiveSongNotice.title}&rdquo;
+              </span>{' '}
+              is {inactiveSongNotice.status === 'unavailable'
+                ? 'no longer available'
+                : `currently ${inactiveSongNotice.status}`}{' '}
+              and can&rsquo;t host a battle. Please pick another song from the
+              list below.
+            </p>
+          </div>
+        )}
+
         {/* Song picker */}
         <Field label="Centerstage Song" required>
           <select

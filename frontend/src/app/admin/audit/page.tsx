@@ -174,7 +174,7 @@ export default function AdminAuditLogPage() {
           <button
             onClick={() => load(nextOffset, true)}
             disabled={loadingMore}
-            className="px-4 py-2 rounded-md border border-stage-700/60 text-haze hover:text-white"
+            className="group inline-flex items-center gap-2 px-7 py-3 bg-stage-900 border-2 border-spotlight/60 text-spotlight font-bold uppercase tracking-widest text-xs rounded-md shadow-md shadow-spotlight/10 hover:bg-spotlight/10 hover:border-spotlight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spotlight focus-visible:ring-offset-2 focus-visible:ring-offset-stage-950 disabled:opacity-50"
           >
             {loadingMore ? 'Loading…' : 'Load more'}
           </button>

@@ -313,13 +313,13 @@ function PerformanceRow({
   const [picking, setPicking] = useState(false);
   return (
     <li
-      className={`bg-stage-900 border rounded-xl p-4 flex flex-wrap items-start justify-between gap-3 ${
+      className={`bg-stage-900 border rounded-xl p-4 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-start sm:justify-between gap-3 ${
         perf.deletedAt
           ? 'border-red-500/30 opacity-60'
           : 'border-stage-700/60'
       }`}
     >
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 w-full sm:w-auto sm:flex-1">
         <div className="flex items-center gap-2 mb-1 flex-wrap">
           <p className="font-bold text-white">{perf.title}</p>
           {/* Deleted status stays in the title row since it changes the
@@ -451,21 +451,24 @@ function PerformanceRow({
                 · {perf.song.artist}
               </span>
             </span>
-          ) : perf.songTitle ? (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-yellow-500/25 border border-yellow-300/70 max-w-full">
-              <Music
-                aria-hidden="true"
-                className="w-3.5 h-3.5 text-yellow-200 shrink-0"
-              />
-              <span className="text-sm font-bold text-yellow-50 truncate">
-                {perf.songTitle}
-              </span>
-              <span className="text-[10px] uppercase tracking-widest text-yellow-100 font-bold">
-                · Unlinked
-              </span>
-            </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-500/25 border border-red-400/70">
+            // No formal song link. Previously we forked into two chips
+            // here: a yellow "<songTitle> · UNLINKED" when the legacy
+            // free-text title existed, and a red "No song linked"
+            // otherwise. The split was misleading because the yellow
+            // chip showed a real song name that wasn't actually
+            // associated with anything — admins read it as a link.
+            // Collapsed into the single "No song linked" red chip; the
+            // legacy songTitle is preserved as a hover tooltip so the
+            // historical text isn't lost during triage.
+            <span
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-500/25 border border-red-400/70"
+              title={
+                perf.songTitle
+                  ? `Uploader originally tagged this as "${perf.songTitle}"`
+                  : undefined
+              }
+            >
               <Music
                 aria-hidden="true"
                 className="w-3.5 h-3.5 text-red-200 shrink-0"

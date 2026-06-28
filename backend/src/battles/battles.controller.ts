@@ -51,21 +51,30 @@ export class BattlesController {
   @ApiQuery({ name: 'source', required: false, enum: ['challenge', 'manual'], description: 'Filter by how the battle was created: `challenge` = promoted from a Red Phone submission; `manual` = admin-created without a linked challenge.' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'offset', required: false, type: Number })
+  @ApiQuery({
+    name: 'withTotal',
+    required: false,
+    type: String,
+    description:
+      'Set to "true" to include the total matching count (an extra COUNT query). Used by dashboard stat cards; the regular paginated list does not need it.',
+  })
   async list(
     @Query('status') status?: BattleStatus,
     @Query('songId') songId?: string,
     @Query('source') source?: 'challenge' | 'manual',
     @Query('limit') limitRaw?: string,
     @Query('offset') offsetRaw?: string,
+    @Query('withTotal') withTotalRaw?: string,
   ) {
     const limit = limitRaw ? parseInt(limitRaw, 10) || undefined : undefined;
     const offset = offsetRaw ? parseInt(offsetRaw, 10) || 0 : undefined;
-    const { items, hasMore, nextOffset } = await this.battles.findAll({
+    const { items, hasMore, nextOffset, total } = await this.battles.findAll({
       status,
       songId,
       source,
       limit,
       offset,
+      withTotal: withTotalRaw === 'true',
     });
     // Listing endpoint hides standings — clients render cards from card-level
     // data (title, status, songId), not vote counts. The detail endpoint is
@@ -87,6 +96,7 @@ export class BattlesController {
       })),
       hasMore,
       nextOffset,
+      total,
     };
   }
 

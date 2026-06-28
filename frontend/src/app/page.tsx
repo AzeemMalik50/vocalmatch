@@ -1460,7 +1460,7 @@ function StageCarousel() {
                 Array.from({ length: 5 }).map((_, i) => (
                   <div
                     key={i}
-                    className="flex-shrink-0 w-full sm:w-80 aspect-[16/12] rounded-xl skeleton snap-start"
+                    className="flex-shrink-0 w-full sm:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-3rem)/3)] xl:w-[calc((100%-4.5rem)/4)] aspect-[16/12] rounded-xl skeleton snap-start"
                   />
                 ))
               ) : videos.length === 0 ? (
@@ -1495,14 +1495,16 @@ function StageCard({ video }: { video: VideoDto }) {
   return (
     <Link
       href={`/v/${video.id}`}
-      // Bug #91 — `w-full` makes one card take 100% of the carousel
-      // scroller's visible width (the flex-1 column between the two
-      // arrow buttons), so exactly one card is visible per swipe
-      // on mobile. From `sm:` upward, fall back to the fixed 320px
-      // so multiple cards fit on wider screens. `snap-start` works
-      // with `snap-x snap-mandatory` on the scroller to land each
-      // swipe on a card edge.
-      className="flex-shrink-0 w-full sm:w-80 snap-start group/card hover:scale-105 transition-transform"
+      // Card sizing is responsive so the carousel always shows a WHOLE
+      // number of cards per page — no partial-clipped card on the right
+      // edge at any viewport. gap-6 = 1.5rem between cards.
+      //   default (<640): 1 card per page    (w-full)
+      //   sm (≥640):      2 cards per page   (50% minus half the gap)
+      //   lg (≥1024):     3 cards per page   (33.33% minus 2/3 the gap)
+      //   xl (≥1280):     4 cards per page   (25% minus 3/4 the gap)
+      // `snap-start` + `snap-x snap-mandatory` on the scroller make each
+      // arrow click / swipe land cleanly on a card edge.
+      className="flex-shrink-0 w-full sm:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-3rem)/3)] xl:w-[calc((100%-4.5rem)/4)] snap-start group/card hover:scale-105 transition-transform"
     >
       <div className="relative bg-card/50 backdrop-blur border border-border rounded-xl overflow-hidden hover:border-red-600 transition">
         <div className="aspect-video bg-gradient-to-br from-red-600/30 to-red-900/30 relative flex items-center justify-center overflow-hidden">

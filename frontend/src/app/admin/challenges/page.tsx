@@ -16,9 +16,12 @@ type FilterStatus = ChallengeStatus | 'all';
 // then was tightened to pending-only, which made it visually identical to
 // the dedicated "Pending" tab. Dropped the Open tab entirely; each tab now
 // maps to exactly one underlying state, and "All" is the no-filter view.
+// "Completed" added so finalized rows (selected → battle resolved) have a
+// dedicated lane rather than only surfacing in "All".
 const FILTERS: { value: FilterStatus; label: string }[] = [
   { value: 'pending', label: 'Pending' },
   { value: 'selected', label: 'Selected' },
+  { value: 'completed', label: 'Completed' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'all', label: 'All' },
 ];
@@ -46,13 +49,19 @@ export default function AdminChallengesPage() {
       if (reset) setLoading(true);
       else setLoadingMore(true);
       try {
+        // Read nextOffset off the closure — useCallback depends on it
+        // below so this value is always current.
         const nextOff = reset ? 0 : nextOffset;
         const resp = await api.adminListChallenges({
           status: filter === 'all' ? undefined : filter,
           limit: PAGE_SIZE,
           offset: nextOff,
         });
-        setItems(reset ? resp.items : [...items, ...resp.items]);
+        // Functional updater so we don't capture `items` in the closure.
+        // Without this, subsequent Load More clicks would spread an empty
+        // (stale) items array, replacing the on-screen rows with just the
+        // newly-fetched page.
+        setItems((prev) => (reset ? resp.items : [...prev, ...resp.items]));
         setHasMore(resp.hasMore);
         setNextOffset(resp.nextOffset ?? nextOff + PAGE_SIZE);
       } finally {
@@ -60,8 +69,11 @@ export default function AdminChallengesPage() {
         else setLoadingMore(false);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filter],
+    // nextOffset MUST be in the deps so paged "Load more" advances past
+    // the first page. The useEffect below pins to [filter] only and uses
+    // its own ESLint-disabled comment, so this change doesn't introduce
+    // an infinite re-fetch loop.
+    [filter, nextOffset],
   );
 
   useEffect(() => {
@@ -207,7 +219,7 @@ export default function AdminChallengesPage() {
                 type="button"
                 onClick={() => load(false)}
                 disabled={loadingMore}
-                className="px-5 py-2.5 bg-stage-800 border border-stage-700 hover:border-spotlight/40 font-bold rounded-md transition-colors disabled:opacity-50"
+                className="group inline-flex items-center gap-2 px-7 py-3 bg-stage-900 border-2 border-spotlight/60 text-spotlight font-bold uppercase tracking-widest text-xs rounded-md shadow-md shadow-spotlight/10 hover:bg-spotlight/10 hover:border-spotlight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spotlight focus-visible:ring-offset-2 focus-visible:ring-offset-stage-950 disabled:opacity-50"
               >
                 {loadingMore ? 'Loading…' : 'Load more'}
               </button>

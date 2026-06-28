@@ -354,6 +354,10 @@ describe('ChallengesService (critical paths)', () => {
         id: 'song-1',
         currentChampionPerformanceId: 'champ-perf',
       });
+      // Both performances exist AND aren't soft-deleted.
+      videoRepo.findOne
+        .mockResolvedValueOnce({ id: 'champ-perf', deletedAt: null })
+        .mockResolvedValueOnce({ id: 'video-challenger', deletedAt: null });
       battlesService.create.mockResolvedValueOnce({
         id: 'new-battle',
         songId: 'song-1',
@@ -376,6 +380,53 @@ describe('ChallengesService (critical paths)', () => {
       expect(subRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({ resultingBattleId: 'new-battle' }),
       );
+    });
+
+    it("rejects when the champion's performance has been soft-deleted", async () => {
+      subRepo.findOne.mockResolvedValueOnce({
+        id: 'c1',
+        status: 'selected',
+        songId: 'song-1',
+        videoId: 'video-challenger',
+        resultingBattleId: null,
+      });
+      songs.findOne.mockResolvedValueOnce({
+        id: 'song-1',
+        currentChampionPerformanceId: 'champ-perf',
+      });
+      videoRepo.findOne
+        .mockResolvedValueOnce({ id: 'champ-perf', deletedAt: new Date() })
+        .mockResolvedValueOnce({ id: 'video-challenger', deletedAt: null });
+
+      await expect(
+        service.createBattleFromChallenge('c1', 'admin-1'),
+      ).rejects.toThrow(/Champion.+deleted/);
+      expect(battlesService.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects when the challenger's video has been soft-deleted", async () => {
+      subRepo.findOne.mockResolvedValueOnce({
+        id: 'c1',
+        status: 'selected',
+        songId: 'song-1',
+        videoId: 'video-challenger',
+        resultingBattleId: null,
+      });
+      songs.findOne.mockResolvedValueOnce({
+        id: 'song-1',
+        currentChampionPerformanceId: 'champ-perf',
+      });
+      videoRepo.findOne
+        .mockResolvedValueOnce({ id: 'champ-perf', deletedAt: null })
+        .mockResolvedValueOnce({
+          id: 'video-challenger',
+          deletedAt: new Date(),
+        });
+
+      await expect(
+        service.createBattleFromChallenge('c1', 'admin-1'),
+      ).rejects.toThrow(/Challenger.+deleted/);
+      expect(battlesService.create).not.toHaveBeenCalled();
     });
   });
 

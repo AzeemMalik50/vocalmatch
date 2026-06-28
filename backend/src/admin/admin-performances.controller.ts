@@ -86,14 +86,22 @@ export class AdminPerformancesController {
       .take(limit + 1)
       .skip(offset);
 
-    // Bug #45 — previously `includeDeleted=true` returned BOTH active and
-    // soft-deleted rows, which made the "Show Deleted" checkbox act like
-    // a "include deleted on top of active" toggle. The clearer semantic
-    // matching the checkbox label is "Show Deleted = show only the
-    // deleted ones"; the default still hides them.
-    if (includeDeleted === 'true' || includeDeleted === '1') {
-      qb.andWhere('v.deletedAt IS NOT NULL');
-    } else {
+    // "Show Deleted" semantics:
+    //   - off (default) → only active rows           (deletedAt IS NULL)
+    //   - on            → active AND deleted rows    (no filter)
+    //
+    // Bug #45 originally changed this to "deleted-only when checked",
+    // which broke the combination of filters reported here: with
+    // "Missing song only" + "Show deleted" both on, the query became
+    // `deletedAt IS NOT NULL AND songId IS NULL`, which returned no
+    // rows whenever no soft-deleted performance also lacked a song —
+    // so the missing-song results visibly "disappeared" when the
+    // admin added the Show Deleted toggle. Additive semantics match
+    // every other "Show X" checkbox in the app and keep filter
+    // combinations behaving predictably (each filter narrows the
+    // result set independently rather than excluding entire
+    // categories).
+    if (!(includeDeleted === 'true' || includeDeleted === '1')) {
       qb.andWhere('v.deletedAt IS NULL');
     }
     if (missingSong === 'true' || missingSong === '1') {

@@ -282,7 +282,7 @@ function AdminBattlesPageInner() {
                 type="button"
                 onClick={loadMore}
                 disabled={loadingMore}
-                className="px-5 py-2.5 bg-stage-800 border border-stage-700 hover:border-spotlight/40 font-bold rounded-md transition-colors disabled:opacity-50"
+                className="group inline-flex items-center gap-2 px-7 py-3 bg-stage-900 border-2 border-spotlight/60 text-spotlight font-bold uppercase tracking-widest text-xs rounded-md shadow-md shadow-spotlight/10 hover:bg-spotlight/10 hover:border-spotlight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spotlight focus-visible:ring-offset-2 focus-visible:ring-offset-stage-950 disabled:opacity-50"
               >
                 {loadingMore ? 'Loading…' : 'Load more'}
               </button>
@@ -550,21 +550,41 @@ function ResolveTieControl({
     : 'Side B (deleted) wins';
 
   return (
-    <div className="flex flex-col gap-2 w-full">
-      <div className="flex flex-wrap gap-2">
+    // Right-aligned column so the action buttons sit flush with the
+    // right edge of the battle row's action area, matching the
+    // placement of every other admin row's controls. The
+    // deleted-performance info message and error feedback right-align
+    // too so the whole block reads as a single right-anchored stack
+    // rather than letting the message visually "push" the buttons left.
+    <div className="flex flex-col gap-2 w-full items-end">
+      <div className="flex flex-wrap gap-2 justify-end">
+        {/* Disable a side when ONLY that side is deleted — admin must
+            pick the surviving performance as winner. When BOTH sides
+            are deleted, both remain selectable so admin can release
+            the streak update against either side. */}
         <button
           type="button"
           onClick={() => pick(battle.performanceAId)}
-          disabled={!!picking}
-          className="px-3 py-1.5 text-xs font-bold rounded-md bg-spotlight text-white disabled:opacity-50"
+          disabled={!!picking || (!a && !!b)}
+          title={
+            !a && !!b
+              ? 'Side A was deleted — pick the surviving side as winner.'
+              : undefined
+          }
+          className="px-3 py-1.5 text-xs font-bold rounded-md bg-spotlight text-white disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {labelA}
         </button>
         <button
           type="button"
           onClick={() => pick(battle.performanceBId)}
-          disabled={!!picking}
-          className="px-3 py-1.5 text-xs font-bold rounded-md bg-gold text-stage-950 disabled:opacity-50"
+          disabled={!!picking || (!b && !!a)}
+          title={
+            !b && !!a
+              ? 'Side B was deleted — pick the surviving side as winner.'
+              : undefined
+          }
+          className="px-3 py-1.5 text-xs font-bold rounded-md bg-gold text-stage-950 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {labelB}
         </button>
@@ -576,13 +596,18 @@ function ResolveTieControl({
           Cancel
         </button>
       </div>
-      {(!a || !b) && (
-        <p className="text-[11px] text-yellow-300">
+      {!a && !b ? (
+        <p className="text-[11px] text-yellow-300 text-right max-w-2xl">
+          Both performances have been deleted; you can still pick a winner
+          from either deleted side to release the streak update.
+        </p>
+      ) : (!a || !b) ? (
+        <p className="text-[11px] text-yellow-300 text-right max-w-2xl">
           One performance has been deleted; you can still pick a winner —
           the surviving side will take the crown.
         </p>
-      )}
-      {error && <p className="text-xs text-red-400">{error}</p>}
+      ) : null}
+      {error && <p className="text-xs text-red-400 text-right">{error}</p>}
     </div>
   );
 }

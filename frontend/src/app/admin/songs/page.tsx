@@ -314,9 +314,9 @@ export default function AdminSongsPage() {
           {songs.map((s) => (
             <li
               key={s.id}
-              className="bg-stage-900 border border-stage-700/60 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3"
+              className="bg-stage-900 border border-stage-700/60 rounded-xl p-4 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-start sm:justify-between gap-3"
             >
-              <div className="min-w-0">
+              <div className="min-w-0 w-full sm:w-auto sm:flex-1">
                 <p className="font-display font-bold text-lg">{s.title}</p>
                 <p className="text-sm text-haze">{s.artist}</p>
                 {s.currentChampionStreak > 0 && (
@@ -325,7 +325,15 @@ export default function AdminSongsPage() {
                   </p>
                 )}
               </div>
-              <div className="flex items-center gap-3">
+              {/* `items-center` on this row kept controls at the same Y
+                  position relative to themselves, but the OUTER row used
+                  to be `items-center` too — so controls floated to the
+                  vertical middle of every card and jumped between cards
+                  whose content height differed (with vs without the
+                  Defending Champion line). The outer row is now
+                  `items-start` so controls always anchor to the top,
+                  yielding consistent placement across cards. */}
+              <div className="flex items-center gap-3 shrink-0 w-full sm:w-auto sm:justify-end">
                 <span
                   className={`text-[10px] uppercase tracking-widest font-bold ${
                     s.status === 'active' ? 'text-spotlight' : 'text-haze/60'
