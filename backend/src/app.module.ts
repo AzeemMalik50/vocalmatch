@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
 // ─── Domain modules ───────────────────────────────────────────────
 import { AuthModule } from './auth/auth.module';
@@ -13,6 +15,9 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { AdminModule } from './admin/admin.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { StatsModule } from './stats/stats.module';
+import { LegalModule } from './legal/legal.module';
+import { SecurityModule } from './security/security.module';
+import { QrModule } from './qr/qr.module';
 
 // ─── Entities (registered with TypeORM at the root) ───────────────
 import { User } from './users/user.entity';
@@ -23,6 +28,9 @@ import { Battle } from './battles/battle.entity';
 import { Vote } from './battles/vote.entity';
 import { ChallengeSubmission } from './battles/challenge-submission.entity';
 import { Notification } from './notifications/notification.entity';
+import { LegalPage } from './legal/legal-page.entity';
+import { LegalPageVersion } from './legal/legal-page-version.entity';
+import { AdminAuditLog } from './admin/admin-audit-log.entity';
 
 const entities = [
   User,
@@ -33,12 +41,20 @@ const entities = [
   Vote,
   ChallengeSubmission,
   Notification,
+  LegalPage,
+  LegalPageVersion,
+  AdminAuditLog,
 ];
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(), // enables @Cron in BattlesScheduler
+    ThrottlerModule.forRoot([
+      { name: 'short',  ttl: 1_000,     limit: 10 },
+      { name: 'medium', ttl: 60_000,    limit: 100 },
+      { name: 'long',   ttl: 3_600_000, limit: 1000 },
+    ]),
     TypeOrmModule.forRoot(
       process.env.DATABASE_URL
         ? {
@@ -71,6 +87,12 @@ const entities = [
     NotificationsModule,
     RealtimeModule,
     StatsModule,
+    LegalModule,
+    SecurityModule,
+    QrModule,
+  ],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule {}

@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import Nav from '@/components/Nav';
-import Footer from '@/components/Footer';
+import QrShareModal from '@/components/QrShareModal';
+import InlineQrCard from '@/components/InlineQrCard';
 import CountdownTimer from '@/components/CountdownTimer';
 import BattleVotePanel from '@/components/BattleVotePanel';
 import { BattlePageSkeleton, PerformancePaneSkeleton, StageLoader } from '@/components/Loaders';
@@ -49,6 +50,14 @@ export default function BattlePage() {
   const [perfErrorB, setPerfErrorB] = useState<string | null>(null);
   const perfError = perfErrorA || perfErrorB;
   const [shareState, setShareState] = useState<'idle' | 'copied'>('idle');
+  const [qrOpen, setQrOpen] = useState(false);
+  // Computed client-side after hydration so the QR encodes the real
+  // current host (localhost in dev, vocalmatch.com in prod). null during
+  // SSR — InlineQrCard skips rendering until it lands.
+  const [battleUrl, setBattleUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (id) setBattleUrl(`${window.location.origin}/battle/${id}`);
+  }, [id]);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -204,7 +213,6 @@ export default function BattlePage() {
             Back to the stage
           </Link>
         </main>
-        <Footer />
       </>
     );
   }
@@ -216,7 +224,6 @@ export default function BattlePage() {
         <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 md:py-12">
           <BattlePageSkeleton />
         </main>
-        <Footer />
       </>
     );
   }
@@ -257,6 +264,20 @@ export default function BattlePage() {
               </svg>
               {shareState === 'copied' ? 'Link copied' : 'Share'}
             </button>
+            <button
+              type="button"
+              onClick={() => setQrOpen(true)}
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-xs uppercase tracking-widest font-bold rounded-full border border-stage-700 bg-stage-900 text-haze hover:text-white hover:border-stage-500 transition-colors"
+            >
+              Share as QR
+            </button>
+            {battleUrl && (
+              <InlineQrCard
+                url={battleUrl}
+                title="Share this battle"
+                label="Scan to vote"
+              />
+            )}
           </div>
           <h1 className="font-display font-black text-3xl md:text-5xl leading-tight mb-2">
             {battle.title || (song ? `Battle: ${song.title}` : 'A VocalMatch battle')}
@@ -380,7 +401,15 @@ export default function BattlePage() {
           </Link>
         </div>
       </main>
-      <Footer />
+
+      {battleUrl && (
+        <QrShareModal
+          open={qrOpen}
+          onClose={() => setQrOpen(false)}
+          url={battleUrl}
+          title="Share this battle"
+        />
+      )}
     </>
   );
 }

@@ -2,11 +2,17 @@ import {
   Body,
   Controller,
   Get,
+  NotFoundException,
   Param,
   Patch,
+  Post,
   Query,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { AdminAuditInterceptor } from './admin-audit.interceptor';
+import { AuditAction } from './audit-action.decorator';
+import { AdminAuditLog } from './admin-audit-log.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -19,6 +25,7 @@ import { IsBoolean, IsOptional } from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from './admin.guard';
 import { User } from '../users/user.entity';
+import { SkipThrottle } from '@nestjs/throttler';
 
 class UpdateUserFlagsDto {
   @IsOptional() @IsBoolean()
@@ -34,11 +41,15 @@ class UpdateUserFlagsDto {
  */
 @ApiTags('Admin – Users')
 @ApiBearerAuth('bearer')
+@SkipThrottle()
+@UseInterceptors(AdminAuditInterceptor)
 @Controller('admin/users')
 @UseGuards(JwtAuthGuard, AdminGuard)
 export class AdminController {
   constructor(
     @InjectRepository(User) private readonly users: Repository<User>,
+    @InjectRepository(AdminAuditLog)
+    private readonly auditLogs: Repository<AdminAuditLog>,
   ) {}
 
   @Get()
@@ -90,9 +101,10 @@ export class AdminController {
     };
   }
 
+  @AuditAction('user.flags.update', { targetType: 'user' })
   @Patch(':id/flags')
   @ApiOperation({
-    summary: 'Admin — toggle a user’s admin / songwriter flags',
+    summary: "Admin — toggle a user's admin / songwriter flags",
     description: 'Admin only. Promote a user to admin, or grant the songwriter flag for upcoming songwriter-portal features.',
   })
   async updateFlags(
@@ -108,6 +120,82 @@ export class AdminController {
       id: user.id,
       isAdmin: user.isAdmin,
       isSongwriter: user.isSongwriter,
+    };
+  }
+
+  @AuditAction('user.unlock', { targetType: 'user' })
+  @Post(':id/unlock')
+  @ApiOperation({
+    summary: 'Admin — clear brute-force lockout for a user',
+    description:
+      'Resets failedLoginCount to 0 and clears lockoutUntil. ' +
+      'Allows the user to log in immediately.',
+  })
+  async unlock(@Param('id') id: string) {
+    const user = await this.users.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('User not found');
+    user.failedLoginCount = 0;
+    user.lockoutUntil = null;
+    await this.users.save(user);
+    return {
+      unlocked: true,
+      userId: user.id,
+      at: new Date().toISOString(),
+    };
+  }
+
+  @Get('/audit-log')
+  @ApiOperation({
+    summary: 'Admin — paginated audit log (most recent first)',
+    description:
+      'Filterable by adminUserId, action, targetType, targetId. ' +
+      'Max limit 200. Joins username for display.',
+  })
+  @ApiQuery({ name: 'adminUserId', required: false, type: String })
+  @ApiQuery({ name: 'action', required: false, type: String })
+  @ApiQuery({ name: 'targetType', required: false, type: String })
+  @ApiQuery({ name: 'targetId', required: false, type: String })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'offset', required: false, type: Number })
+  async listAuditLog(
+    @Query('adminUserId') adminUserId?: string,
+    @Query('action') action?: string,
+    @Query('targetType') targetType?: string,
+    @Query('targetId') targetId?: string,
+    @Query('limit') limitRaw?: string,
+    @Query('offset') offsetRaw?: string,
+  ) {
+    const limit = Math.min(parseInt(limitRaw ?? '50', 10) || 50, 200);
+    const offset = parseInt(offsetRaw ?? '0', 10) || 0;
+
+    const qb = this.auditLogs
+      .createQueryBuilder('l')
+      .leftJoin(User, 'u', 'u.id = l.adminUserId')
+      .addSelect('u.username', 'adminUsername')
+      .orderBy('l.at', 'DESC')
+      .take(limit + 1)
+      .skip(offset);
+    if (adminUserId) qb.andWhere('l.adminUserId = :a', { a: adminUserId });
+    if (action) qb.andWhere('l.action = :ac', { ac: action });
+    if (targetType) qb.andWhere('l.targetType = :tt', { tt: targetType });
+    if (targetId) qb.andWhere('l.targetId = :ti', { ti: targetId });
+
+    const raws = await qb.getRawAndEntities();
+    const items = raws.entities.slice(0, limit).map((row, i) => ({
+      id: row.id,
+      at: row.at.toISOString(),
+      adminUserId: row.adminUserId,
+      adminUsername: (raws.raw[i] as any).adminUsername ?? null,
+      action: row.action,
+      targetType: row.targetType,
+      targetId: row.targetId,
+      payloadSnapshot: row.payloadSnapshot,
+    }));
+    const hasMore = raws.entities.length > limit;
+    return {
+      items,
+      hasMore,
+      nextOffset: hasMore ? offset + limit : null,
     };
   }
 }

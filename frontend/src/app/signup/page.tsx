@@ -7,6 +7,7 @@ import Nav from '@/components/Nav';
 import Logo from '@/components/Logo';
 import { Button, Field, StepIndicator, TextInput } from '@/components/forms';
 import { useAuth } from '@/lib/auth-context';
+import TurnstileWidget from '@/components/TurnstileWidget';
 
 export default function SignupPage() {
   const { signup } = useAuth();
@@ -17,6 +18,9 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   // Live username validation
   const usernameValid =
@@ -44,9 +48,13 @@ export default function SignupPage() {
       setErr('Pick a valid username first.');
       return;
     }
+    if (!acceptedTerms || !acceptedPrivacy) {
+      setErr('Please accept the Terms of Service and Privacy Policy to continue.');
+      return;
+    }
     setLoading(true);
     try {
-      await signup(email, username, password);
+      await signup(email, username, password, acceptedTerms, acceptedPrivacy, turnstileToken ?? undefined);
       router.push('/onboarding');
     } catch (e: any) {
       setErr(e.message);
@@ -172,11 +180,55 @@ export default function SignupPage() {
             </div>
           )}
 
+          <label className="flex items-start gap-2 text-sm text-haze">
+            <input
+              type="checkbox"
+              checked={acceptedTerms}
+              onChange={(e) => setAcceptedTerms(e.target.checked)}
+              className="mt-1 accent-spotlight"
+            />
+            <span>
+              I agree to the{' '}
+              <Link
+                href="/legal/terms"
+                className="text-spotlight hover:underline"
+                target="_blank"
+                rel="noopener"
+              >
+                Terms of Service
+              </Link>
+              .
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-sm text-haze">
+            <input
+              type="checkbox"
+              checked={acceptedPrivacy}
+              onChange={(e) => setAcceptedPrivacy(e.target.checked)}
+              className="mt-1 accent-spotlight"
+            />
+            <span>
+              I agree to the{' '}
+              <Link
+                href="/legal/privacy"
+                className="text-spotlight hover:underline"
+                target="_blank"
+                rel="noopener"
+              >
+                Privacy Policy
+              </Link>
+              .
+            </span>
+          </label>
+
+          <TurnstileWidget onToken={setTurnstileToken} />
+
           <Button
             type="submit"
             size="lg"
             fullWidth
             loading={loading}
+            disabled={loading || !acceptedTerms || !acceptedPrivacy || turnstileToken === null}
           >
             Continue →
           </Button>

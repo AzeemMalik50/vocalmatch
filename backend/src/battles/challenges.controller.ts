@@ -15,6 +15,7 @@ import {
 } from '@nestjs/swagger';
 import { IsUUID } from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Throttle } from '@nestjs/throttler';
 import { ChallengesService } from './challenges.service';
 
 class CreateChallengeDto {
@@ -27,6 +28,7 @@ class CreateChallengeDto {
 export class ChallengesController {
   constructor(private readonly challenges: ChallengesService) {}
 
+  @Throttle({ short: { limit: 5, ttl: 60_000 } })
   @Post('songs/:songId/challenges')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('bearer')

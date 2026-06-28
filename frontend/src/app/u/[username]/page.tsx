@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
-import Footer from '@/components/Footer';
 import PerformanceCard from '@/components/PerformanceCard';
 import MyChallenges from '@/components/MyChallenges';
 import { PublicUser, VideoDto, VOICE_TYPE_LABELS, api } from '@/lib/api';
@@ -304,8 +303,6 @@ export default function ProfilePage() {
           </>
         )}
       </main>
-
-      <Footer />
     </>
   );
 }

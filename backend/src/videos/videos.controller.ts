@@ -3,7 +3,6 @@ import {
   Body,
   Controller,
   Delete,
-  FileTypeValidator,
   Get,
   MaxFileSizeValidator,
   Param,
@@ -25,6 +24,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import {
+  Equals,
+  IsBoolean,
   IsIn,
   IsOptional,
   IsString,
@@ -32,13 +33,24 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Throttle } from '@nestjs/throttler';
 import { VideosService, VideoSort } from './videos.service';
 import { VideoCategory, VideoVisibility } from './video.entity';
 import { BattlesService } from '../battles/battles.service';
+import { LegalService } from '../legal/legal.service';
+import { assertMagicMime } from '../common/magic-mime.validator';
+import { sanitizeFilename } from '../common/sanitize-filename';
 
 const SORTS: VideoSort[] = ['newest', 'most_viewed', 'trending'];
 const VISIBILITIES: VideoVisibility[] = ['public', 'unlisted', 'private'];
+
+const VIDEO_MIME_ALLOWLIST = [
+  'video/mp4',
+  'video/quicktime',
+  'video/webm',
+] as const;
 
 class CreateVideoDto {
   @IsString() @MinLength(1) @MaxLength(120)
@@ -63,6 +75,16 @@ class CreateVideoDto {
   @IsOptional() @IsString() @MaxLength(500)
   // Comma-separated string from FormData; service parses
   tags?: string;
+
+  // FormData fields arrive as strings. Transform 'true' → true, anything
+  // else → false so @Equals(true) rejects missing/false correctly.
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  @Equals(true, {
+    message:
+      'You must acknowledge ownership and grant the platform license to upload',
+  })
+  uploadAcknowledged: boolean;
 }
 
 @ApiTags('Videos')
@@ -71,6 +93,7 @@ export class VideosController {
   constructor(
     private readonly videos: VideosService,
     private readonly battles: BattlesService,
+    private readonly legal: LegalService,
   ) {}
 
   @Get()
@@ -157,6 +180,7 @@ export class VideosController {
     };
   }
 
+  @Throttle({ short: { limit: 5, ttl: 60_000 } })
   @Post()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('bearer')
@@ -190,13 +214,15 @@ export class VideosController {
       new ParseFilePipe({
         validators: [
           new MaxFileSizeValidator({ maxSize: 100 * 1024 * 1024 }),
-          new FileTypeValidator({ fileType: /video\/.*/ }),
         ],
       }),
     )
     file: Express.Multer.File,
   ) {
     if (!file) throw new BadRequestException('No file uploaded');
+    await assertMagicMime(file.buffer, VIDEO_MIME_ALLOWLIST);
+    file.originalname = sanitizeFilename(file.originalname);
+    const versions = await this.legal.getCurrentVersionIds(['terms']);
     const tags = (dto.tags ?? '')
       .split(',')
       .map((t) => t.trim().toLowerCase().replace(/^#/, ''))
@@ -213,6 +239,8 @@ export class VideosController {
       category: dto.category ?? 'solo',
       visibility: dto.visibility ?? 'public',
       tags,
+      uploadAckTermsVersionId: versions.terms,
+      uploadAckAt: new Date(),
     });
     return this.videos.toPublic(created);
   }

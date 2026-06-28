@@ -5,16 +5,23 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { LockedException } from './locked.exception';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 import { User } from '../users/user.entity';
+import { LegalService } from '../legal/legal.service';
+import { MailerService } from '../mailer/mailer.service';
+import { TurnstileService } from '../security/turnstile.service';
 import {
   ChangeEmailDto,
   ChangePasswordDto,
   DeleteAccountDto,
+  ForgotPasswordDto,
   LoginDto,
+  ResetPasswordDto,
   SignupDto,
 } from './auth.dto';
 
@@ -23,9 +30,20 @@ export class AuthService {
   constructor(
     @InjectRepository(User) private readonly users: Repository<User>,
     private readonly jwt: JwtService,
+    private readonly legal: LegalService,
+    private readonly mailer: MailerService,
+    private readonly turnstile: TurnstileService,
   ) {}
 
-  async signup(dto: SignupDto) {
+  async signup(dto: SignupDto, remoteIp?: string) {
+    const turnstilePass = await this.turnstile.verify(
+      dto.turnstileToken,
+      remoteIp,
+    );
+    if (!turnstilePass) {
+      throw new BadRequestException('Bot challenge failed — refresh and try again');
+    }
+
     const lcEmail = dto.email.toLowerCase();
     const lcUsername = dto.username.toLowerCase();
 
@@ -45,18 +63,29 @@ export class AuthService {
       );
     }
 
-    const passwordHash = await bcrypt.hash(dto.password, 10);
+    // Capture which version of ToS + Privacy the user accepted. Throws if
+    // either seed is missing — surfaces a deploy issue immediately rather
+    // than silently storing nulls.
+    const versions = await this.legal.getCurrentVersionIds([
+      'terms',
+      'privacy',
+    ]);
+
+    const passwordHash = await bcrypt.hash(dto.password, 12);
     const user = this.users.create({
       email: lcEmail,
       username: dto.username,
       passwordHash,
+      acceptedTermsVersionId: versions.terms,
+      acceptedPrivacyVersionId: versions.privacy,
+      legalAcceptedAt: new Date(),
     });
     await this.users.save(user);
 
     return this.tokenize(user);
   }
 
-  async login(dto: LoginDto) {
+  async login(dto: LoginDto, remoteIp?: string) {
     // The `email` field on LoginDto is a misnomer for backwards
     // compatibility — callers may send either an email address or a
     // username. Match against both columns case-insensitively in a
@@ -70,8 +99,47 @@ export class AuthService {
       })
       .getOne();
     if (!user) throw new UnauthorizedException('Invalid credentials');
+
+    // Check lockout BEFORE bcrypt — don't leak whether the password is
+    // correct via a slow vs fast response. Throws 423.
+    if (user.lockoutUntil && user.lockoutUntil > new Date()) {
+      throw new LockedException(
+        `Account locked until ${user.lockoutUntil.toISOString()}. Try again later.`,
+      );
+    }
+
+    // Adaptive Turnstile: only required after 3 consecutive failed
+    // attempts. Cheap user-experience win — legit users don't see the
+    // widget unless something is already off.
+    if ((user.failedLoginCount ?? 0) >= 3) {
+      const turnstilePass = await this.turnstile.verify(
+        dto.turnstileToken,
+        remoteIp,
+      );
+      if (!turnstilePass) {
+        throw new UnauthorizedException(
+          'Bot challenge required — refresh and try again',
+        );
+      }
+    }
+
     const ok = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!ok) throw new UnauthorizedException('Invalid credentials');
+    if (!ok) {
+      user.failedLoginCount = (user.failedLoginCount ?? 0) + 1;
+      if (user.failedLoginCount >= 5) {
+        user.lockoutUntil = new Date(Date.now() + 15 * 60_000);
+      }
+      await this.users.save(user);
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Success — reset both fields if they're nonzero / set.
+    if (user.failedLoginCount > 0 || user.lockoutUntil !== null) {
+      user.failedLoginCount = 0;
+      user.lockoutUntil = null;
+      await this.users.save(user);
+    }
+
     return this.tokenize(user);
   }
 
@@ -95,6 +163,7 @@ export class AuthService {
     if (taken) throw new ConflictException('Email already in use');
 
     user.email = lcNew;
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
     await this.users.save(user);
     return { ok: true, email: lcNew };
   }
@@ -110,7 +179,7 @@ export class AuthService {
       throw new BadRequestException('New password must be different');
     }
 
-    user.passwordHash = await bcrypt.hash(dto.newPassword, 10);
+    user.passwordHash = await bcrypt.hash(dto.newPassword, 12);
     // Invalidate every existing session except this one
     user.tokenVersion = (user.tokenVersion ?? 0) + 1;
     await this.users.save(user);
@@ -148,6 +217,61 @@ export class AuthService {
     if (!user) return null;
     if ((user.tokenVersion ?? 0) !== (tokenVersion ?? 0)) return null;
     return user;
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto, remoteIp?: string) {
+    const turnstilePass = await this.turnstile.verify(
+      dto.turnstileToken,
+      remoteIp,
+    );
+    if (!turnstilePass) {
+      throw new BadRequestException('Bot challenge failed — refresh and try again');
+    }
+
+    const lcEmail = dto.email.toLowerCase();
+    const user = await this.users.findOne({ where: { email: lcEmail } });
+    if (!user) {
+      // Don't reveal whether the address belongs to a real account.
+      return { sent: true };
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const hash = crypto.createHash('sha256').update(token).digest('hex');
+    user.passwordResetTokenHash = hash;
+    user.passwordResetExpiresAt = new Date(Date.now() + 60 * 60_000);
+    await this.users.save(user);
+
+    const base =
+      process.env.FRONTEND_RESET_URL ?? 'http://localhost:3000/reset-password';
+    const resetUrl = `${base}?token=${token}`;
+    await this.mailer.sendPasswordResetEmail(user.email, resetUrl);
+
+    return { sent: true };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const hash = crypto
+      .createHash('sha256')
+      .update(dto.token)
+      .digest('hex');
+    const user = await this.users.findOne({
+      where: { passwordResetTokenHash: hash },
+    });
+    if (
+      !user ||
+      !user.passwordResetExpiresAt ||
+      user.passwordResetExpiresAt <= new Date()
+    ) {
+      throw new BadRequestException('Invalid or expired reset link');
+    }
+
+    user.passwordHash = await bcrypt.hash(dto.newPassword, 12);
+    user.passwordResetTokenHash = null;
+    user.passwordResetExpiresAt = null;
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+    await this.users.save(user);
+
+    return { reset: true };
   }
 
   private tokenize(user: User) {

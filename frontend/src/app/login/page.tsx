@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Nav from '@/components/Nav';
 import { Button, Field, TextInput } from '@/components/forms';
 import { useAuth } from '@/lib/auth-context';
+import TurnstileWidget from '@/components/TurnstileWidget';
 
 /**
  * Pick a safe redirect target from `?next=`. Restricts to same-origin paths
@@ -51,6 +52,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = safeNext(searchParams?.get('next') ?? null);
+  const justReset = searchParams?.get('reset') === '1';
   // `identifier` is either an email OR a username — the backend looks
   // the user up against both columns. Keeping the variable named for
   // its UX semantics, even though the auth-context API still passes
@@ -60,16 +62,27 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [requiresTurnstile, setRequiresTurnstile] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
     setLoading(true);
     try {
-      await login(identifier, password);
+      await login(identifier, password, turnstileToken ?? undefined);
       router.push(next);
     } catch (e: any) {
-      setErr(e.message);
+      const msg = e?.message ?? '';
+      if (/Bot challenge required/i.test(msg)) {
+        setRequiresTurnstile(true);
+        setTurnstileToken(null);
+        setTurnstileResetKey((k) => k + 1);
+        setErr('Please complete the bot challenge below and try again.');
+      } else {
+        setErr(msg || 'Login failed');
+      }
     } finally {
       setLoading(false);
     }
@@ -77,6 +90,11 @@ function LoginForm() {
 
   return (
     <>
+      {justReset && (
+        <div className="mb-5 rounded-md border border-green-500/40 bg-green-500/10 text-green-200 px-3 py-2 text-sm">
+          Password reset. Sign in with your new password.
+        </div>
+      )}
       <form onSubmit={submit} className="space-y-5">
         <Field label="Email or username">
           {/* type=text (was type=email) so the browser's native
@@ -113,13 +131,32 @@ function LoginForm() {
           </div>
         </Field>
 
+        <p className="text-xs text-right">
+          <Link href="/forgot-password" className="text-spotlight hover:underline">
+            Forgot password?
+          </Link>
+        </p>
+
         {err && (
           <div className="text-sm text-red-300 bg-red-950/40 border border-red-900/40 rounded-md px-4 py-3">
             {err}
           </div>
         )}
 
-        <Button type="submit" size="lg" fullWidth loading={loading}>
+        {requiresTurnstile && (
+          <TurnstileWidget
+            onToken={setTurnstileToken}
+            resetKey={turnstileResetKey}
+          />
+        )}
+
+        <Button
+          type="submit"
+          size="lg"
+          fullWidth
+          loading={loading}
+          disabled={loading || (requiresTurnstile && turnstileToken === null)}
+        >
           Sign in →
         </Button>
       </form>

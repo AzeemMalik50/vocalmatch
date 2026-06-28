@@ -65,6 +65,9 @@ function UploadForm() {
   const [file, setFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
 
+  const [acceptedOwnership, setAcceptedOwnership] = useState(false);
+  const [acceptedLicense, setAcceptedLicense] = useState(false);
+
   const [err, setErr] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState(0); // 0..100
@@ -322,6 +325,12 @@ function UploadForm() {
       );
       return;
     }
+    if (!acceptedOwnership || !acceptedLicense) {
+      setErr(
+        'Please acknowledge ownership and the platform license to continue.',
+      );
+      return;
+    }
 
     // All validation passed — now it's safe to flip into the uploading
     // state. From here, the only way back is the real cancel path or a
@@ -338,6 +347,10 @@ function UploadForm() {
     fd.append('visibility', visibility);
     if (tags.length > 0) fd.append('tags', tags.join(','));
     fd.append('video', file);
+    fd.append(
+      'uploadAcknowledged',
+      String(acceptedOwnership && acceptedLicense),
+    );
 
     const handle = uploadVideoWithProgress(fd, (loaded, total) => {
       setUploaded(loaded);
@@ -896,6 +909,32 @@ function UploadForm() {
             </div>
           )}
 
+          <label className="flex items-start gap-2 text-sm text-haze">
+            <input
+              type="checkbox"
+              checked={acceptedOwnership}
+              onChange={(e) => setAcceptedOwnership(e.target.checked)}
+              className="mt-1 accent-spotlight"
+            />
+            <span>
+              I represent and warrant that I own or control all rights necessary
+              to upload this content.
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-sm text-haze">
+            <input
+              type="checkbox"
+              checked={acceptedLicense}
+              onChange={(e) => setAcceptedLicense(e.target.checked)}
+              className="mt-1 accent-spotlight"
+            />
+            <span>
+              I grant VOCALMATCH permission to display, stream, promote, archive,
+              distribute, and use this content within the VOCALMATCH platform and
+              related promotional activities.
+            </span>
+          </label>
+
           <div className="flex flex-col sm:flex-row gap-2">
             <button
               type="submit"
@@ -903,7 +942,9 @@ function UploadForm() {
                 submitting ||
                 checkingActiveBattle ||
                 (challengeMode && songHasActiveBattle) ||
-                songHasNoChampion
+                songHasNoChampion ||
+                !acceptedOwnership ||
+                !acceptedLicense
               }
               className="flex-1 px-4 py-3.5 bg-spotlight text-white font-bold rounded-md hover:bg-spotlight-dim transition-colors disabled:opacity-50 shadow-lg shadow-spotlight/30"
             >

@@ -92,4 +92,14 @@ export class Video {
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
+
+  // ─── Upload acknowledgement (A2) ───────────────────────────────
+  // Null for uploads created before A2. New uploads always populate
+  // both with the live currentVersionId of the Terms page at the
+  // moment the upload happened.
+  @Column({ type: 'uuid', nullable: true })
+  uploadAckTermsVersionId: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  uploadAckAt: Date | null;
 }

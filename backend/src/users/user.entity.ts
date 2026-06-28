@@ -103,4 +103,36 @@ export class User {
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
+
+  // ─── Legal acceptance (A2) ──────────────────────────────────────
+  // Null for users created before A2 (grandfathered). New signups
+  // populate all three in a single transaction with the live
+  // currentVersionId of each legal page at signup time.
+  @Column({ type: 'uuid', nullable: true })
+  acceptedTermsVersionId: string | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  acceptedPrivacyVersionId: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  legalAcceptedAt: Date | null;
+
+  // ─── Brute-force lockout (B1) ──────────────────────────────────
+  // Incremented on every failed login. Reset to 0 on a successful
+  // login. When it reaches 5, lockoutUntil is set to now + 15 min.
+  @Column({ default: 0 })
+  failedLoginCount: number;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  lockoutUntil: Date | null;
+
+  // ─── Password reset (B2) ────────────────────────────────────────
+  // Set by POST /auth/forgot-password, cleared by POST /auth/reset-password.
+  // The raw token is never stored — only its sha256 hash. Expires 1 hour
+  // after issuance.
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  passwordResetTokenHash: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  passwordResetExpiresAt: Date | null;
 }

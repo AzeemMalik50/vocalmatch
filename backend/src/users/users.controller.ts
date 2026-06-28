@@ -3,7 +3,6 @@ import {
   Body,
   Controller,
   Delete,
-  FileTypeValidator,
   ForbiddenException,
   Get,
   MaxFileSizeValidator,
@@ -37,6 +36,15 @@ import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UsersService } from './users.service';
 import { CloudinaryService } from '../videos/cloudinary.service';
 import { VoiceType } from './user.entity';
+import { assertMagicMime } from '../common/magic-mime.validator';
+import { sanitizeFilename } from '../common/sanitize-filename';
+
+const AVATAR_MIME_ALLOWLIST = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+] as const;
 
 const VOICE_TYPES: VoiceType[] = [
   'soprano',
@@ -155,13 +163,14 @@ export class UsersController {
       new ParseFilePipe({
         validators: [
           new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
-          new FileTypeValidator({ fileType: /image\/.*/ }),
         ],
       }),
     )
     file: Express.Multer.File,
   ) {
     if (!file) throw new BadRequestException('No file uploaded');
+    await assertMagicMime(file.buffer, AVATAR_MIME_ALLOWLIST);
+    file.originalname = sanitizeFilename(file.originalname);
     const upload = await this.cloudinary.uploadImage(file.buffer, 'avatars');
     const user = await this.users.updateProfile(req.user.userId, {
       avatarUrl: upload.secure_url,

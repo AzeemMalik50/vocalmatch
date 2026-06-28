@@ -49,6 +49,8 @@ export class VideosService {
     category?: VideoCategory;
     visibility?: VideoVisibility;
     tags?: string[];
+    uploadAckTermsVersionId?: string | null;
+    uploadAckAt?: Date | null;
   }) {
     const upload = await this.cloudinary.uploadVideo(params.fileBuffer);
 
@@ -65,6 +67,8 @@ export class VideosService {
       category: params.category ?? 'solo',
       visibility: params.visibility ?? 'public',
       tags: (params.tags ?? []).slice(0, 10),
+      uploadAckTermsVersionId: params.uploadAckTermsVersionId ?? null,
+      uploadAckAt: params.uploadAckAt ?? null,
     });
     return this.videos.save(video);
   }

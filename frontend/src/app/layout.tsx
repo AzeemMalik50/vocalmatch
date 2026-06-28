@@ -7,6 +7,7 @@ import { ConfirmProvider } from '@/lib/confirm-context';
 import ScrollResetOnReload from '@/components/ScrollResetOnReload';
 import ScrollResetOnNavigate from '@/components/ScrollResetOnNavigate';
 import SuppressExtensionErrors from '@/components/SuppressExtensionErrors';
+import Footer from '@/components/Footer';
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, '') ||
@@ -99,7 +100,10 @@ export default function RootLayout({
         <ScrollResetOnNavigate />
         <ThemeProvider>
           <AuthProvider>
-            <ConfirmProvider>{children}</ConfirmProvider>
+            <ConfirmProvider>
+              {children}
+              <Footer />
+            </ConfirmProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

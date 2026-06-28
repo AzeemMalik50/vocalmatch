@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
-import Footer from '@/components/Footer';
 import AvatarUpload from '@/components/AvatarUpload';
 import {
   Button,
@@ -341,7 +340,6 @@ export default function SettingsPage() {
           />
         </div>
       </main>
-      <Footer />
     </>
   );
 }

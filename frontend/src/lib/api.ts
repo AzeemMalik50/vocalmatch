@@ -32,6 +32,28 @@ export function buildStreamUrl(
   return `${API_URL}/stream?${params.toString()}`;
 }
 
+/**
+ * Build an <img>-ready URL for the backend QR endpoint. Not a fetch —
+ * the value is meant to land directly in `<img src=...>` so the
+ * browser caches the result for us.
+ */
+export function qrImageUrl(opts: {
+  url: string;
+  size?: number;
+  format?: 'png' | 'svg';
+  fgColor?: string;
+  bgColor?: string;
+  margin?: number;
+}): string {
+  const params = new URLSearchParams({ url: opts.url });
+  if (opts.size) params.set('size', String(opts.size));
+  if (opts.format) params.set('format', opts.format);
+  if (opts.fgColor) params.set('fgColor', opts.fgColor);
+  if (opts.bgColor) params.set('bgColor', opts.bgColor);
+  if (opts.margin !== undefined) params.set('margin', String(opts.margin));
+  return `${API_URL}/qr?${params.toString()}`;
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
@@ -147,6 +169,74 @@ export const GENRE_OPTIONS = [
   'Electronic',
   'Acoustic',
 ];
+
+// ─── Security DTOs ──────────────────────────────────────────────────
+
+export interface TurnstileConfigDto {
+  enabled: boolean;
+  siteKey: string | null;
+}
+
+// ─── Legal DTOs ─────────────────────────────────────────────────────
+
+export interface LegalPageSummaryDto {
+  slug: string;
+  title: string;
+}
+
+export interface PublicLegalPageDto {
+  slug: string;
+  title: string;
+  bodyMarkdown: string;
+  versionNumber: number;
+  publishedAt: string;
+}
+
+export interface LegalVersionMetaDto {
+  versionNumber: number;
+  publishedAt: string;
+  publishedById: string | null;
+}
+
+export interface AdminLegalPageListItemDto {
+  id: string;
+  slug: string;
+  title: string;
+  currentVersion: LegalVersionMetaDto | null;
+  updatedAt: string;
+}
+
+export interface AdminLegalPageDto {
+  id: string;
+  slug: string;
+  title: string;
+  currentVersion:
+    | (LegalVersionMetaDto & { id: string; bodyMarkdown: string })
+    | null;
+  history: (LegalVersionMetaDto & { id: string })[];
+}
+
+export interface AdminLegalUpdateDto {
+  title: string;
+  bodyMarkdown: string;
+}
+
+export interface AdminAuditLogEntryDto {
+  id: string;
+  at: string;
+  adminUserId: string;
+  adminUsername: string | null;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  payloadSnapshot: Record<string, unknown> | null;
+}
+
+export interface AdminAuditLogListDto {
+  items: AdminAuditLogEntryDto[];
+  hasMore: boolean;
+  nextOffset: number | null;
+}
 
 export type VideoVisibility = 'public' | 'unlisted' | 'private';
 export type VideoSort = 'newest' | 'most_viewed' | 'trending';
@@ -563,13 +653,23 @@ export interface VideoListParams {
 export const api = {
   getStats: () => request<PublicStats>('/stats'),
 
-  signup: (body: { email: string; username: string; password: string }) =>
+  getTurnstileConfig: () =>
+    request<TurnstileConfigDto>('/security/turnstile-config'),
+
+  signup: (body: {
+    email: string;
+    username: string;
+    password: string;
+    acceptedTerms: boolean;
+    acceptedPrivacy: boolean;
+    turnstileToken?: string;
+  }) =>
     request<AuthResponse>('/auth/signup', {
       method: 'POST',
       body: JSON.stringify(body),
     }),
 
-  login: (body: { email: string; password: string }) =>
+  login: (body: { email: string; password: string; turnstileToken?: string }) =>
     request<AuthResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(body),
@@ -595,6 +695,18 @@ export const api = {
 
   signOutEverywhere: () =>
     request<AuthResponse>('/auth/sign-out-everywhere', { method: 'POST' }),
+
+  forgotPassword: (body: { email: string; turnstileToken?: string }) =>
+    request<{ sent: boolean }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  resetPassword: (body: { token: string; newPassword: string }) =>
+    request<{ reset: boolean }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 
   me: () => request<PublicUser>('/users/me'),
 
@@ -861,4 +973,54 @@ export const api = {
     request<{ ok: true }>(`/notifications/${id}/read`, { method: 'PATCH' }),
   markAllNotificationsRead: () =>
     request<{ ok: true }>('/notifications/read-all', { method: 'PATCH' }),
+
+  // ─── Legal pages (public) ────────────────────────────────────────
+  listLegalPages: () => request<LegalPageSummaryDto[]>('/legal/pages'),
+  getLegalPage: (slug: string) =>
+    request<PublicLegalPageDto>(`/legal/pages/${encodeURIComponent(slug)}`),
+
+  // ─── Legal pages (admin) ─────────────────────────────────────────
+  adminListLegalPages: () =>
+    request<AdminLegalPageListItemDto[]>('/admin/legal/pages'),
+  adminGetLegalPage: (slug: string) =>
+    request<AdminLegalPageDto>(
+      `/admin/legal/pages/${encodeURIComponent(slug)}`,
+    ),
+  adminGetLegalVersion: (slug: string, versionNumber: number) =>
+    request<LegalVersionMetaDto & { id: string; bodyMarkdown: string }>(
+      `/admin/legal/pages/${encodeURIComponent(slug)}/versions/${versionNumber}`,
+    ),
+  adminUpdateLegalPage: (slug: string, body: AdminLegalUpdateDto) =>
+    request<{
+      id: string;
+      versionNumber: number;
+      bodyMarkdown: string;
+      publishedAt: string;
+      publishedById: string | null;
+    }>(`/admin/legal/pages/${encodeURIComponent(slug)}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  // ─── Admin: Audit log ────────────────────────────────────────────
+  adminListAuditLog: (params: {
+    limit?: number;
+    offset?: number;
+    adminUserId?: string;
+    action?: string;
+    targetType?: string;
+    targetId?: string;
+  } = {}) => {
+    const q = new URLSearchParams();
+    if (params.limit) q.set('limit', String(params.limit));
+    if (params.offset) q.set('offset', String(params.offset));
+    if (params.adminUserId) q.set('adminUserId', params.adminUserId);
+    if (params.action) q.set('action', params.action);
+    if (params.targetType) q.set('targetType', params.targetType);
+    if (params.targetId) q.set('targetId', params.targetId);
+    const qs = q.toString();
+    return request<AdminAuditLogListDto>(
+      `/admin/users/audit-log${qs ? `?${qs}` : ''}`,
+    );
+  },
 };

@@ -8,6 +8,7 @@ import { VideoView } from './video-view.entity';
 import { Battle } from '../battles/battle.entity';
 import { AuthModule } from '../auth/auth.module';
 import { BattlesModule } from '../battles/battles.module';
+import { LegalModule } from '../legal/legal.module';
 
 @Module({
   // Battle entity is registered locally so VideosService can query it for the
@@ -19,6 +20,7 @@ import { BattlesModule } from '../battles/battles.module';
     TypeOrmModule.forFeature([Video, VideoView, Battle]),
     AuthModule,
     forwardRef(() => BattlesModule),
+    LegalModule,
   ],
   controllers: [VideosController],
   providers: [VideosService, CloudinaryService],

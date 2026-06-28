@@ -13,11 +13,14 @@ import { AuthUser, api } from './api';
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<AuthUser>;
+  login: (email: string, password: string, turnstileToken?: string) => Promise<AuthUser>;
   signup: (
     email: string,
     username: string,
     password: string,
+    acceptedTerms: boolean,
+    acceptedPrivacy: boolean,
+    turnstileToken?: string,
   ) => Promise<AuthUser>;
   logout: () => void;
   refresh: () => Promise<void>;
@@ -51,14 +54,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(u);
   };
 
-  const login = async (email: string, password: string) => {
-    const { token, user } = await api.login({ email, password });
+  const login = async (email: string, password: string, turnstileToken?: string) => {
+    const { token, user } = await api.login({ email, password, turnstileToken });
     persist(token, user);
     return user;
   };
 
-  const signup = async (email: string, username: string, password: string) => {
-    const { token, user } = await api.signup({ email, username, password });
+  const signup = async (
+    email: string,
+    username: string,
+    password: string,
+    acceptedTerms: boolean,
+    acceptedPrivacy: boolean,
+    turnstileToken?: string,
+  ) => {
+    const { token, user } = await api.signup({
+      email,
+      username,
+      password,
+      acceptedTerms,
+      acceptedPrivacy,
+      turnstileToken,
+    });
     // Newly signed-up users haven't completed profile by default
     const enriched: AuthUser = { ...user, profileCompleted: false };
     persist(token, enriched);
