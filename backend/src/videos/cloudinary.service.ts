@@ -5,7 +5,7 @@ import * as streamifier from 'streamifier';
 @Injectable()
 export class CloudinaryService {
   private readonly folderPrefix =
-    process.env.CLOUDINARY_FOLDER_PREFIX?.replace(/\/$/, '') ?? 'vocalmatch';
+    process.env.CLOUDINARY_FOLDER_PREFIX?.replace(/\/$/, '') || 'vocalmatch';
 
   constructor() {
     cloudinary.config({
