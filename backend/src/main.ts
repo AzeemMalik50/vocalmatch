@@ -50,10 +50,23 @@ async function bootstrap() {
 
   const isProd = process.env.NODE_ENV === 'production';
 
+  // Project-scoped Vercel previews. Tighter than a `*.vercel.app`
+  // wildcard (which would accept ANY Vercel-hosted origin, including
+  // attacker-owned previews) but loose enough to cover this project's
+  // dev / staging / pr-NN preview deployments without an env-var dance
+  // every time a new preview spins up. Add additional project prefixes
+  // here if a sibling Vercel project also needs to call this backend.
+  const PROJECT_VERCEL_PREVIEW =
+    /^https:\/\/vocalmatch(?:-[a-z0-9-]+)?\.vercel\.app$/;
+
   app.enableCors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) return callback(null, true);
+
+      // Allowed in BOTH dev and prod: only this project's named Vercel
+      // previews. Wide-open `*.vercel.app` stays dev-only below.
+      if (PROJECT_VERCEL_PREVIEW.test(origin)) return callback(null, true);
 
       if (!isProd) {
         // Dev / preview deployments: allow Vercel previews, Railway-hosted
