@@ -11,3 +11,9 @@ database.sqlite
 .DS_Store
 .vercel
 .turbo
+.env
+db.json
+.claude/
+**/.claude/
+__pycache__/
+*.pyc

@@ -1,0 +1,241 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Music } from 'lucide-react';
+import AdminShell from '@/components/AdminShell';
+import { TableRowsSkeleton } from '@/components/Loaders';
+import { PublicUser, SongDto, api } from '@/lib/api';
+
+interface Row {
+  song: SongDto;
+  champion: PublicUser | null;
+}
+
+/**
+ * Per-song current-champion overview. Sorted by champion streak (longest
+ * first) so the strongest reigns are immediately visible — supports the
+ * "battle prestige" goal by making dominant champions look dominant.
+ *
+ * Reads songs + champion users only (no per-battle work) so it stays cheap
+ * even with a big catalog. Songs without a champion get a "First battle
+ * not yet run" empty state so admin can scan what's not been seeded.
+ */
+export default function AdminChampionsPage() {
+  const [rows, setRows] = useState<Row[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const songsResp = await api.listSongs({ status: 'all', limit: 200 });
+        const songs = songsResp.items;
+        // Fetch champion users in parallel — public profile endpoint is the
+        // cheapest path (already cached / read by the rest of the app).
+        const championIds = Array.from(
+          new Set(
+            songs
+              .map((s) => s.currentChampionUserId)
+              .filter((x): x is string => !!x),
+          ),
+        );
+        // We need usernames keyed by user id; the public lookup is by
+        // username. Easiest: keep a flat map by walking songs and looking
+        // up each unique champion via /admin/users (lets us look up by id).
+        const usersByIdResp = championIds.length
+          ? await api
+              .adminListUsers({ limit: 200 })
+              .catch(() => ({ items: [] as any[] }))
+          : { items: [] as any[] };
+        const userById = new Map(
+          (usersByIdResp.items as any[]).map((u) => [u.id, u as PublicUser]),
+        );
+
+        const out = songs
+          .map<Row>((s) => ({
+            song: s,
+            champion: s.currentChampionUserId
+              ? (userById.get(s.currentChampionUserId) ?? null)
+              : null,
+          }))
+          .sort(
+            (a, b) =>
+              (b.song.currentChampionStreak ?? 0) -
+              (a.song.currentChampionStreak ?? 0),
+          );
+
+        if (!cancelled) setRows(out);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const withChampion = rows.filter((r) => r.song.currentChampionUserId);
+  const open = rows.filter((r) => !r.song.currentChampionUserId);
+
+  return (
+    <AdminShell>
+      <div className="mb-6">
+        <h1 className="font-display font-black text-3xl mb-1">Champions</h1>
+        <p className="text-haze">
+          Current defending champion per Centerstage Song. Sorted by streak,
+          longest reigns first.
+        </p>
+      </div>
+
+      {loading ? (
+        <TableRowsSkeleton rows={4} />
+      ) : (
+        <>
+          {withChampion.length === 0 ? (
+            <div className="text-center py-16 border-2 border-dashed border-stage-700 rounded-2xl">
+              <p className="font-display text-2xl mb-2">No champions yet</p>
+              <p className="text-haze">
+                Run a battle to its conclusion to crown the first one.
+              </p>
+            </div>
+          ) : (
+            <ul className="space-y-2 mb-8">
+              {withChampion.map(({ song, champion }) => (
+                <ChampionRow key={song.id} song={song} champion={champion} />
+              ))}
+            </ul>
+          )}
+
+          {open.length > 0 && (
+            <section>
+              <h2 className="font-display text-xl font-bold mb-3 text-haze">
+                Open thrones
+              </h2>
+              <ul className="space-y-2">
+                {open.map(({ song }) => (
+                  <li
+                    key={song.id}
+                    className="bg-stage-900 border border-stage-700/60 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3"
+                  >
+                    <div className="min-w-0 flex items-center gap-3">
+                      <Music
+                        aria-hidden="true"
+                        className="w-5 h-5 text-spotlight shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <p className="font-display font-bold text-lg text-white truncate">
+                          {song.title}
+                        </p>
+                        {/* Bumped from text-haze (off-white at ~60–70%
+                            apparent contrast) to text-haze/95 so the
+                            artist line reads alongside the song title
+                            on dark stage-900 bg. */}
+                        <p className="text-sm text-haze/95 truncate">
+                          {song.artist}
+                        </p>
+                      </div>
+                    </div>
+                    <Link
+                      href={`/admin/battles/new?songId=${song.id}`}
+                      className="text-xs font-bold text-spotlight hover:opacity-90"
+                    >
+                      Seed the first battle →
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </>
+      )}
+    </AdminShell>
+  );
+}
+
+function ChampionRow({
+  song,
+  champion,
+}: {
+  song: SongDto;
+  champion: PublicUser | null;
+}) {
+  // Bug #24 — previously this row showed the per-song streak
+  // (`song.currentChampionStreak`), which routinely diverged from the
+  // user's overall career streak shown on the User Details page and
+  // confused admins. We now show the user's authoritative streak from
+  // the User entity (same source as User Details). The per-song streak
+  // is reported alongside in parentheses so we don't lose that signal.
+  const careerStreak = champion?.currentStreak ?? 0;
+  const songStreak = song.currentChampionStreak ?? 0;
+  const streak = careerStreak;
+  return (
+    <li className="bg-stage-900 border border-gold/30 rounded-xl p-4 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center sm:justify-between gap-3 sm:gap-4">
+      <div className="flex items-center gap-3 min-w-0 w-full sm:w-auto sm:flex-1">
+        {champion?.avatarUrl ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={champion.avatarUrl}
+            alt=""
+            className="w-12 h-12 rounded-full object-cover border-2 border-gold/40 shrink-0"
+          />
+        ) : (
+          <div className="w-12 h-12 rounded-full bg-stage-800 border-2 border-gold/40 flex items-center justify-center font-bold text-haze shrink-0">
+            {champion?.username[0]?.toUpperCase() ?? '?'}
+          </div>
+        )}
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <p className="font-display font-bold text-lg leading-tight break-words">
+            {champion ? (
+              <Link
+                href={`/u/${champion.username}`}
+                className="hover:text-gold"
+              >
+                @{champion.username}
+              </Link>
+            ) : (
+              <span className="italic text-haze">unknown</span>
+            )}
+          </p>
+          {/* Song title pill — gives every championship row a clearly
+              visible "what song is this crown on?" label. Bumped the
+              fill from gold/10 → gold/25 + gold-100 text so the pill
+              actually reads against the stage-900 bg; the old 10%
+              opacity blended in and made the song name disappear. */}
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gold/25 border border-gold/60 max-w-full">
+            <Music aria-hidden="true" className="w-3.5 h-3.5 text-yellow-200 shrink-0" />
+            <span className="text-sm font-bold text-yellow-50 truncate">
+              {song.title}
+            </span>
+            {song.artist && (
+              <span className="text-xs font-semibold text-yellow-100/90 truncate">
+                · {song.artist}
+              </span>
+            )}
+          </span>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 shrink-0 w-full sm:w-auto sm:justify-end">
+        {streak >= 2 && (
+          <span
+            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold uppercase tracking-widest bg-gold/15 text-gold border border-gold/30 rounded"
+            title={`${songStreak} consecutive wins on this song`}
+          >
+            🔥 {streak}-streak
+            {songStreak !== streak && (
+              <span className="opacity-75 font-normal">
+                ({songStreak} on song)
+              </span>
+            )}
+          </span>
+        )}
+        <Link
+          href={`/admin/songs`}
+          className="text-xs font-bold text-haze hover:text-white ml-auto sm:ml-0"
+        >
+          Manage song
+        </Link>
+      </div>
+    </li>
+  );
+}

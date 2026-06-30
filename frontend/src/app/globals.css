@@ -2,52 +2,97 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Hide the native number-input spinner arrows on inputs we wrap with
+   our own −/+ stepper controls. Without this, both the browser's
+   built-in arrows AND our custom buttons render, which looks cluttered
+   and lets admins step the value two different ways. Cross-browser:
+   WebKit / Blink ship inner+outer spin pseudo-elements; Firefox uses
+   the older `appearance: textfield`. */
+.no-spinner::-webkit-inner-spin-button,
+.no-spinner::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.no-spinner {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Bug #94 — native `<select>` dropdowns (e.g. The Stage filters on the
+   homepage: Newest / Voice Type / Genre) rendered with the OS's
+   default LIGHT-mode option panel even though the rest of the app is
+   dark-themed. The `colorScheme: dark` on <html> is supposed to
+   propagate to native form controls, but Tailwind's preflight (which
+   resets `appearance` on selects) and various browsers don't always
+   honor the inheritance. Re-asserting `color-scheme: dark` directly
+   on selects and their options tells the browser to render the
+   dropdown PANEL in dark mode; we additionally set explicit
+   background + color on options because Chrome desktop honors those
+   on the popup once color-scheme is dark. */
+select,
+select option {
+  color-scheme: dark;
+}
+select option {
+  background-color: rgb(15 15 18); /* stage-950 */
+  color: rgb(244 244 245); /* near-white */
+}
+
 :root {
-  --font-display: 'Fraunces', 'Playfair Display', Georgia, serif;
+  /* Phase 3 typography stack — cinematic + premium.
+     - display: Bebas Neue (condensed sans, hero + section headlines)
+     - script:  Allura      (one-line script accents only)
+     - sans:    Inter       (body)
+     Track letter-spacing tight (`-0.01em`) on display to feel premium. */
+  --font-display: 'Bebas Neue', 'Impact', sans-serif;
+  --font-script: 'Allura', 'Brush Script MT', cursive;
   --font-sans: 'Inter', system-ui, sans-serif;
 
-  /* Stage (dark) — default */
-  --c-stage-950: 8 7 13;
-  --c-stage-900: 14 12 23;
-  --c-stage-800: 23 19 35;
-  --c-stage-700: 34 29 51;
-  --c-stage-600: 51 44 74;
-  --c-spotlight: 255 45 85;
-  --c-spotlight-dim: 204 36 68;
-  --c-gold: 245 196 81;
-  --c-haze: 168 157 199;
+  /* Battlefield (dark) — default. Warm near-black stage with cinematic
+     crimson + gold accents. Designed to feel emotionally explosive at
+     scale and premium at component scale. */
+  --c-stage-950: 6 4 6;
+  --c-stage-900: 13 9 11;
+  --c-stage-800: 22 15 18;
+  --c-stage-700: 38 26 30;
+  --c-stage-600: 58 40 46;
+  --c-spotlight: 239 68 68;        /* vibrant crimson — danger / heat (reference-matched) */
+  --c-spotlight-dim: 185 28 28;    /* deeper crimson — hover / pressed */
+  --c-gold: 250 204 21;            /* punchy stage gold — prestige (reference-matched) */
+  --c-haze: 210 198 184;           /* warm off-white — body / secondary text */
 
-  --c-body-bg: 8 7 13;
-  --c-body-text: 240 238 247;
+  --c-body-bg: 0 0 0;
+  --c-body-text: 245 240 232;
   --c-vignette-edge: 0 0 0;
-  --c-vignette-alpha: 0.5;
-  --c-scrollbar-track: 8 7 13;
-  --c-scrollbar-thumb: 34 29 51;
-  --c-scrollbar-thumb-hover: 51 44 74;
-  --c-stage-tint-1: 0.08;
-  --c-stage-tint-2: 0.04;
+  --c-vignette-alpha: 0.55;
+  --c-scrollbar-track: 6 4 6;
+  --c-scrollbar-thumb: 38 26 30;
+  --c-scrollbar-thumb-hover: 58 40 46;
+  --c-stage-tint-1: 0.1;
+  --c-stage-tint-2: 0.05;
 }
 
 html.theme-light {
-  /* Studio (light) — paper-warm, dimmed glow */
-  --c-stage-950: 250 247 240;
-  --c-stage-900: 245 241 232;
-  --c-stage-800: 233 226 213;
-  --c-stage-700: 200 190 170;
-  --c-stage-600: 165 153 130;
-  --c-spotlight: 207 30 68;
-  --c-spotlight-dim: 165 22 52;
-  --c-gold: 184 130 24;
-  --c-haze: 95 86 70;
+  /* Stage Lights (light) — warm paper with darker crimson + bronze gold
+     for contrast. Same emotional palette, inverted luminance. */
+  --c-stage-950: 252 248 240;
+  --c-stage-900: 246 240 230;
+  --c-stage-800: 233 222 206;
+  --c-stage-700: 192 178 160;
+  --c-stage-600: 152 138 120;
+  --c-spotlight: 178 28 38;        /* darker crimson for contrast */
+  --c-spotlight-dim: 132 18 25;
+  --c-gold: 168 118 22;            /* darker bronze-gold */
+  --c-haze: 88 78 68;              /* warm dark — body text */
 
-  --c-body-bg: 250 247 240;
-  --c-body-text: 27 22 19;
-  --c-vignette-edge: 90 70 50;
-  --c-vignette-alpha: 0.12;
-  --c-scrollbar-track: 245 241 232;
-  --c-scrollbar-thumb: 200 190 170;
-  --c-scrollbar-thumb-hover: 165 153 130;
-  --c-stage-tint-1: 0.05;
+  --c-body-bg: 252 248 240;
+  --c-body-text: 24 18 16;
+  --c-vignette-edge: 90 60 40;
+  --c-vignette-alpha: 0.14;
+  --c-scrollbar-track: 246 240 230;
+  --c-scrollbar-thumb: 192 178 160;
+  --c-scrollbar-thumb-hover: 152 138 120;
+  --c-stage-tint-1: 0.06;
   --c-stage-tint-2: 0.03;
 }
 
@@ -61,14 +106,39 @@ html, body {
 
 .font-display {
   font-family: var(--font-display);
-  letter-spacing: -0.02em;
+  /* Bebas Neue likes a tiny tracking nudge — too tight feels cramped,
+     loose feels unfocused. -0.01em hits the cinematic sweet spot. */
+  letter-spacing: -0.01em;
 }
 
-/* Stage backdrop — radial gradient, subtle */
+.font-script {
+  font-family: var(--font-script);
+  /* Allura runs small at its natural size; bump line-height for breathing
+     room and slightly extend tracking so the connections read cleanly. */
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+}
+
+/* Stage backdrop — subtle radial gradient used as the body background.
+   The crimson radial top-left and gold radial mid-right echo the dual-
+   spotlight singer-vs-singer hero composition without competing with
+   foreground content. */
 .stage-bg {
   background:
-    radial-gradient(ellipse at 30% 0%, rgba(var(--c-spotlight) / var(--c-stage-tint-1)) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 30%, rgba(var(--c-gold) / var(--c-stage-tint-2)) 0%, transparent 50%),
+    radial-gradient(ellipse at 25% -10%, rgba(var(--c-spotlight) / var(--c-stage-tint-1)) 0%, transparent 55%),
+    radial-gradient(ellipse at 78% 28%, rgba(var(--c-gold) / var(--c-stage-tint-2)) 0%, transparent 55%),
+    rgb(var(--c-body-bg));
+}
+
+/* Battlefield backdrop — used on hero sections and live battles.
+   Twin spotlight cones from each side meet in a vignetted center, like
+   two singers facing off on stage. More intense than .stage-bg; reserve
+   for hero / featured-battle sections only. */
+.battlefield-bg {
+  background:
+    radial-gradient(ellipse at 0% 50%, rgba(var(--c-spotlight) / 0.18) 0%, transparent 45%),
+    radial-gradient(ellipse at 100% 50%, rgba(var(--c-spotlight) / 0.14) 0%, transparent 45%),
+    radial-gradient(ellipse at 50% 120%, rgba(var(--c-gold) / 0.06) 0%, transparent 60%),
     rgb(var(--c-body-bg));
 }
 
@@ -116,6 +186,411 @@ html, body {
 
 /* Number tabular */
 .tabular { font-variant-numeric: tabular-nums; }
+
+/* The cinematic homepage is an editorial surface — it should always feel
+   dark and dangerous regardless of whether the user has flipped to light
+   mode for the interior product. .vm-force-dark pins every stage / spotlight
+   / gold / haze variable back to the Battlefield palette inside the
+   wrapped subtree, so `bg-stage-950`, `text-spotlight`, etc. render dark
+   even when html.theme-light is set. */
+.vm-force-dark {
+  --c-stage-950: 0 0 0;
+  --c-stage-900: 10 6 8;
+  --c-stage-800: 18 12 14;
+  --c-stage-700: 32 22 26;
+  --c-stage-600: 52 36 42;
+  --c-spotlight: 239 68 68;
+  --c-spotlight-dim: 185 28 28;
+  --c-gold: 250 204 21;
+  --c-haze: 210 198 184;
+  --c-body-bg: 0 0 0;
+  --c-body-text: 245 240 232;
+  --c-vignette-edge: 0 0 0;
+  --c-vignette-alpha: 0.55;
+  --c-stage-tint-1: 0.1;
+  --c-stage-tint-2: 0.05;
+  /* Shadcn-style tokens used by the homepage sections ported from the
+     reference design. Sit on top of the same Battlefield palette so the
+     existing stage / spotlight / gold / haze utilities keep working. */
+  --c-background: 0 0 0;
+  --c-foreground: 245 240 232;
+  --c-card: 18 12 14;
+  --c-card-foreground: 245 240 232;
+  --c-muted: 40 28 32;
+  --c-muted-foreground: 168 156 144;
+  --c-border: 52 36 42;
+  background: rgb(var(--c-body-bg));
+  color: rgb(var(--c-body-text));
+}
+
+/* Gold-bordered panel wrapper — the signature framing language from the
+   reference design. Use as a wrapping container around major homepage
+   sections (Live Battle, Champion, Hero stats) so the page reads as a
+   set of premium gold-trimmed cards on pure black. */
+.gold-panel {
+  border: 1px solid rgba(var(--c-gold) / 0.35);
+  border-radius: 0.75rem;
+  box-shadow:
+    0 0 0 1px rgba(var(--c-gold) / 0.08),
+    0 12px 40px -12px rgba(var(--c-spotlight) / 0.15);
+}
+
+/* Stronger red glow halo for primary CTAs (WATCH & VOTE-style). The
+   reference shows a clear soft red bloom around the main red button. */
+.red-glow {
+  box-shadow:
+    0 0 0 1px rgba(var(--c-spotlight) / 0.4),
+    0 0 30px rgba(var(--c-spotlight) / 0.35),
+    0 0 60px rgba(var(--c-spotlight) / 0.18);
+}
+
+/* Personalized-stake panel framing. Layered on top of .gold-panel for
+   surfaces showing the signed-in user's own crown / dethronement —
+   visually louder so the user can tell it's about them, not the marquee.
+   The ::before pseudo-element is the "FOR YOU" pill in the corner. */
+.personal-stake {
+  box-shadow:
+    0 0 0 1px rgba(var(--c-gold) / 0.6),
+    0 0 28px rgba(var(--c-spotlight) / 0.35),
+    0 0 70px rgba(var(--c-spotlight) / 0.15);
+}
+.personal-stake::before {
+  content: 'FOR YOU';
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 40;
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.3em;
+  color: rgb(var(--c-gold));
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(var(--c-gold) / 0.5);
+  border-radius: 9999px;
+  padding: 0.25rem 0.625rem;
+  pointer-events: none;
+}
+
+/* ─── Prestige + danger utility classes ───────────────────────────────
+   Phase 3 emotional layer. Use sparingly — these are loud effects.
+   crown-glow:   gold halo for champion identity (defending-champion card,
+                 winner banner, streak chips ≥ 5)
+   crimson-pulse: red breathing alert for live + critical states (Crown
+                 at Risk HIGH/CRITICAL, last-hour countdown)
+*/
+.crown-glow {
+  box-shadow:
+    0 0 0 1px rgba(var(--c-gold) / 0.45),
+    0 0 24px rgba(var(--c-gold) / 0.35),
+    0 0 60px rgba(var(--c-gold) / 0.15);
+}
+
+.crimson-pulse {
+  animation: crimsonPulse 1.8s ease-in-out infinite;
+}
+@keyframes crimsonPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 0 rgba(var(--c-spotlight) / 0.55),
+      0 0 12px rgba(var(--c-spotlight) / 0.2);
+  }
+  50% {
+    box-shadow:
+      0 0 0 14px rgba(var(--c-spotlight) / 0),
+      0 0 28px rgba(var(--c-spotlight) / 0.35);
+  }
+}
+
+/* Gold dust — fine particle overlay used on prestige-moment surfaces
+   (winner banners, DETHRONED cards). Lightweight CSS so we don't need
+   a particle library for the basic case. */
+.gold-dust {
+  position: relative;
+}
+.gold-dust::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle at 12% 18%, rgba(var(--c-gold) / 0.5) 0, transparent 1.5px),
+    radial-gradient(circle at 78% 32%, rgba(var(--c-gold) / 0.4) 0, transparent 1.5px),
+    radial-gradient(circle at 42% 68%, rgba(var(--c-gold) / 0.45) 0, transparent 1.5px),
+    radial-gradient(circle at 88% 82%, rgba(var(--c-gold) / 0.35) 0, transparent 1.5px),
+    radial-gradient(circle at 22% 88%, rgba(var(--c-gold) / 0.5) 0, transparent 1.5px);
+  background-size: 220px 180px;
+  background-repeat: repeat;
+  opacity: 0.6;
+  mix-blend-mode: screen;
+}
+
+/* Respect user motion preference. Neutralizes all keyframe-driven
+   effects (crimson pulse, spotlight sweep, crown pulse, skeleton
+   shimmer) and clamps any property-based transition to a near-zero
+   duration so layouts settle instantly without the cinematic flair. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .crimson-pulse,
+  .skeleton,
+  .animate-pulse-glow,
+  .animate-spotlight-sweep,
+  .animate-crown-pulse {
+    animation: none !important;
+  }
+}
+
+/* ─── Hero cinematic frame ──────────────────────────────────────────
+   Refinements specific to the homepage HeroComposite. The artwork
+   itself does the heavy lifting; these utilities add the editorial
+   chrome (gold rule, twin cones, grain, slow ken-burns, sweep) so it
+   reads as a film still rather than a stock photo in a rounded box. */
+
+.hero-frame {
+  /* Bug #75/76/77 — historically there was a real `border: 1px solid …`
+     here, but Safari/WebKit clips absolutely-positioned children
+     (Next.js `<Image fill>` lands at `position:absolute; inset:0`)
+     to the padding-box instead of the border-box inside an
+     `overflow:hidden` + `border-radius` container, so the image
+     painted over the gold border at the four corners and the
+     border vanished there. Earlier attempts (WebKit mask trick,
+     keeping the border AND adding an overlay) either still chopped
+     corners in Safari or doubled the line in Chrome/Firefox.
+     Single source of truth now: don't draw a real `border` at all
+     — render the gold edge via the `::after` pseudo-element below,
+     which paints on top of every interior layer (image, letterbox,
+     vignette, grain, sweep, badges at z < 50) in every browser,
+     so it can't be clipped away. */
+  box-shadow:
+    0 0 0 1px rgba(var(--c-gold) / 0.1),
+    0 30px 80px -20px rgba(var(--c-spotlight) / 0.35),
+    0 0 40px rgba(var(--c-spotlight) / 0.12);
+  /* Forces a fresh stacking context so the `.hero-grain` child's
+     `mix-blend-mode: overlay` composites against the image inside
+     this frame only, not against whatever sits behind the section
+     — Safari was darkening the corners of the frame because the
+     blend reached outside the rounded clip in WebKit. */
+  isolation: isolate;
+  /* Bug #78 — the Ken Burns image (.hero-kenburns) uses
+     `will-change: transform` + a scale() animation, which promotes
+     it to its own compositing layer in Safari. WebKit then fails
+     to apply the parent's `overflow:hidden` + `border-radius`
+     clip to that promoted child, so the scaled image bleeds past
+     the four rounded corners. Promoting the frame itself to a
+     compositing layer (translateZ(0) is the smallest no-op that
+     does this) aligns parent + child on the same layer so the
+     clip is honored. */
+  transform: translateZ(0);
+  /* Belt-and-braces: `clip-path` is honored by WebKit even when
+     overflow + border-radius isn't, and it works at the
+     compositor level so transformed/promoted children can't
+     escape it. The `inset(0 round 1rem)` matches the visible
+     `rounded-2xl` shape exactly. Modern WebKit needs the
+     unprefixed property; older versions take -webkit-. */
+  -webkit-clip-path: inset(0 round 1rem);
+  clip-path: inset(0 round 1rem);
+}
+
+.hero-frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(var(--c-gold) / 0.45);
+  border-radius: inherit;
+  pointer-events: none;
+  /* Paint above all interior layers (badges sit at z-40, vignette
+     and grain at z-20/z-30) but stay below external chrome like
+     the crown emblem (z-50 on the outer composite). */
+  z-index: 50;
+}
+
+.hero-kenburns {
+  animation: heroKenBurns 14s ease-in-out infinite alternate;
+  will-change: transform;
+  /* Bug #78 — second layer of defense for Safari's rounded-corner
+     bleed. Tailwind `rounded-2xl` = 1rem on the parent. Explicit
+     value (not `inherit`) because Next.js `<Image fill>` renders
+     the `<img>` inside a `<span>` wrapper, so the img would
+     inherit from the span (no border-radius) and not from
+     `.hero-frame`. With its own rounded corners the image clips
+     itself even if WebKit drops the parent's overflow clip on a
+     transformed compositing layer. No-op in Chrome/Firefox. */
+  border-radius: 1rem;
+}
+
+/* Round the Next.js `<Image fill>` wrapper too so the absolutely-
+   positioned span doesn't poke past the gold border in Safari. The
+   class targets any direct child span the framework injects — they
+   sit at `position:absolute; inset:0` and have `overflow:hidden`
+   themselves, but without a border-radius they're rectangles. */
+.hero-frame > span {
+  border-radius: 1rem;
+}
+@keyframes heroKenBurns {
+  0%   { transform: scale(1) translateY(0); }
+  100% { transform: scale(1.04) translateY(-0.5%); }
+}
+
+.hero-sweep::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 35%,
+    rgba(255, 240, 200, 0.06) 48%,
+    rgba(255, 220, 160, 0.16) 50%,
+    rgba(255, 240, 200, 0.06) 52%,
+    transparent 65%
+  );
+  transform: translateX(-100%);
+  animation: heroSweep 9s ease-in-out infinite;
+}
+@keyframes heroSweep {
+  0%        { transform: translateX(-100%); opacity: 0; }
+  12%       { opacity: 1; }
+  62%       { opacity: 1; }
+  72%, 100% { transform: translateX(100%); opacity: 0; }
+}
+
+/* Fine grain noise overlay encoded as an inline SVG so it ships with
+   the bundle and doesn't block LCP. */
+.hero-grain {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.45 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  background-size: 180px 180px;
+}
+
+/* Twin halo cones — crimson left, gold right, meeting at the fire
+   spine. Out of phase pulses so they breathe like dual spotlights. */
+.hero-cone-crimson {
+  animation: heroConeCrimson 6s ease-in-out infinite;
+}
+.hero-cone-gold {
+  animation: heroConeGold 6s ease-in-out infinite 1.5s;
+}
+@keyframes heroConeCrimson {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 0.8; }
+}
+@keyframes heroConeGold {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 0.65; }
+}
+
+/* Badge pulses — gold on the Official Voice, crimson on the
+   Challenger, deliberately out of phase. */
+.animate-hero-badge-gold {
+  animation: heroBadgeGold 3.8s ease-in-out infinite;
+}
+@keyframes heroBadgeGold {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(var(--c-gold) / 0.45),
+      0 0 0 rgba(var(--c-gold) / 0);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(var(--c-gold) / 0.7),
+      0 0 22px rgba(var(--c-gold) / 0.45);
+  }
+}
+.animate-hero-badge-crimson {
+  animation: heroBadgeCrimson 3.4s ease-in-out infinite 0.6s;
+}
+@keyframes heroBadgeCrimson {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(var(--c-spotlight) / 0.55),
+      0 0 0 rgba(var(--c-spotlight) / 0);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(var(--c-spotlight) / 0.85),
+      0 0 22px rgba(var(--c-spotlight) / 0.5);
+  }
+}
+
+/* Entrance — image + chrome fade up on first paint. Cheap, runs once.
+   Bug #50 — `animation-fill-mode: both` (the `both` token below) holds
+   the final keyframe's `transform` forever, which silently overrides
+   any Tailwind `-translate-x-1/2` / `-translate-y-1/2` utility on the
+   same element. That's why the crown emblem and the "Tonight's Battle"
+   chip — both centered with `left-1/2 -translate-x-1/2` — visually
+   slid right after the animation finished: their X-centering transform
+   was wiped out. Fix: keep the default keyframes (used by elements
+   that *don't* need horizontal centering), and add two centered
+   variants below for the elements that do. The animation now ends on
+   the correct translate, so the centering survives. */
+.hero-enter {
+  animation: heroEnter 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.hero-enter-delay-1 { animation-delay: 120ms; }
+.hero-enter-delay-2 { animation-delay: 220ms; }
+.hero-enter-delay-3 { animation-delay: 320ms; }
+@keyframes heroEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Crown emblem — needs both X and Y centering preserved across the
+   entrance animation (uses `left-1/2 top-0 -translate-x-1/2 -translate-y-1/2`). */
+@keyframes heroEnterCrown {
+  0%   { opacity: 0; transform: translate(-50%, calc(-50% + 8px)); }
+  100% { opacity: 1; transform: translate(-50%, -50%); }
+}
+.hero-enter.crown-glow {
+  animation-name: heroEnterCrown;
+}
+
+/* "Tonight's Battle" chip — needs X centering preserved (uses
+   `left-1/2 -translate-x-1/2`). Anything else that combines `.hero-enter`
+   with `left-1/2` and isn't the crown picks this up automatically. */
+@keyframes heroEnterCenterX {
+  0%   { opacity: 0; transform: translate(-50%, 8px); }
+  100% { opacity: 1; transform: translate(-50%, 0); }
+}
+.hero-enter.left-1\/2:not(.crown-glow) {
+  animation-name: heroEnterCenterX;
+}
+
+/* ─── Red Phone Challenge section ───────────────────────────────────
+   Brand-metaphor chrome: a coiled phone "cord" weaves between the four
+   step circles (crimson 1→3, gold at 4), with per-step breathing pulses
+   to make the row feel alive. */
+
+.cord-flow {
+  animation: cordFlow 4s linear infinite;
+}
+@keyframes cordFlow {
+  0%   { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -1.15; }
+}
+
+.step-pulse {
+  animation: stepPulse 4s ease-in-out infinite;
+}
+.step-pulse-1 { animation-delay: 0s; }
+.step-pulse-2 { animation-delay: 1s; }
+.step-pulse-3 { animation-delay: 2s; }
+@keyframes stepPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 0 rgba(var(--c-spotlight) / 0),
+      0 0 0 rgba(var(--c-spotlight) / 0);
+  }
+  50% {
+    box-shadow:
+      0 0 0 4px rgba(var(--c-spotlight) / 0.18),
+      0 0 28px rgba(var(--c-spotlight) / 0.35);
+  }
+}
 
 /* Skeleton shimmer used for loading cards */
 .skeleton {

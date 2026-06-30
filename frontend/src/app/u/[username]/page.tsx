@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
-import Footer from '@/components/Footer';
 import PerformanceCard from '@/components/PerformanceCard';
+import MyChallenges from '@/components/MyChallenges';
 import { PublicUser, VideoDto, VOICE_TYPE_LABELS, api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
@@ -115,8 +115,11 @@ export default function ProfilePage() {
                   </div>
 
                   <div className="flex-1 min-w-0">
+                    {/* Bug #27 — the eyebrow label was hardcoded to
+                        "Performer", which surfaced on admin profiles
+                        too. Use the actual role flag. */}
                     <p className="text-xs uppercase tracking-[0.3em] text-haze/60 mb-2">
-                      Performer
+                      {profile.isAdmin ? 'Admin' : 'Performer'}
                       {profile.privateProfile && isOwnProfile && (
                         <span className="ml-2 text-spotlight">· Private</span>
                       )}
@@ -137,11 +140,21 @@ export default function ProfilePage() {
                       </h1>
                     )}
 
-                    {profile.championTitle && (
-                      <p className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-gold/10 border border-gold/30 rounded-full text-sm font-bold text-gold">
-                        ★ {profile.championTitle}
-                      </p>
-                    )}
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {profile.championTitle && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-gold/10 border border-gold/30 rounded-full text-sm font-bold text-gold">
+                          ★ {profile.championTitle}
+                        </span>
+                      )}
+                      {profile.currentStreak >= 2 && (
+                        <span
+                          className="inline-flex items-center gap-1 px-3 py-1 bg-gold/15 border border-gold/40 rounded-full text-sm font-bold text-gold"
+                          title={`${profile.currentStreak} consecutive wins`}
+                        >
+                          🔥 {profile.currentStreak} wins in a row
+                        </span>
+                      )}
+                    </div>
 
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-4 text-sm text-haze">
                       {profile.voiceType && (
@@ -224,6 +237,11 @@ export default function ProfilePage() {
               </div>
             </div>
 
+            {/* My pending challenges — own profile only. Confirms the
+                upload was queued and shows where it stands in the Red
+                Phone pipeline. Drives return behavior. */}
+            {isOwnProfile && <MyChallenges />}
+
             <div className="mb-6 flex items-end justify-between">
               <div>
                 <h2 className="font-display text-3xl font-bold">
@@ -285,8 +303,6 @@ export default function ProfilePage() {
           </>
         )}
       </main>
-
-      <Footer />
     </>
   );
 }

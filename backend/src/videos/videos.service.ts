@@ -4,9 +4,11 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { Video, VideoCategory, VideoVisibility } from './video.entity';
+import { VideoView } from './video-view.entity';
 import { CloudinaryService } from './cloudinary.service';
+import { Battle } from '../battles/battle.entity';
 
 export type VideoSort = 'newest' | 'most_viewed' | 'trending';
 
@@ -32,6 +34,8 @@ export interface VideoListQuery {
 export class VideosService {
   constructor(
     @InjectRepository(Video) private readonly videos: Repository<Video>,
+    @InjectRepository(VideoView) private readonly videoViews: Repository<VideoView>,
+    @InjectRepository(Battle) private readonly battles: Repository<Battle>,
     private readonly cloudinary: CloudinaryService,
   ) {}
 
@@ -39,11 +43,14 @@ export class VideosService {
     title: string;
     description?: string;
     songTitle?: string;
+    songId?: string;
     uploaderId: string;
     fileBuffer: Buffer;
     category?: VideoCategory;
     visibility?: VideoVisibility;
     tags?: string[];
+    uploadAckTermsVersionId?: string | null;
+    uploadAckAt?: Date | null;
   }) {
     const upload = await this.cloudinary.uploadVideo(params.fileBuffer);
 
@@ -51,6 +58,7 @@ export class VideosService {
       title: params.title,
       description: params.description ?? null,
       songTitle: params.songTitle ?? null,
+      songId: params.songId ?? null,
       url: upload.secure_url,
       thumbnailUrl: upload.eager?.[0]?.secure_url ?? null,
       durationSeconds: upload.duration ? Math.round(upload.duration) : null,
@@ -59,6 +67,8 @@ export class VideosService {
       category: params.category ?? 'solo',
       visibility: params.visibility ?? 'public',
       tags: (params.tags ?? []).slice(0, 10),
+      uploadAckTermsVersionId: params.uploadAckTermsVersionId ?? null,
+      uploadAckAt: params.uploadAckAt ?? null,
     });
     return this.videos.save(video);
   }
@@ -70,18 +80,22 @@ export class VideosService {
     const qb = this.videos
       .createQueryBuilder('v')
       .leftJoinAndSelect('v.uploader', 'uploader')
+      .andWhere('v.deletedAt IS NULL') // soft-delete filter (decision D)
       .take(limit + 1) // grab one extra to detect "has more"
       .skip(offset);
 
     // Visibility rules:
-    //   - own profile feed (uploaderId === viewerId): public + unlisted
-    //   - everywhere else: public only (private/unlisted are excluded)
+    //   - own profile feed (uploaderId === viewerId): public + unlisted + private
+    //   - everywhere else: public only (unlisted needs the direct URL,
+    //     private is owner-only)
+    // Bug #7 — the owner branch was missing 'private', so videos marked
+    // "Only You" disappeared even from the uploader's own profile.
     if (
       query.uploaderId &&
       query.viewerId &&
       query.uploaderId === query.viewerId
     ) {
-      qb.andWhere("v.visibility IN ('public', 'unlisted')");
+      qb.andWhere("v.visibility IN ('public', 'unlisted', 'private')");
     } else {
       qb.andWhere("v.visibility = 'public'");
     }
@@ -121,21 +135,14 @@ export class VideosService {
         qb.orderBy('v.viewCount', 'DESC').addOrderBy('v.createdAt', 'DESC');
         break;
       case 'trending':
-        // views per hour since upload, integer math (works on sqlite + postgres)
-        // Cast to float, hoist into an alias for ordering
-        qb.addSelect(
-          // (viewCount + 1) / (hours_since_creation + 2)
-          // Use julianday on sqlite, EXTRACT(EPOCH ...) on postgres — simple-array
-          // doesn't help here. We'll use SQL-portable createdAt epoch math via
-          // strftime('%s', ...) on sqlite and EXTRACT on postgres. To keep the
-          // query portable, we approximate using "viewCount * 1.0 / (julianday('now') - julianday(v.createdAt) + 0.05)"
-          // when on sqlite, otherwise EXTRACT. Simpler: rank by viewCount, then
-          // newer first as tiebreaker — practical until we add a tracked stat.
-          'v.viewCount',
-          'trending_score',
-        )
-          .orderBy('v.viewCount', 'DESC')
-          .addOrderBy('v.createdAt', 'DESC');
+        // Bug #23 — the previous implementation called `addSelect` with a
+        // duplicate column alias which, combined with the leftJoinAndSelect
+        // for uploader + the `.skip()` pagination, broke TypeORM's
+        // entity-hydration step and crashed the request. We don't actually
+        // need the alias: the ORDER BY references the real column directly.
+        // Practical "trending" ranking until we wire a tracked stat: most
+        // views, newer first as tiebreaker.
+        qb.orderBy('v.viewCount', 'DESC').addOrderBy('v.createdAt', 'DESC');
         break;
       case 'newest':
       default:
@@ -149,10 +156,49 @@ export class VideosService {
     return { items, hasMore, nextOffset: hasMore ? offset + limit : null };
   }
 
+  /**
+   * Public lookup — soft-deleted videos appear as "not found".
+   * Battle pages use `findOneIncludingDeleted()` instead.
+   */
   async findOne(id: string) {
+    const v = await this.videos.findOne({ where: { id, deletedAt: IsNull() } });
+    if (!v) throw new NotFoundException('Video not found');
+    return v;
+  }
+
+  /**
+   * Battle-page lookup — returns the row even if soft-deleted, so historical
+   * battles still resolve their performance media. Public-facing surfaces
+   * (feed, profile, search) must keep using `findOne()` instead.
+   */
+  async findOneIncludingDeleted(id: string) {
     const v = await this.videos.findOne({ where: { id } });
     if (!v) throw new NotFoundException('Video not found');
     return v;
+  }
+
+  /**
+   * List by uploader — used by profile pages. Skips soft-deleted.
+   */
+  async findByUploader(uploaderId: string) {
+    return this.videos.find({
+      where: { uploaderId, deletedAt: IsNull() },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  /**
+   * Used by the admin "create battle" flow to list candidate performances
+   * for a given Centerstage Song.
+   */
+  async findEligibleForBattle(songId: string) {
+    return this.videos
+      .createQueryBuilder('v')
+      .leftJoinAndSelect('v.uploader', 'uploader')
+      .where('v.songId = :songId', { songId })
+      .andWhere('v.deletedAt IS NULL')
+      .orderBy('v.createdAt', 'DESC')
+      .getMany();
   }
 
   /**
@@ -169,18 +215,64 @@ export class VideosService {
     return v;
   }
 
-  async incrementView(id: string) {
-    await this.videos.increment({ id }, 'viewCount', 1);
+  /**
+   * Record a unique view from an authenticated user. Counts each
+   * (videoId, userId) pair at most once — the UNIQUE constraint on
+   * VideoView is the source of truth. Returns true on a brand-new
+   * view (counter incremented), false on a duplicate (counter untouched).
+   *
+   * Callers must pre-filter out self-views (uploader viewing their own
+   * video) and anonymous views — this method records anything it's given.
+   */
+  async recordView(videoId: string, userId: string): Promise<boolean> {
+    try {
+      await this.videoViews.insert({ videoId, userId });
+    } catch (err: any) {
+      // SQLite: SQLITE_CONSTRAINT (code 19); Postgres: 23505 unique_violation
+      if (
+        err?.code === 'SQLITE_CONSTRAINT' ||
+        err?.code === '23505' ||
+        /UNIQUE/i.test(err?.message ?? '')
+      ) {
+        return false;
+      }
+      throw err;
+    }
+    await this.videos.increment({ id: videoId }, 'viewCount', 1);
+    return true;
   }
 
+  /**
+   * Delete a performance. Vincent's decision D:
+   *   - If the video has been used in any battle (as A or B in any status),
+   *     it can NOT be hard-deleted. We soft-delete instead — sets deletedAt,
+   *     keeps the row + Cloudinary asset so historical battles still resolve.
+   *   - Otherwise hard-delete: remove the row and the Cloudinary asset.
+   *
+   * Returns { mode: 'soft' | 'hard' } so the UI can word the confirmation.
+   */
   async delete(id: string, requestingUserId: string) {
     const video = await this.findOne(id);
     if (video.uploaderId !== requestingUserId) {
       throw new ForbiddenException('You can only delete your own videos');
     }
+
+    const usedInBattle = await this.battles
+      .createQueryBuilder('b')
+      .where('b.performanceAId = :id OR b.performanceBId = :id', { id })
+      .getCount();
+
+    if (usedInBattle > 0) {
+      // Soft-delete: hide from feed/profile but keep battle history intact
+      video.deletedAt = new Date();
+      await this.videos.save(video);
+      return { ok: true, mode: 'soft' as const };
+    }
+
+    // Safe to hard-delete
     await this.cloudinary.deleteVideo(video.cloudinaryPublicId);
     await this.videos.remove(video);
-    return { ok: true };
+    return { ok: true, mode: 'hard' as const };
   }
 
   // Used by frontend to render uploader info nicely
@@ -190,6 +282,7 @@ export class VideosService {
       title: video.title,
       description: video.description,
       songTitle: video.songTitle,
+      songId: video.songId,
       url: video.url,
       thumbnailUrl: video.thumbnailUrl,
       durationSeconds: video.durationSeconds,
@@ -198,6 +291,7 @@ export class VideosService {
       tags: video.tags ?? [],
       viewCount: video.viewCount,
       createdAt: video.createdAt,
+      // deletedAt is intentionally NOT exposed — it's an internal soft-delete flag.
       uploader: video.uploader
         ? {
             id: video.uploader.id,
@@ -205,6 +299,9 @@ export class VideosService {
             avatarUrl: video.uploader.avatarUrl,
             championTitle: video.uploader.championTitle,
             winCount: video.uploader.winCount,
+            // Phase 2B: needed to render the "🔥 X wins in a row" chip on the
+            // battle/profile/performance card without an extra fetch.
+            currentStreak: video.uploader.currentStreak,
           }
         : null,
     };

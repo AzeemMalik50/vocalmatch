@@ -61,6 +61,10 @@ export class UsersService {
       battleCount: user.battleCount,
       currentStreak: user.currentStreak,
       championTitle: user.championTitle,
+      // Phase 2A — flags are exposed so the frontend can show admin / songwriter UI.
+      // Authorization itself is server-side via AdminGuard; these flags are advisory.
+      isAdmin: !!user.isAdmin,
+      isSongwriter: !!user.isSongwriter,
       createdAt: user.createdAt,
     };
   }

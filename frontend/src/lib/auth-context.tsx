@@ -13,11 +13,14 @@ import { AuthUser, api } from './api';
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<AuthUser>;
+  login: (email: string, password: string, turnstileToken?: string) => Promise<AuthUser>;
   signup: (
     email: string,
     username: string,
     password: string,
+    acceptedTerms: boolean,
+    acceptedPrivacy: boolean,
+    turnstileToken?: string,
   ) => Promise<AuthUser>;
   logout: () => void;
   refresh: () => Promise<void>;
@@ -37,6 +40,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try { setUser(JSON.parse(raw)); } catch {}
     }
     setLoading(false);
+    // Refresh from /me on mount so flags like isAdmin/isSongwriter
+    // pick up server-side changes without forcing a re-login.
+    if (localStorage.getItem('vm_token')) {
+      refresh();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const persist = (token: string, u: AuthUser) => {
@@ -45,14 +54,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(u);
   };
 
-  const login = async (email: string, password: string) => {
-    const { token, user } = await api.login({ email, password });
+  const login = async (email: string, password: string, turnstileToken?: string) => {
+    const { token, user } = await api.login({ email, password, turnstileToken });
     persist(token, user);
     return user;
   };
 
-  const signup = async (email: string, username: string, password: string) => {
-    const { token, user } = await api.signup({ email, username, password });
+  const signup = async (
+    email: string,
+    username: string,
+    password: string,
+    acceptedTerms: boolean,
+    acceptedPrivacy: boolean,
+    turnstileToken?: string,
+  ) => {
+    const { token, user } = await api.signup({
+      email,
+      username,
+      password,
+      acceptedTerms,
+      acceptedPrivacy,
+      turnstileToken,
+    });
     // Newly signed-up users haven't completed profile by default
     const enriched: AuthUser = { ...user, profileCompleted: false };
     persist(token, enriched);
@@ -69,16 +92,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!localStorage.getItem('vm_token')) return;
     try {
       const me = await api.me();
-      const updated: AuthUser = {
+      // /users/me doesn't return email — preserve it from existing state
+      const prev = JSON.parse(localStorage.getItem('vm_user') || '{}');
+      const merged: AuthUser = {
         id: me.id,
-        email: '', // /users/me doesn't return email; preserve from state
+        email: prev.email ?? '',
         username: me.username,
         avatarUrl: me.avatarUrl,
         profileCompleted: me.profileCompleted,
+        isAdmin: me.isAdmin,
+        isSongwriter: me.isSongwriter,
       };
-      // Preserve email from existing state
-      const prev = JSON.parse(localStorage.getItem('vm_user') || '{}');
-      const merged = { ...updated, email: prev.email ?? '' };
       localStorage.setItem('vm_user', JSON.stringify(merged));
       setUser(merged);
     } catch {

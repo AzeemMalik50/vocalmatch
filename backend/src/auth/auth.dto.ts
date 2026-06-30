@@ -1,4 +1,4 @@
-import { IsEmail, IsString, Matches, MinLength } from 'class-validator';
+import { Equals, IsBoolean, IsEmail, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
 export class SignupDto {
   @IsEmail()
@@ -12,16 +12,40 @@ export class SignupDto {
   username: string;
 
   @IsString()
-  @MinLength(6)
+  @MinLength(8)
   password: string;
+
+  @IsBoolean()
+  @Equals(true, { message: 'You must agree to the Terms of Service' })
+  acceptedTerms: boolean;
+
+  @IsBoolean()
+  @Equals(true, { message: 'You must agree to the Privacy Policy' })
+  acceptedPrivacy: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  turnstileToken?: string;
 }
 
 export class LoginDto {
-  @IsEmail()
+  // Field name kept as `email` for API + frontend compatibility, but the
+  // value can be EITHER an email address OR a username — the service
+  // looks the user up by both. Validation relaxed to `@IsString` so
+  // usernames (which don't pass `@IsEmail`) aren't rejected at the
+  // pipe layer.
+  @IsString()
+  @MinLength(1)
   email: string;
 
   @IsString()
   password: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  turnstileToken?: string;
 }
 
 export class ChangeEmailDto {
@@ -37,11 +61,32 @@ export class ChangePasswordDto {
   currentPassword: string;
 
   @IsString()
-  @MinLength(6)
+  @MinLength(8)
   newPassword: string;
 }
 
 export class DeleteAccountDto {
   @IsString()
   currentPassword: string;
+}
+
+export class ForgotPasswordDto {
+  @IsEmail()
+  email: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  turnstileToken?: string;
+}
+
+export class ResetPasswordDto {
+  @IsString()
+  @MinLength(64)
+  @MaxLength(64)
+  token: string;
+
+  @IsString()
+  @MinLength(8)
+  newPassword: string;
 }
