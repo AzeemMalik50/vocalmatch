@@ -4,6 +4,8 @@ import * as streamifier from 'streamifier';
 
 @Injectable()
 export class CloudinaryService {
+  // `||` (not `??`) so an empty-string env var also falls back to the default —
+  // CI/CD pipelines that set every var explicitly often pass `""` for unset values.
   private readonly folderPrefix =
     process.env.CLOUDINARY_FOLDER_PREFIX?.replace(/\/$/, '') || 'vocalmatch';
 
