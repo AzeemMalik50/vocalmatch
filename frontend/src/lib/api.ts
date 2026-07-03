@@ -54,6 +54,35 @@ export function qrImageUrl(opts: {
   return `${API_URL}/qr?${params.toString()}`;
 }
 
+/**
+ * Force-download a file from a URL. The `download` attribute on `<a>`
+ * only works when the resource is same-origin; the QR endpoint lives
+ * on the API domain (different origin than the frontend), so a plain
+ * `<a href download>` silently opens the image inline instead. Fetch
+ * the bytes into a Blob, wrap in an object URL, click a synthetic
+ * anchor. Works cross-origin as long as the endpoint's CORS response
+ * permits the fetch — which the QR endpoint already does since the
+ * modal's `<img src>` preview loads through the same CORS rule.
+ */
+export async function downloadFile(url: string, filename: string) {
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Download failed (HTTP ${res.status})`);
+  }
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = objectUrl;
+  a.download = filename;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // Safari needs the object URL to stay alive briefly after the click
+  // resolves, otherwise the download aborts on some versions.
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {},

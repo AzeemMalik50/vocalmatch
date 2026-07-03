@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { qrImageUrl } from '@/lib/api';
+import { qrImageUrl, downloadFile } from '@/lib/api';
 
 interface Props {
   url: string;
@@ -14,6 +14,7 @@ interface Props {
 
 export default function QrShareModal({ url, title, open, onClose }: Props) {
   const [copied, setCopied] = useState(false);
+  const [downloading, setDownloading] = useState<'png' | 'svg' | null>(null);
 
   // ESC to close
   useEffect(() => {
@@ -45,6 +46,21 @@ export default function QrShareModal({ url, title, open, onClose }: Props) {
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // best-effort
+    }
+  };
+  const handleDownload = async (format: 'png' | 'svg') => {
+    if (downloading) return;
+    setDownloading(format);
+    try {
+      const src =
+        format === 'png'
+          ? qrImageUrl({ url, size: 512 })
+          : qrImageUrl({ url, format: 'svg' });
+      await downloadFile(src, `vocalmatch-qr.${format}`);
+    } catch {
+      // best-effort — the browser will surface fetch failures in devtools.
+    } finally {
+      setDownloading(null);
     }
   };
 
@@ -90,20 +106,28 @@ export default function QrShareModal({ url, title, open, onClose }: Props) {
         <p className="mt-3 text-xs text-haze break-all font-mono">{url}</p>
 
         <div className="mt-4 flex flex-wrap gap-2">
-          <a
-            href={qrImageUrl({ url, size: 512 })}
-            download="vocalmatch-qr.png"
-            className="px-3 py-2 rounded-md bg-spotlight text-white text-sm font-semibold"
+          {/* Buttons (not anchors with `download`): the QR image is served
+              cross-origin from the API domain, and browsers ignore the
+              `download` attribute on cross-origin resources — that's why
+              clicking previously opened the image inline. `downloadFile`
+              fetches to a Blob and clicks a synthetic anchor, which
+              actually triggers a save. */}
+          <button
+            type="button"
+            onClick={() => handleDownload('png')}
+            disabled={downloading !== null}
+            className="px-3 py-2 rounded-md bg-spotlight text-white text-sm font-semibold disabled:opacity-60"
           >
-            Download PNG
-          </a>
-          <a
-            href={qrImageUrl({ url, format: 'svg' })}
-            download="vocalmatch-qr.svg"
-            className="px-3 py-2 rounded-md border border-stage-700/60 text-white text-sm font-semibold"
+            {downloading === 'png' ? 'Downloading…' : 'Download PNG'}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleDownload('svg')}
+            disabled={downloading !== null}
+            className="px-3 py-2 rounded-md border border-stage-700/60 text-white text-sm font-semibold disabled:opacity-60"
           >
-            Download SVG
-          </a>
+            {downloading === 'svg' ? 'Downloading…' : 'Download SVG'}
+          </button>
           <button
             onClick={copyLink}
             aria-live="polite"
