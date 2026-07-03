@@ -83,6 +83,22 @@ export async function downloadFile(url: string, filename: string) {
   setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
 }
 
+/**
+ * Rich error subclass so callers (specifically the auth refresh path) can
+ * tell an HTTP 401 apart from a network/CORS/abort failure. Without this,
+ * `refresh()` treated a fetch aborted by Safari during F5 unload as an
+ * auth failure and silently logged the user out — see auth-context's
+ * refresh() for the consumer.
+ */
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
@@ -104,7 +120,10 @@ async function request<T>(
     const msg =
       (data && (data.message || data.error)) ||
       `Request failed (${res.status})`;
-    throw new Error(Array.isArray(msg) ? msg.join(', ') : msg);
+    throw new ApiError(
+      Array.isArray(msg) ? msg.join(', ') : msg,
+      res.status,
+    );
   }
   return data;
 }
