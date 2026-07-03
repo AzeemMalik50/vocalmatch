@@ -312,11 +312,10 @@ export default function BattlePage() {
           </div>
         )}
 
-        {perfError && (
-          <div className="bg-red-950/30 border border-red-900/40 rounded-lg p-3 text-sm text-red-300 mb-4">
-            {perfError}
-          </div>
-        )}
+        {/* Previously a redundant red banner echoed the pane-level
+            "Performance X is unavailable" line. Removed so viewers see
+            the clear removed-performance explanation once (below the
+            video panes) instead of the same fact twice. */}
 
         {/* The two videos */}
         <div className="grid md:grid-cols-2 gap-4 md:gap-6 mb-8">
@@ -337,9 +336,13 @@ export default function BattlePage() {
         </div>
 
         {/* Vote panel — needs both performances loaded. When either
-            side failed to load (e.g. soft-deleted media) we replace the
-            indefinite "loading" state with a clear explanation so the
-            page doesn't appear stuck. */}
+            side failed to load (e.g. admin soft-deleted the video) we
+            replace the indefinite "loading" state with an explicit
+            explanation so the page doesn't appear stuck AND the affected
+            performer / audience know why voting stopped. Copy tuned to
+            match Vincent's spec — clear, plain, tells the viewer to
+            contact the admin for more info rather than implying an
+            automatic notification. */}
         {performanceA && performanceB ? (
           <BattleVotePanel
             battle={battle}
@@ -350,11 +353,12 @@ export default function BattlePage() {
         ) : perfError ? (
           <div className="bg-stage-900 border border-red-900/40 rounded-2xl p-8 text-center">
             <p className="font-display text-xl font-bold text-white mb-2">
-              Voting is paused for this battle.
+              Voting for this battle has been closed.
             </p>
-            <p className="text-sm text-haze">
-              One or both performance videos are no longer available. An admin
-              has been notified — check back later or browse other live battles.
+            <p className="text-sm text-haze max-w-lg mx-auto leading-relaxed">
+              {perfErrorA && perfErrorB
+                ? 'Both performances have been removed. Please contact the administrator for more information.'
+                : 'One of the performances has been removed, so this battle can no longer accept votes. Please contact the administrator for more information.'}
             </p>
           </div>
         ) : (
