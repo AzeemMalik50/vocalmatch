@@ -544,11 +544,11 @@ function ChangePasswordSection({
             autoComplete="current-password"
           />
         </Field>
-        <Field label="New password" hint="At least 6 characters.">
+        <Field label="New password" hint="At least 8 characters.">
           <TextInput
             type="password"
             required
-            minLength={6}
+            minLength={8}
             value={next}
             onChange={(e) => setNext(e.target.value)}
             autoComplete="new-password"
