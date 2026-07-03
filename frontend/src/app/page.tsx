@@ -1371,6 +1371,13 @@ function StageCarousel() {
   const [sort, setSort] = useState<VideoSort>('newest');
   const [videos, setVideos] = useState<VideoDto[]>([]);
   const [loading, setLoading] = useState(true);
+  // Track whether the scroller is at either edge so the arrows can
+  // disable themselves — otherwise the chevrons look interactive on the
+  // first/last slide even though clicking does nothing. Defaults are
+  // `true` on both ends so arrows render disabled until content and
+  // widths settle (measured in the effect below).
+  const [atStart, setAtStart] = useState(true);
+  const [atEnd, setAtEnd] = useState(true);
 
   // Strip a leading "@" so users searching "@foo" get matched against
   // usernames (stored without the prefix) instead of returning empty.
@@ -1407,6 +1414,31 @@ function StageCarousel() {
       cancelled = true;
     };
   }, [debouncedSearch, voiceType, genre, sort]);
+
+  // Recompute atStart / atEnd whenever the scroller moves, the viewport
+  // resizes, or the video list changes (filter swap → different total
+  // width → arrow state may need to flip). `useEffect` re-runs on
+  // `[videos, loading]` so the initial post-load render is measured too.
+  useEffect(() => {
+    const el = document.getElementById('stage-scroll');
+    if (!el) return;
+    const update = () => {
+      const maxScroll = el.scrollWidth - el.clientWidth;
+      // 1-pixel tolerance — smooth-scroll animations can settle at
+      // subpixel offsets on iOS Safari that never quite reach 0 or
+      // maxScroll, which would otherwise strand the arrows in an
+      // "always enabled" state at the very edges.
+      setAtStart(el.scrollLeft <= 1);
+      setAtEnd(maxScroll <= 0 || el.scrollLeft >= maxScroll - 1);
+    };
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => {
+      el.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [videos, loading]);
 
   const scroll = (dir: 'left' | 'right') => {
     const el = document.getElementById('stage-scroll');
@@ -1508,8 +1540,10 @@ function StageCarousel() {
           <button
             type="button"
             onClick={() => scroll('left')}
+            disabled={atStart}
             aria-label="Scroll left"
-            className="shrink-0 self-center flex h-10 w-10 items-center justify-center rounded-full bg-stage-900 border border-stage-700 text-white hover:text-red-500 hover:border-red-500/50 shadow-lg transition-colors"
+            aria-disabled={atStart}
+            className="shrink-0 self-center flex h-10 w-10 items-center justify-center rounded-full bg-stage-900 border border-stage-700 text-white hover:text-red-500 hover:border-red-500/50 shadow-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-white disabled:hover:border-stage-700"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -1542,8 +1576,10 @@ function StageCarousel() {
           <button
             type="button"
             onClick={() => scroll('right')}
+            disabled={atEnd}
             aria-label="Scroll right"
-            className="shrink-0 self-center flex h-10 w-10 items-center justify-center rounded-full bg-stage-900 border border-stage-700 text-white hover:text-red-500 hover:border-red-500/50 shadow-lg transition-colors"
+            aria-disabled={atEnd}
+            className="shrink-0 self-center flex h-10 w-10 items-center justify-center rounded-full bg-stage-900 border border-stage-700 text-white hover:text-red-500 hover:border-red-500/50 shadow-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-white disabled:hover:border-stage-700"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
