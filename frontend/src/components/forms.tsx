@@ -191,7 +191,14 @@ export function Button({
     variant === 'primary'
       ? 'bg-spotlight text-white hover:bg-spotlight-dim shadow-lg shadow-spotlight/30 disabled:shadow-none'
       : variant === 'secondary'
-      ? 'bg-stage-800 border border-stage-700 hover:border-stage-600'
+      ? // Bug — the previous `border-stage-700` on a `bg-stage-800` background
+        // gave a delta of ~25 points against the near-black card background
+        // (matches the low-visibility pattern fixed on card borders app-wide).
+        // Combined with no explicit `text-*` (which inherited the body's muted
+        // grey), the button read as disabled. Bump the border to `stage-600`
+        // and pin text to white so the label pops; hover strengthens with the
+        // spotlight accent.
+        'bg-stage-800 border border-stage-600 text-white hover:bg-stage-700 hover:border-spotlight/60'
       : 'text-haze';
 
   return (
