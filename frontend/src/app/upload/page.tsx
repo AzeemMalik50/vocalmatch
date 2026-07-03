@@ -84,6 +84,15 @@ function UploadForm() {
   const [progress, setProgress] = useState(0); // 0..100
   const [uploaded, setUploaded] = useState(0); // bytes
   const handleRef = useRef<UploadHandle | null>(null);
+  // Bug — if the user hit Cancel just as the server finished saving the
+  // upload, `handle.cancel()` was a no-op (XHR already resolved) but the
+  // main submit's `await handle.promise` was still pending. It resolved
+  // with a real `created` object and the code then went on to submit the
+  // challenge and navigate — before the cancel-path's deleteVideo could
+  // catch up. Net effect: user saw "Cancelled" toast but the performance
+  // was live in their profile. This ref lets the post-await path detect
+  // that cancellation happened during the race and bail cleanly.
+  const cancelledRef = useRef(false);
   // Ref on the song-picker wrapper so we can detect taps outside the
   // dropdown and close it. Without this the picker had no dismiss
   // mechanism at all — the only way to close it was to select an item
@@ -382,6 +391,7 @@ function UploadForm() {
     // All validation passed — now it's safe to flip into the uploading
     // state. From here, the only way back is the real cancel path or a
     // success/error response from the upload itself.
+    cancelledRef.current = false;
     setSubmitting(true);
     setProgress(0);
     setUploaded(0);
@@ -410,6 +420,17 @@ function UploadForm() {
 
     try {
       const created = await handle.promise;
+      // Cancel-during-final-stage race: if the user hit Cancel while the
+      // server was finalising this upload, `cancelledRef` was flipped in
+      // the interim. The cancel handler already scheduled a deleteVideo
+      // on this `created` id, so we must NOT go on to submit a challenge
+      // or navigate to the video page — that would leave the challenge
+      // linked to a video the cancel path is about to delete (or worse,
+      // succeed racing the delete). Bail here; the cancel handler owns
+      // cleanup + state reset.
+      if (cancelledRef.current) {
+        return;
+      }
       setProgress(100);
 
       // Challenge mode: register the upload as a Red Phone submission for
@@ -445,6 +466,10 @@ function UploadForm() {
 
       router.push(`/v/${created.id}`);
     } catch (e: any) {
+      // Cancellation-triggered abort throws too — swallow silently so
+      // the user doesn't see an error toast on top of the "Cancelled"
+      // message. The cancel handler has already reset submit state.
+      if (cancelledRef.current) return;
       setErr(e.message);
       setSubmitting(false);
       setProgress(0);
@@ -461,6 +486,12 @@ function UploadForm() {
   const cancel = () => {
     const handle = handleRef.current;
     if (!handle) return;
+    // Flag first — the main submit's post-await code checks this and
+    // bails before running challenge-submit or navigate. Order matters:
+    // if we set this after calling `handle.cancel()`, a synchronous
+    // resolution of the promise (already-completed XHR) could race
+    // ahead of the flag and land us on the video page.
+    cancelledRef.current = true;
     handle.cancel();
     handle.promise
       .then((created) => {
