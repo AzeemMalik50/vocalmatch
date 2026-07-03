@@ -442,6 +442,12 @@ function LiveBattle() {
   const [battle, setBattle] = useState<BattleDto | null>(null);
   const [a, setA] = useState<VideoDto | null>(null);
   const [b, setB] = useState<VideoDto | null>(null);
+  // Song is needed so we can tell whether this is a first-ever battle for
+  // the song (no defending champion) vs. a title-defense (one side is the
+  // reigning Official Voice). Without this, both sides were labeled with
+  // Champion / Challenger roles even on a song's very first battle, where
+  // neither role applies yet.
+  const [song, setSong] = useState<SongDto | null>(null);
   // Bug #57 — the section used to fetch a single live battle and pretend
   // it was the only one. Track the other concurrent live battles
   // separately so we can render them as a compact grid below the
@@ -467,18 +473,21 @@ function LiveBattle() {
         setBattle(null);
         setA(null);
         setB(null);
+        setSong(null);
         setExtraBattles([]);
         return;
       }
       const featured = await api.getBattle(resp.items[0].id);
       setBattle(featured);
       setExtraBattles(resp.items.slice(1));
-      const [perfA, perfB] = await Promise.all([
+      const [perfA, perfB, songForBattle] = await Promise.all([
         api.getVideo(featured.performanceAId),
         api.getVideo(featured.performanceBId),
+        api.getSong(featured.songId).catch(() => null),
       ]);
       setA(perfA);
       setB(perfB);
+      setSong(songForBattle);
     } catch {
       // Non-fatal — section degrades to empty state.
     } finally {
@@ -519,8 +528,18 @@ function LiveBattle() {
               </h2>
             </div>
             <p className="text-sm md:text-base text-gray-300 max-w-xl">
-              Official Voice vs Challenger. Two singers, same song — vote
-              before the clock runs out.
+              {(() => {
+                // Only use the "Official Voice vs Challenger" framing when
+                // there's an actual reigning champion in this battle. For
+                // a song's very first battle there is no defender yet.
+                const championPerfId = song?.currentChampionPerformanceId;
+                const hasChampion =
+                  !!championPerfId &&
+                  (championPerfId === a?.id || championPerfId === b?.id);
+                return hasChampion
+                  ? 'Official Voice vs Challenger. Two singers, same song — vote before the clock runs out.'
+                  : 'Two singers, same song. Vote before the clock runs out — whoever wins is crowned the first Official Voice.';
+              })()}
             </p>
           </div>
         </div>
@@ -536,45 +555,71 @@ function LiveBattle() {
               The next one drops as soon as the admin pairs the next contender.
             </p>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <BattleSideCard
-              performance={a}
-              side="A"
-              label="Current Official Voice"
-              tone="red"
-            />
+        ) : (() => {
+          // Bug — the labels below were hardcoded to
+          // "Current Official Voice" / "Challenger", so on a song's
+          // very first battle (no crown established yet) both
+          // participants were mislabeled. Compute per-side roles from
+          // the song's `currentChampionPerformanceId`:
+          //   - matches side A → A is defender, B is challenger
+          //   - matches side B → B is defender, A is challenger
+          //     (rare — most challenge-promoted battles put champion
+          //      at side A, but admin-created first battles don't)
+          //   - matches neither / null → first battle, no defender;
+          //     both sides get a neutral "Contender" label.
+          const championPerfId = song?.currentChampionPerformanceId;
+          const labelA =
+            championPerfId === a.id
+              ? 'Current Official Voice'
+              : championPerfId === b.id
+                ? 'Challenger'
+                : 'Contender';
+          const labelB =
+            championPerfId === b.id
+              ? 'Current Official Voice'
+              : championPerfId === a.id
+                ? 'Challenger'
+                : 'Contender';
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <BattleSideCard
+                performance={a}
+                side="A"
+                label={labelA}
+                tone="red"
+              />
 
-            <div className="flex flex-col items-center justify-center gap-6">
-              <div className="text-6xl font-black text-white">VS</div>
-              <div className="bg-card/50 backdrop-blur border border-red-600/30 rounded-2xl p-8 w-full flex justify-center">
-                {/* Bug #65 — use the shared CountdownTimer so this
-                    surface is in lockstep with the admin + battle-
-                    detail pages. Was previously a bespoke 4-cell
-                    Days/Hrs/Mins/Secs block backed by a local
-                    setInterval, which drifted from the standard
-                    H:M:S formatting used everywhere else. */}
-                <CountdownTimer
-                  endsAt={battle.votingClosesAt}
-                  size="large"
-                />
+              <div className="flex flex-col items-center justify-center gap-6">
+                <div className="text-6xl font-black text-white">VS</div>
+                <div className="bg-card/50 backdrop-blur border border-red-600/30 rounded-2xl p-8 w-full flex justify-center">
+                  {/* Bug #65 — use the shared CountdownTimer so this
+                      surface is in lockstep with the admin + battle-
+                      detail pages. Was previously a bespoke 4-cell
+                      Days/Hrs/Mins/Secs block backed by a local
+                      setInterval, which drifted from the standard
+                      H:M:S formatting used everywhere else. */}
+                  <CountdownTimer
+                    endsAt={battle.votingClosesAt}
+                    size="large"
+                  />
+                </div>
+                <Link
+                  href={`/battle/${battle.id}`}
+                  className="w-full inline-flex items-center justify-center bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-lg uppercase tracking-widest transition"
+                >
+                  Watch Battle
+                </Link>
               </div>
-              <Link
-                href={`/battle/${battle.id}`}
-                className="w-full inline-flex items-center justify-center bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-lg uppercase tracking-widest transition"
-              >
-                Watch Battle
-              </Link>
-            </div>
 
-            <BattleSideCard
-              performance={b}
-              side="B"
-              label="Challenger"
-              tone="blue"
-            />
-          </div>
-        )}
+              <BattleSideCard
+                performance={b}
+                side="B"
+                label={labelB}
+                tone="blue"
+              />
+            </div>
+          );
+        })()}
 
         {/* Other concurrently-live battles. The featured card above is
             the marquee; this strip surfaces every other battle that's
@@ -666,7 +711,10 @@ function LiveBattleSkeleton() {
       <div className="flex flex-col items-center justify-center gap-6">
         <div className="text-6xl font-black text-white/30">VS</div>
         <div className="bg-card/50 backdrop-blur border border-border rounded-2xl p-8 w-full">
-          <div className="grid grid-cols-4 gap-4 text-center">
+          {/* Countdown skeleton: 4 units (days/hours/mins/secs). On mobile
+              they wrap to 2×2 so each cell has room for the large digits;
+              from the `sm` breakpoint up, the row lays flat as 1×4. */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i}>
                 <div className="h-8 w-full skeleton rounded mb-2" />
@@ -1165,9 +1213,16 @@ function ChampionSection() {
                   {champion ? `@${champion.username}` : 'The Reigning Voice'}
                 </h2>
               </div>
-              <div className="flex items-center gap-2">
-                <Crown className="w-5 h-5 text-yellow-500" />
-                <p className="text-yellow-500 font-bold uppercase tracking-widest">
+              {/* `items-start` (not `items-center`) so the crown icon
+                  aligns to the top when the title wraps to multiple
+                  lines instead of centering vertically to a tall block
+                  and drifting mid-paragraph. `min-w-0` on the <p>
+                  container lets the flex child actually shrink; without
+                  it, `break-words` on the span alone has no effect
+                  because the parent doesn't constrain its width. */}
+              <div className="flex items-start gap-2">
+                <Crown className="w-5 h-5 text-yellow-500 shrink-0 mt-1" />
+                <p className="min-w-0 text-yellow-500 font-bold uppercase tracking-widest break-words line-clamp-3">
                   Official Voice of{' '}
                   <span className="text-yellow-300">
                     {song.title}
@@ -1323,6 +1378,13 @@ function StageCarousel() {
   const [sort, setSort] = useState<VideoSort>('newest');
   const [videos, setVideos] = useState<VideoDto[]>([]);
   const [loading, setLoading] = useState(true);
+  // Track whether the scroller is at either edge so the arrows can
+  // disable themselves — otherwise the chevrons look interactive on the
+  // first/last slide even though clicking does nothing. Defaults are
+  // `true` on both ends so arrows render disabled until content and
+  // widths settle (measured in the effect below).
+  const [atStart, setAtStart] = useState(true);
+  const [atEnd, setAtEnd] = useState(true);
 
   // Strip a leading "@" so users searching "@foo" get matched against
   // usernames (stored without the prefix) instead of returning empty.
@@ -1360,15 +1422,56 @@ function StageCarousel() {
     };
   }, [debouncedSearch, voiceType, genre, sort]);
 
+  // Recompute atStart / atEnd whenever the scroller moves, the viewport
+  // resizes, or the video list changes (filter swap → different total
+  // width → arrow state may need to flip). `useEffect` re-runs on
+  // `[videos, loading]` so the initial post-load render is measured too.
+  useEffect(() => {
+    const el = document.getElementById('stage-scroll');
+    if (!el) return;
+    const update = () => {
+      const maxScroll = el.scrollWidth - el.clientWidth;
+      // 1-pixel tolerance — smooth-scroll animations can settle at
+      // subpixel offsets on iOS Safari that never quite reach 0 or
+      // maxScroll, which would otherwise strand the arrows in an
+      // "always enabled" state at the very edges.
+      setAtStart(el.scrollLeft <= 1);
+      setAtEnd(maxScroll <= 0 || el.scrollLeft >= maxScroll - 1);
+    };
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => {
+      el.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [videos, loading]);
+
   const scroll = (dir: 'left' | 'right') => {
     const el = document.getElementById('stage-scroll');
     if (!el) return;
-    // Bug #89 — was hard-coded 340px (one desktop card + gap). Now
-    // card width varies with viewport (full-vw on mobile, 320px on
-    // sm+), so use the scroller's own visible width as the step —
-    // mobile gets one card per click, desktop gets ~one screenful.
+    const inner = el.firstElementChild as HTMLElement | null;
+    if (!inner) return;
+    const cards = Array.from(inner.children) as HTMLElement[];
+    if (cards.length === 0) return;
+
+    // Bug #89 — was hard-coded 340px; then `clientWidth`. Both miss the
+    // 24px gap between cards, so on iOS Safari `scrollBy` + snap-mandatory
+    // race each other and leave the incoming card clipped. Compute the
+    // raw ~one-screen target, then snap it to the nearest card's left edge
+    // in JS so the landing position is deterministic on every browser.
     const step = el.clientWidth;
-    el.scrollBy({ left: dir === 'left' ? -step : step, behavior: 'smooth' });
+    const elLeft = el.getBoundingClientRect().left;
+    const offsets = cards.map(
+      (c) => el.scrollLeft + (c.getBoundingClientRect().left - elLeft),
+    );
+    const rawTarget = el.scrollLeft + (dir === 'right' ? step : -step);
+    const targetLeft = offsets.reduce(
+      (best, cur) =>
+        Math.abs(cur - rawTarget) < Math.abs(best - rawTarget) ? cur : best,
+      offsets[0],
+    );
+    el.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
   };
 
   return (
@@ -1444,8 +1547,10 @@ function StageCarousel() {
           <button
             type="button"
             onClick={() => scroll('left')}
+            disabled={atStart}
             aria-label="Scroll left"
-            className="shrink-0 self-center flex h-10 w-10 items-center justify-center rounded-full bg-stage-900 border border-stage-700 text-white hover:text-red-500 hover:border-red-500/50 shadow-lg transition-colors"
+            aria-disabled={atStart}
+            className="shrink-0 self-center flex h-10 w-10 items-center justify-center rounded-full bg-stage-900 border border-stage-700 text-white hover:text-red-500 hover:border-red-500/50 shadow-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-white disabled:hover:border-stage-700"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -1478,8 +1583,10 @@ function StageCarousel() {
           <button
             type="button"
             onClick={() => scroll('right')}
+            disabled={atEnd}
             aria-label="Scroll right"
-            className="shrink-0 self-center flex h-10 w-10 items-center justify-center rounded-full bg-stage-900 border border-stage-700 text-white hover:text-red-500 hover:border-red-500/50 shadow-lg transition-colors"
+            aria-disabled={atEnd}
+            className="shrink-0 self-center flex h-10 w-10 items-center justify-center rounded-full bg-stage-900 border border-stage-700 text-white hover:text-red-500 hover:border-red-500/50 shadow-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-white disabled:hover:border-stage-700"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -1904,16 +2011,31 @@ function CrownAtRiskPanelView({
           <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-black/85" />
           <div className="relative grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-8 items-center">
             <div>
-              <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle className={`w-5 h-5 ${tone.text}`} />
+              {/* Bug — icons were fixed at 20px (`w-5 h-5`) while the
+                  heading scaled from 24px to 30px. On mobile the small
+                  icons visually vanished next to the wrapped heading,
+                  making the block feel "smaller and less bold" than the
+                  desktop single-line version. Bumping icons to 28px on
+                  mobile and 32px on desktop keeps them proportional to
+                  the heading at every breakpoint. `shrink-0` guards
+                  against flex-shrinking them out of frame when the row
+                  is tight. Gap widened to `gap-3` so the icons don't
+                  crowd the wrapped text. */}
+              <div className="flex items-center gap-3 mb-3">
+                <AlertTriangle className={`w-7 h-7 md:w-8 md:h-8 shrink-0 ${tone.text}`} />
                 <h2
                   className={`text-2xl md:text-3xl font-black ${tone.text} tracking-widest uppercase`}
                 >
                   {eyebrow}
                 </h2>
-                <AlertTriangle className={`w-5 h-5 ${tone.text}`} />
+                <AlertTriangle className={`w-7 h-7 md:w-8 md:h-8 shrink-0 ${tone.text}`} />
               </div>
-              <p className="text-gray-400 text-sm uppercase tracking-widest mb-6">
+              {/* `break-words` breaks pathological unbroken titles
+                  (e.g. "AAAAAAA..."), `line-clamp-3` caps ordinary long
+                  titles at three lines with an ellipsis so a runaway
+                  song name (repeated words, joke titles) can't blow out
+                  the panel height and overlap the stat row below. */}
+              <p className="text-gray-400 text-sm uppercase tracking-widest mb-6 break-words line-clamp-3">
                 {subtitle}
               </p>
               {/* Bug #84 — was `flex items-center gap-6` with no
@@ -2188,11 +2310,11 @@ function DethronedPanelView({
                   Won {margin}%
                 </span>
               </div>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-2 text-balance">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-2 text-balance break-words line-clamp-3">
                 {subtitle}
               </h2>
               {latest.songTitle && (
-                <p className="text-gray-300 mb-6">
+                <p className="text-gray-300 mb-6 break-words line-clamp-2">
                   <span className="text-yellow-400 font-bold">
                     {latest.songTitle}
                   </span>
@@ -2368,11 +2490,11 @@ function RedPhoneWinnerPanel() {
                   Won {winner.winnerVotePercent}%
                 </span>
               </div>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-2 text-balance">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-2 text-balance break-words line-clamp-3">
                 {headline}
               </h2>
               {winner.songTitle && (
-                <p className="text-gray-300 mb-6">
+                <p className="text-gray-300 mb-6 break-words line-clamp-2">
                   on{' '}
                   <span className="text-red-300 font-bold">
                     {winner.songTitle}
@@ -2647,7 +2769,7 @@ function ShareCard({
           <div
             role="group"
             aria-label="Share to a platform"
-            className="grid grid-cols-5 gap-1.5 border-t border-yellow-500/15 pt-3"
+            className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 border-t border-yellow-500/15 pt-3"
           >
             {/* TikTok — copy-only with a small `Copy` corner badge so
                 the action is visually unambiguous on every device

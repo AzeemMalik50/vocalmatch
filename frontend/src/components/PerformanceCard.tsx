@@ -29,7 +29,7 @@ function timeAgo(date: string): string {
 
 export default function PerformanceCard({ video }: Props) {
   return (
-    <article className="group relative bg-stage-900 border border-stage-700/60 rounded-xl overflow-hidden hover:border-spotlight/40 hover:-translate-y-1 transition-all duration-200">
+    <article className="group relative bg-stage-900 border border-stage-600 rounded-xl overflow-hidden hover:border-spotlight/40 hover:-translate-y-1 transition-all duration-200">
       {/* Video */}
       <Link href={`/v/${video.id}`} className="block relative aspect-video bg-black overflow-hidden">
         {video.thumbnailUrl ? (

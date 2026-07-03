@@ -3,7 +3,7 @@
 
 import { useMemo, useState } from 'react';
 import AdminShell from '@/components/AdminShell';
-import { qrImageUrl } from '@/lib/api';
+import { qrImageUrl, downloadFile } from '@/lib/api';
 
 const FRONTEND_BASE =
   process.env.NEXT_PUBLIC_FRONTEND_URL ||
@@ -43,8 +43,49 @@ export default function AdminQrPage() {
   const previewSrc = qrImageUrl({ url: fullUrl, size, fgColor, bgColor });
 
   const embed = `<img src="${previewSrc}" alt="QR code for ${fullUrl}" />`;
-  const copyEmbed = () => navigator.clipboard.writeText(embed);
-  const copyUrl = () => navigator.clipboard.writeText(fullUrl);
+
+  // Transient "Copied!" state per button — matches the pattern used in
+  // BattleVotePanel and QrShareModal so users get consistent feedback
+  // across every copy-to-clipboard action.
+  const [copiedKey, setCopiedKey] = useState<'url' | 'embed' | null>(null);
+  const copyText = async (text: string, key: 'url' | 'embed') => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      setTimeout(
+        () => setCopiedKey((k) => (k === key ? null : k)),
+        2000,
+      );
+    } catch {
+      // best-effort — the clipboard API can reject on non-secure origins
+      // or when the tab hasn't been focused since load.
+    }
+  };
+  const copyEmbed = () => copyText(embed, 'embed');
+  const copyUrl = () => copyText(fullUrl, 'url');
+
+  // Cross-origin download: the QR image is served by the API domain,
+  // so a bare `<a href download>` opens the file inline instead of
+  // saving it. `downloadFile` fetches the bytes into a Blob and clicks
+  // a synthetic anchor so the save dialog actually fires.
+  const [downloadingKey, setDownloadingKey] = useState<
+    'png-512' | 'png-1024' | 'svg' | null
+  >(null);
+  const handleDownload = async (
+    key: 'png-512' | 'png-1024' | 'svg',
+    src: string,
+    filename: string,
+  ) => {
+    if (downloadingKey) return;
+    setDownloadingKey(key);
+    try {
+      await downloadFile(src, filename);
+    } catch {
+      // best-effort — surfacing to the admin isn't worth a toast here.
+    } finally {
+      setDownloadingKey(null);
+    }
+  };
 
   return (
     <AdminShell>
@@ -169,9 +210,14 @@ export default function AdminQrPage() {
               />
               <button
                 onClick={copyUrl}
-                className="px-3 py-2 rounded-md border border-stage-700/60 text-haze hover:text-white text-xs"
+                aria-live="polite"
+                className={`px-3 py-2 rounded-md border text-xs transition-colors ${
+                  copiedKey === 'url'
+                    ? 'border-green-500/50 bg-green-500/10 text-green-300'
+                    : 'border-stage-700/60 text-haze hover:text-white'
+                }`}
               >
-                Copy
+                {copiedKey === 'url' ? 'Copied!' : 'Copy'}
               </button>
             </div>
           </section>
@@ -179,7 +225,7 @@ export default function AdminQrPage() {
 
         {/* Right: preview + download */}
         <div>
-          <div className="rounded-lg border border-stage-700/60 p-6 bg-stage-900/40 flex items-center justify-center">
+          <div className="rounded-lg border border-stage-700 p-6 bg-stage-900/40 flex items-center justify-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={previewSrc}
@@ -190,27 +236,53 @@ export default function AdminQrPage() {
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <a
-              href={qrImageUrl({ url: fullUrl, size: 512, fgColor, bgColor })}
-              download="vocalmatch-qr-512.png"
-              className="px-3 py-2 rounded-md bg-spotlight text-white text-sm font-semibold"
+            <button
+              type="button"
+              onClick={() =>
+                handleDownload(
+                  'png-512',
+                  qrImageUrl({ url: fullUrl, size: 512, fgColor, bgColor }),
+                  'vocalmatch-qr-512.png',
+                )
+              }
+              disabled={downloadingKey !== null}
+              className="px-3 py-2 rounded-md bg-spotlight text-white text-sm font-semibold disabled:opacity-60"
             >
-              PNG 512
-            </a>
-            <a
-              href={qrImageUrl({ url: fullUrl, size: 1024, fgColor, bgColor })}
-              download="vocalmatch-qr-1024.png"
-              className="px-3 py-2 rounded-md bg-spotlight text-white text-sm font-semibold"
+              {downloadingKey === 'png-512' ? 'Downloading…' : 'PNG 512'}
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                handleDownload(
+                  'png-1024',
+                  qrImageUrl({ url: fullUrl, size: 1024, fgColor, bgColor }),
+                  'vocalmatch-qr-1024.png',
+                )
+              }
+              disabled={downloadingKey !== null}
+              className="px-3 py-2 rounded-md bg-spotlight text-white text-sm font-semibold disabled:opacity-60"
             >
-              PNG 1024
-            </a>
-            <a
-              href={qrImageUrl({ url: fullUrl, format: 'svg', fgColor, bgColor })}
-              download="vocalmatch-qr.svg"
-              className="px-3 py-2 rounded-md bg-spotlight text-white text-sm font-semibold"
+              {downloadingKey === 'png-1024' ? 'Downloading…' : 'PNG 1024'}
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                handleDownload(
+                  'svg',
+                  qrImageUrl({
+                    url: fullUrl,
+                    format: 'svg',
+                    fgColor,
+                    bgColor,
+                  }),
+                  'vocalmatch-qr.svg',
+                )
+              }
+              disabled={downloadingKey !== null}
+              className="px-3 py-2 rounded-md bg-spotlight text-white text-sm font-semibold disabled:opacity-60"
             >
-              SVG
-            </a>
+              {downloadingKey === 'svg' ? 'Downloading…' : 'SVG'}
+            </button>
           </div>
 
           <div className="mt-4">
@@ -225,9 +297,14 @@ export default function AdminQrPage() {
             />
             <button
               onClick={copyEmbed}
-              className="mt-2 px-3 py-1.5 rounded-md border border-stage-700/60 text-haze hover:text-white text-xs"
+              aria-live="polite"
+              className={`mt-2 px-3 py-1.5 rounded-md border text-xs transition-colors ${
+                copiedKey === 'embed'
+                  ? 'border-green-500/50 bg-green-500/10 text-green-300'
+                  : 'border-stage-700/60 text-haze hover:text-white'
+              }`}
             >
-              Copy embed
+              {copiedKey === 'embed' ? 'Copied!' : 'Copy embed'}
             </button>
           </div>
         </div>

@@ -128,7 +128,7 @@ export default function Nav() {
                   <div
                     role="menu"
                     aria-label="Account"
-                    className="absolute right-0 top-full mt-2 w-56 bg-stage-900 border border-stage-700 rounded-xl shadow-2xl overflow-hidden"
+                    className="absolute right-0 top-full mt-2 w-56 bg-stage-900 border border-stage-600 rounded-xl shadow-2xl overflow-hidden"
                   >
                     <Link
                       href={`/u/${user.username}`}

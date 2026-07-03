@@ -127,12 +127,12 @@ export default function SignupPage() {
             />
           </Field>
 
-          <Field label="Password" hint="At least 6 characters">
+          <Field label="Password" hint="At least 8 characters">
             <div className="relative">
               <TextInput
                 type={showPassword ? 'text' : 'password'}
                 required
-                minLength={6}
+                minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="new-password"

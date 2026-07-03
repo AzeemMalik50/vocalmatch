@@ -293,7 +293,7 @@ export default function SettingsPage() {
             </div>
           )}
 
-          <div className="sticky bottom-4 z-20 flex items-center justify-between gap-4 p-4 bg-stage-900/95 backdrop-blur-md border border-stage-700 rounded-xl shadow-2xl">
+          <div className="sticky bottom-4 z-20 flex items-center justify-between gap-4 p-4 bg-stage-900/95 backdrop-blur-md border border-stage-600 rounded-xl shadow-2xl">
             <p className="text-sm text-haze">
               {savedFlash ? (
                 <span className="text-spotlight font-bold">✓ Saved</span>
@@ -544,11 +544,11 @@ function ChangePasswordSection({
             autoComplete="current-password"
           />
         </Field>
-        <Field label="New password" hint="At least 6 characters.">
+        <Field label="New password" hint="At least 8 characters.">
           <TextInput
             type="password"
             required
-            minLength={6}
+            minLength={8}
             value={next}
             onChange={(e) => setNext(e.target.value)}
             autoComplete="new-password"

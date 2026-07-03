@@ -123,10 +123,13 @@ export default function AdminUsersPage() {
       {loading ? (
         <TableRowsSkeleton rows={5} />
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto scrollbar-hide">
+          {/* `min-w-[760px]` guards against the six columns (User / Email
+              / Admin / Songwriter / Battles / Wins) collapsing into
+              unreadable cells before the horizontal scroll kicks in. */}
+          <table className="w-full min-w-[760px] text-sm">
             <thead>
-              <tr className="text-left text-xs uppercase tracking-widest text-haze/70 border-b border-stage-700/60">
+              <tr className="text-left text-xs uppercase tracking-widest text-haze/70 border-b border-stage-600">
                 <th className="px-3 py-2">User</th>
                 <th className="px-3 py-2">Email</th>
                 <th className="px-3 py-2 text-center">Admin</th>
@@ -137,7 +140,7 @@ export default function AdminUsersPage() {
             </thead>
             <tbody>
               {users.map((u) => (
-                <tr key={u.id} className="border-b border-stage-700/30 hover:bg-stage-900/40">
+                <tr key={u.id} className="border-b border-stage-600/50 hover:bg-stage-900/40">
                   <td className="px-3 py-3">
                     <div className="flex items-center gap-2">
                       {u.avatarUrl ? (
