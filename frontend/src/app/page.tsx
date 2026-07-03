@@ -2011,14 +2011,24 @@ function CrownAtRiskPanelView({
           <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-black/85" />
           <div className="relative grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-8 items-center">
             <div>
-              <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle className={`w-5 h-5 ${tone.text}`} />
+              {/* Bug — icons were fixed at 20px (`w-5 h-5`) while the
+                  heading scaled from 24px to 30px. On mobile the small
+                  icons visually vanished next to the wrapped heading,
+                  making the block feel "smaller and less bold" than the
+                  desktop single-line version. Bumping icons to 28px on
+                  mobile and 32px on desktop keeps them proportional to
+                  the heading at every breakpoint. `shrink-0` guards
+                  against flex-shrinking them out of frame when the row
+                  is tight. Gap widened to `gap-3` so the icons don't
+                  crowd the wrapped text. */}
+              <div className="flex items-center gap-3 mb-3">
+                <AlertTriangle className={`w-7 h-7 md:w-8 md:h-8 shrink-0 ${tone.text}`} />
                 <h2
                   className={`text-2xl md:text-3xl font-black ${tone.text} tracking-widest uppercase`}
                 >
                   {eyebrow}
                 </h2>
-                <AlertTriangle className={`w-5 h-5 ${tone.text}`} />
+                <AlertTriangle className={`w-7 h-7 md:w-8 md:h-8 shrink-0 ${tone.text}`} />
               </div>
               {/* `break-words` breaks pathological unbroken titles
                   (e.g. "AAAAAAA..."), `line-clamp-3` caps ordinary long
