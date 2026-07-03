@@ -321,28 +321,14 @@ export default function BattlePage() {
         {/* The two videos */}
         <div className="grid md:grid-cols-2 gap-4 md:gap-6 mb-8">
           {performanceA ? (
-            <PerformancePane
-              performance={performanceA}
-              side="A"
-              isDefendingChampion={
-                !!song?.currentChampionPerformanceId &&
-                song.currentChampionPerformanceId === performanceA.id
-              }
-            />
+            <PerformancePane performance={performanceA} side="A" />
           ) : perfErrorA ? (
             <PerformancePaneUnavailable side="A" message={perfErrorA} />
           ) : (
             <PerformancePaneSkeleton side="A" />
           )}
           {performanceB ? (
-            <PerformancePane
-              performance={performanceB}
-              side="B"
-              isDefendingChampion={
-                !!song?.currentChampionPerformanceId &&
-                song.currentChampionPerformanceId === performanceB.id
-              }
-            />
+            <PerformancePane performance={performanceB} side="B" />
           ) : perfErrorB ? (
             <PerformancePaneUnavailable side="B" message={perfErrorB} />
           ) : (
@@ -612,23 +598,20 @@ function PerformancePaneUnavailable({
 function PerformancePane({
   performance,
   side,
-  isDefendingChampion,
 }: {
   performance: VideoDto;
   side: 'A' | 'B';
-  isDefendingChampion?: boolean;
 }) {
   const accent = side === 'A' ? 'border-spotlight/30' : 'border-gold/30';
   return (
     <div className={`relative bg-stage-900 border-2 ${accent} rounded-xl overflow-hidden`}>
-      {/* Champion identity: a single, unmissable badge so returning visitors
-          instantly recognize who's defending. Drives prestige. */}
-      {isDefendingChampion && (
-        <span className="absolute top-3 left-3 z-10 inline-flex items-center gap-1 px-2 py-1 text-[10px] uppercase tracking-widest font-bold rounded-full bg-gold text-stage-950 shadow-lg">
-          <span aria-hidden="true">👑</span>
-          Defending Champion
-        </span>
-      )}
+      {/* Champion badges intentionally removed from this pane. The prior
+          "👑 Defending Champion" overlay biased viewers toward the sitting
+          champion on live battles (implies the outcome is already decided)
+          and on completed battles it competed with the actual winner
+          indicator for attention. Championship context still lives on the
+          Home page's ChampionSection and the singer's profile — the
+          battle page focuses on THIS battle. */}
       <div className="aspect-video bg-stage-950">
         <video
           key={performance.id}
@@ -673,11 +656,10 @@ function PerformancePane({
               )}
             </span>
             @{performance.uploader.username}
-            {performance.uploader.championTitle && (
-              <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-widest bg-gold/15 text-gold rounded">
-                {performance.uploader.championTitle}
-              </span>
-            )}
+            {/* championTitle pill removed on the battle page — it implies
+                the participant has already won when the outcome of THIS
+                battle is what the page is about. Still shown on singer
+                profile pages and on video detail pages. */}
             {performance.uploader.currentStreak >= 2 && (
               <span
                 className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-widest bg-gold/15 text-gold rounded"

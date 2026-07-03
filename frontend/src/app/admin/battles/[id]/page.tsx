@@ -562,11 +562,9 @@ function ParticipantCard({
             className="inline-flex items-center gap-2 text-sm text-haze hover:text-white"
           >
             @{performance.uploader.username}
-            {performance.uploader.championTitle && (
-              <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-widest bg-gold/15 text-gold rounded">
-                {performance.uploader.championTitle}
-              </span>
-            )}
+            {/* championTitle pill removed on the admin battle page — same
+                reasoning as the user-facing battle page: the row is about
+                THIS battle, not the participant's existing crowns. */}
           </Link>
         ) : unavailable && fallbackUser ? (
           // Winner snapshot only — the uploader of a non-winning deleted
