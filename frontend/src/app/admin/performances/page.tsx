@@ -331,7 +331,14 @@ function PerformanceRow({
               Deleted
             </span>
           )}
-          {perf.activeBattleId && (
+          {/* "In active battle" is a lock-status hint for admins deciding
+              whether they can safely reassign the song. It's meaningless
+              when the performance is already deleted — a deleted row can't
+              be reassigned regardless of what battle it used to be in,
+              and showing both labels reads as a contradiction ("deleted
+              AND live"). Suppress it on soft-deleted rows so only the
+              terminal state renders. */}
+          {perf.activeBattleId && !perf.deletedAt && (
             <Link
               href={`/admin/battles/${perf.activeBattleId}`}
               title="Locked while a live or tie-pending battle uses this performance"
