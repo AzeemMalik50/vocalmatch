@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { qrImageUrl } from '@/lib/api';
 
 interface Props {
@@ -23,6 +24,10 @@ export default function QrShareModal({ url, title, open, onClose }: Props) {
   }, [open, onClose]);
 
   if (!open) return null;
+  // SSR guard: `createPortal` needs `document`. Even though this is a
+  // client component, the initial hydration render can execute before
+  // `document` is safe to reference in some Next.js flows.
+  if (typeof document === 'undefined') return null;
 
   const previewSrc = qrImageUrl({ url, size: 512 });
   const copyLink = async () => {
@@ -33,7 +38,17 @@ export default function QrShareModal({ url, title, open, onClose }: Props) {
     }
   };
 
-  return (
+  // Portal to <body>. Without this, the overlay's `position: fixed`
+  // resolves relative to the nearest ancestor with `transform`,
+  // `filter`, `backdrop-filter`, `perspective`, `will-change: transform`,
+  // or `contain: paint/layout/strict` — a CSS containing-block gotcha.
+  // The home page nests this modal deep inside sections with
+  // `backdrop-blur-*` decorative treatments, so the "fixed" overlay
+  // was being anchored to whichever section owned the trigger button
+  // rather than to the viewport. Escaping to <body> guarantees the
+  // overlay covers the actual viewport regardless of scroll position
+  // or the trigger's DOM location.
+  return createPortal(
     <div
       className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
       onClick={onClose}
@@ -87,6 +102,7 @@ export default function QrShareModal({ url, title, open, onClose }: Props) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
