@@ -381,13 +381,22 @@ export default function BattlePage() {
             Only shown when:
               - the song has a current champion (someone to dethrone)
               - the viewer isn't that champion (no self-challenge)
-              - the viewer isn't already a participant in this battle */}
+              - the viewer isn't already a participant in this battle
+
+            Bug — the previous gate also required BOTH `performanceA` and
+            `performanceB` to have loaded, which effectively hid the CTA
+            whenever either side was soft-deleted (the fetch throws for
+            deleted videos). That's wrong for the "losing performance
+            deleted" case: the champion is crowned, their performance is
+            intact, and new challengers should absolutely still be able
+            to queue. The uploader-participation checks use optional
+            chaining so a null performance side no longer blocks the
+            render — it just can't identify a participant on that side,
+            which is fine (backend does the real gate at submission). */}
         {song?.currentChampionUserId &&
-          performanceA &&
-          performanceB &&
           user?.id !== song.currentChampionUserId &&
-          user?.id !== performanceA.uploader?.id &&
-          user?.id !== performanceB.uploader?.id && (
+          user?.id !== performanceA?.uploader?.id &&
+          user?.id !== performanceB?.uploader?.id && (
             <ChallengeCta song={song} authed={!!user} />
           )}
 
