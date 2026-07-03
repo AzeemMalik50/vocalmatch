@@ -73,6 +73,12 @@ function UploadForm() {
   const [progress, setProgress] = useState(0); // 0..100
   const [uploaded, setUploaded] = useState(0); // bytes
   const handleRef = useRef<UploadHandle | null>(null);
+  // Ref on the song-picker wrapper so we can detect taps outside the
+  // dropdown and close it. Without this the picker had no dismiss
+  // mechanism at all — the only way to close it was to select an item
+  // or blur the input by tabbing away, and mobile taps outside kept
+  // it stuck open.
+  const songPickerRef = useRef<HTMLDivElement | null>(null);
   const confirm = useConfirm();
 
   useEffect(() => {
@@ -200,6 +206,35 @@ function UploadForm() {
       cancelled = true;
     };
   }, [challengeMode, songId]);
+
+  // Close the song picker on:
+  //   - a tap outside the picker wrapper (mousedown/touchstart, so it
+  //     fires before the tap resolves to a focus event that would
+  //     re-open the picker via the input's onFocus)
+  //   - Escape key press (keyboard-user parity)
+  // Only wired when the picker is actually open so we're not paying
+  // for a document-level listener on every keystroke of the rest of
+  // the form.
+  useEffect(() => {
+    if (!songPickerOpen) return;
+    const onPointerDown = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node | null;
+      if (target && songPickerRef.current && !songPickerRef.current.contains(target)) {
+        setSongPickerOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSongPickerOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('touchstart', onPointerDown, { passive: true });
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('touchstart', onPointerDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [songPickerOpen]);
 
   // "Dirty" state for the Reset button — true if the user has touched any
   // field beyond what the URL prefilled. Drives both the visible-state of
@@ -490,7 +525,7 @@ function UploadForm() {
                 at least one before you can upload a performance.
               </div>
             ) : (
-              <div className="relative">
+              <div className="relative" ref={songPickerRef}>
                 {selectedSong ? (
                   // Bug #61 — when the user lands here via challenge mode
                   // with a song pre-filled from the URL (`?challenge=1&songId=…`,
@@ -588,6 +623,17 @@ function UploadForm() {
                         setSongPickerOpen(true);
                       }}
                       onFocus={() => setSongPickerOpen(true)}
+                      // Tap-again-to-close: if the picker is already
+                      // open and the user taps the input, close it.
+                      // `preventDefault` on mousedown keeps focus
+                      // where it is so onFocus doesn't immediately
+                      // re-open the picker on the next tick.
+                      onMouseDown={(e) => {
+                        if (songPickerOpen) {
+                          e.preventDefault();
+                          setSongPickerOpen(false);
+                        }
+                      }}
                       placeholder="Search the catalog by title or artist"
                       className="w-full px-4 py-3 bg-stage-900 border border-stage-700 rounded-md focus:outline-none focus:border-spotlight transition-colors"
                     />
