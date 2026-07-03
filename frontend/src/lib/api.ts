@@ -528,7 +528,11 @@ export type ChallengeStatus =
   // Terminal state set by the backend once the resulting battle has
   // finalized (completed or cancelled). Released from the per-song
   // queue so a new challenger can take the same song.
-  | 'completed';
+  | 'completed'
+  // Terminal state — admin removed a `selected` submission whose
+  // Champion or Challenger performance was deleted, so it could
+  // no longer be promoted. Also released from the per-song queue.
+  | 'cancelled';
 
 /** Lightweight shape returned to the user (their own submissions). */
 export interface ChallengeSubmissionDto {
@@ -561,6 +565,13 @@ export interface AdminChallengeDto {
     url: string;
   } | null;
   status: ChallengeStatus;
+  /**
+   * Backend flag — true when this `selected` row can no longer be promoted
+   * because the Champion or Challenger performance has been soft-deleted.
+   * Only populated for `selected` rows with no linked battle; false for
+   * every other status. Drives the admin Remove button.
+   */
+  isOrphaned: boolean;
   createdAt: string;
   decidedAt: string | null;
   decidedByAdminId: string | null;
@@ -963,6 +974,10 @@ export const api = {
     }),
   adminRejectChallenge: (id: string) =>
     request<AdminChallengeDto>(`/admin/challenges/${id}/reject`, {
+      method: 'POST',
+    }),
+  adminCancelOrphanedChallenge: (id: string) =>
+    request<AdminChallengeDto>(`/admin/challenges/${id}/cancel-orphaned`, {
       method: 'POST',
     }),
   adminCreateBattleFromChallenge: (

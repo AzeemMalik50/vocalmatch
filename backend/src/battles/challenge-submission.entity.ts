@@ -15,7 +15,15 @@ export type ChallengeStatus =
    *  the `one_active_challenger_per_song` partial unique index, so a
    *  completed challenge no longer blocks fresh challenges on the same
    *  song. */
-  | 'completed';
+  | 'completed'
+  /** Terminal state — admin removed a `selected` submission that could
+   *  no longer be promoted because the Champion (or Challenger) video
+   *  was deleted. Distinct from `rejected`: rejection is a quality
+   *  judgment; cancellation is a plumbing consequence of the pairing
+   *  falling apart. Also NOT in `one_active_challenger_per_song` so a
+   *  fresh challenger can queue up on the same song once a new
+   *  champion appears. */
+  | 'cancelled';
 
 /**
  * Red Phone challenge submission. A user uploads a performance of a

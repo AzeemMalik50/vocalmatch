@@ -23,6 +23,10 @@ const FILTERS: { value: FilterStatus; label: string }[] = [
   { value: 'selected', label: 'Selected' },
   { value: 'completed', label: 'Completed' },
   { value: 'rejected', label: 'Rejected' },
+  // Terminal lane for `selected` rows an admin removed after the Champion
+  // or Challenger performance was deleted. Kept distinct from Rejected so
+  // the audit trail separates "we said no" from "plumbing fell apart".
+  { value: 'cancelled', label: 'Cancelled' },
   { value: 'all', label: 'All' },
 ];
 
@@ -156,6 +160,29 @@ export default function AdminChallengesPage() {
     }
   };
 
+  const handleRemove = async (id: string) => {
+    const ok = await confirm({
+      title: 'Remove this orphaned challenger?',
+      message:
+        "The Champion's performance is no longer available, so this challenge can never be promoted.",
+      detail:
+        'The challenger will be notified and the song will be free for a new challenger once a new champion appears.',
+      confirmLabel: 'Remove',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setWorking(id);
+    setError(null);
+    try {
+      const updated = await api.adminCancelOrphanedChallenge(id);
+      reconcileAfterStatusChange(updated);
+    } catch (e: any) {
+      setError(e.message || 'Could not remove challenge');
+    } finally {
+      setWorking(null);
+    }
+  };
+
   return (
     <AdminShell>
       <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
@@ -210,6 +237,7 @@ export default function AdminChallengesPage() {
                 onSelect={() => handleSelect(c.id)}
                 onReject={() => handleReject(c.id)}
                 onPromote={() => handlePromote(c.id)}
+                onRemove={() => handleRemove(c.id)}
               />
             ))}
           </ul>
@@ -237,20 +265,28 @@ function ChallengeRow({
   onSelect,
   onReject,
   onPromote,
+  onRemove,
 }: {
   challenge: AdminChallengeDto;
   busy: boolean;
   onSelect: () => void;
   onReject: () => void;
   onPromote: () => void;
+  onRemove: () => void;
 }) {
+  const showRemove =
+    challenge.status === 'selected' &&
+    !challenge.resultingBattleId &&
+    challenge.isOrphaned;
   return (
     <li
       className={`bg-stage-900 border rounded-xl p-4 md:p-5 flex flex-wrap items-start justify-between gap-4 ${
         challenge.status === 'pending'
           ? 'border-spotlight/30'
           : challenge.status === 'selected'
-            ? 'border-gold/40'
+            ? showRemove
+              ? 'border-red-500/40'
+              : 'border-gold/40'
             : 'border-stage-700/60 opacity-70'
       }`}
     >
@@ -269,6 +305,11 @@ function ChallengeRow({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <StatusBadge status={challenge.status} />
+            {showRemove && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] uppercase tracking-widest font-bold bg-red-500/15 text-red-300 border border-red-500/40 rounded">
+                Champion unavailable
+              </span>
+            )}
             <span className="text-xs text-haze tabular-nums">
               {new Date(challenge.createdAt).toLocaleDateString()}
             </span>
@@ -317,9 +358,19 @@ function ChallengeRow({
             </ActionButton>
           </>
         )}
-        {challenge.status === 'selected' && !challenge.resultingBattleId && (
-          <ActionButton onClick={onPromote} disabled={busy} variant="gold">
-            {busy ? 'Promoting…' : 'Promote → battle'}
+        {/* Promote is only offered while the pairing is still valid;
+            once orphaned, the Remove action replaces it so admin can
+            clean the queue without hitting the promote-time error. */}
+        {challenge.status === 'selected' &&
+          !challenge.resultingBattleId &&
+          !challenge.isOrphaned && (
+            <ActionButton onClick={onPromote} disabled={busy} variant="gold">
+              {busy ? 'Promoting…' : 'Promote → battle'}
+            </ActionButton>
+          )}
+        {showRemove && (
+          <ActionButton onClick={onRemove} disabled={busy} variant="danger">
+            {busy ? 'Removing…' : 'Remove'}
           </ActionButton>
         )}
         {challenge.status === 'selected' && challenge.resultingBattleId && (
@@ -343,7 +394,9 @@ function StatusBadge({ status }: { status: ChallengeStatus }) {
         ? 'bg-gold/15 text-gold border-gold/40'
         : status === 'completed'
           ? 'bg-stage-800 text-haze/80 border-stage-700'
-          : 'bg-stage-800 text-haze border-stage-700';
+          : status === 'cancelled'
+            ? 'bg-red-500/10 text-red-300 border-red-500/30'
+            : 'bg-stage-800 text-haze border-stage-700';
   return (
     <span
       className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] uppercase tracking-widest font-bold rounded border ${tone}`}

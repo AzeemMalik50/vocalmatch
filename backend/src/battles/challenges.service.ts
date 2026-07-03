@@ -382,30 +382,9 @@ export class ChallengesService {
       );
     }
 
-    // Bug fix — both performances must still be available at promote
-    // time. `battlesService.create` only catches truly missing rows
-    // via findOne; a SOFT-deleted performance (deletedAt set) sneaks
-    // past because the row still exists. We catch each side with a
-    // distinct message so the admin knows exactly what to address —
-    // previously only the Challenger side was effectively flagged
-    // (via downstream uniqueness checks), and a deleted Champion
-    // performance silently promoted into a live battle no-one could
-    // play.
-    const [championPerf, challengerVideo] = await Promise.all([
-      this.videos.findOne({
-        where: { id: song.currentChampionPerformanceId },
-      }),
-      this.videos.findOne({ where: { id: sub.videoId } }),
-    ]);
-    if (!championPerf || championPerf.deletedAt) {
-      throw new BadRequestException(
-        "The Champion's performance has been deleted and is no longer available. A new champion must be established before this challenge can be promoted.",
-      );
-    }
-    if (!challengerVideo || challengerVideo.deletedAt) {
-      throw new BadRequestException(
-        "The Challenger's performance has been deleted and is no longer available. Reject this challenge and ask the challenger to re-upload.",
-      );
+    const orphan = await this.checkOrphanState(sub, song);
+    if (orphan.orphaned) {
+      throw new BadRequestException(orphan.reason);
     }
 
     // Prefer an explicit `votingClosesAt` (matches the regular POST /battles
@@ -464,11 +443,117 @@ export class ChallengesService {
     return battle;
   }
 
+  // ─── Orphan detection ────────────────────────────────────────────
+
+  /**
+   * A submission is "orphaned" when it could never be promoted into a
+   * battle: either the song has no current champion, the champion's
+   * performance was soft-deleted, or the challenger's own performance
+   * was soft-deleted. Shared by the promote-time gate (which throws)
+   * and the admin-UI enrichment (which surfaces a Remove button on
+   * orphaned `selected` rows).
+   *
+   * `song` may be supplied to save a lookup when the caller already has it.
+   */
+  private async checkOrphanState(
+    sub: ChallengeSubmission,
+    song?: { currentChampionPerformanceId: string | null } | null,
+  ): Promise<
+    { orphaned: false } | { orphaned: true; reason: string }
+  > {
+    const resolvedSong =
+      song ?? (await this.songs.findOne(sub.songId).catch(() => null));
+    if (!resolvedSong || !resolvedSong.currentChampionPerformanceId) {
+      return {
+        orphaned: true,
+        reason:
+          "This song has no current champion — a new champion must be established before this challenge can be promoted.",
+      };
+    }
+    const [championPerf, challengerVideo] = await Promise.all([
+      this.videos.findOne({
+        where: { id: resolvedSong.currentChampionPerformanceId },
+      }),
+      this.videos.findOne({ where: { id: sub.videoId } }),
+    ]);
+    if (!championPerf || championPerf.deletedAt) {
+      return {
+        orphaned: true,
+        reason:
+          "The Champion's performance has been deleted and is no longer available. A new champion must be established before this challenge can be promoted.",
+      };
+    }
+    if (!challengerVideo || challengerVideo.deletedAt) {
+      return {
+        orphaned: true,
+        reason:
+          "The Challenger's performance has been deleted and is no longer available. Reject this challenge and ask the challenger to re-upload.",
+      };
+    }
+    return { orphaned: false };
+  }
+
+  /**
+   * Admin removes a `selected` submission that can no longer be promoted
+   * because the Champion or Challenger performance has been soft-deleted.
+   * Distinct from `reject`: rejection is a quality judgment on a
+   * `pending` row; cancellation is a plumbing consequence on a row that
+   * was already accepted and can't move forward.
+   *
+   * Server-side validates orphan state — never trust the client's
+   * assertion that a row is orphaned. If the row is still promotable,
+   * cancellation is refused.
+   */
+  async cancelOrphaned(id: string, adminId: string) {
+    const row = await this.findOne(id);
+    if (row.status === 'cancelled') return row;
+    if (row.status !== 'selected') {
+      throw new ConflictException(
+        `Only selected challenges can be cancelled (this one is ${row.status})`,
+      );
+    }
+    if (row.resultingBattleId) {
+      throw new ConflictException(
+        'A battle has already been created from this challenge — cancellation is not available',
+      );
+    }
+    const orphan = await this.checkOrphanState(row);
+    if (!orphan.orphaned) {
+      throw new ConflictException(
+        'This challenge is still promotable — cancellation is only available when a performance has been removed',
+      );
+    }
+    row.status = 'cancelled';
+    row.decidedAt = new Date();
+    row.decidedByAdminId = adminId;
+    const saved = await this.submissions.save(row);
+
+    const song = await this.songs.findOne(row.songId).catch(() => null);
+    const songLabel = song ? song.title : 'a Centerstage Song';
+    this.notifications
+      .create({
+        userId: row.userId,
+        kind: 'challenger_rejected',
+        title: "Your challenge was withdrawn.",
+        body: `A performance in this pairing on ${songLabel} is no longer available, so your selected challenge was withdrawn. Watch the queue for a new opening.`,
+        href: '/u/me',
+      })
+      .catch((err) =>
+        this.logger.error(`Failed to notify cancelled challenger: ${err}`),
+      );
+
+    return saved;
+  }
+
   // ─── Public serialization ────────────────────────────────────────
 
   /**
    * Enrich a row with the song / video / uploader info the admin UI needs.
    * Used by the list endpoint to avoid an N+1 round-trip from the frontend.
+   *
+   * `isOrphaned` is populated only for `selected` rows — that's the only
+   * status where the frontend Remove button is offered, so the extra
+   * champion-video lookup would be wasted elsewhere.
    */
   async toAdminPublic(row: ChallengeSubmission) {
     const [video, user] = await Promise.all([
@@ -476,6 +561,11 @@ export class ChallengesService {
       this.users.findOne({ where: { id: row.userId } }),
     ]);
     const song = await this.songs.findOne(row.songId).catch(() => null);
+    let isOrphaned = false;
+    if (row.status === 'selected' && !row.resultingBattleId) {
+      const orphan = await this.checkOrphanState(row, song);
+      isOrphaned = orphan.orphaned;
+    }
     return {
       id: row.id,
       songId: row.songId,
@@ -501,6 +591,7 @@ export class ChallengesService {
           }
         : null,
       status: row.status,
+      isOrphaned,
       createdAt: row.createdAt,
       decidedAt: row.decidedAt,
       decidedByAdminId: row.decidedByAdminId,

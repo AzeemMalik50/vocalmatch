@@ -76,7 +76,7 @@ export class AdminChallengesController {
       'Admin only. With no `status` query, returns every submission (pending + selected + rejected) — this is what the admin UI\'s "All" tab uses. Pass `status=pending`, `selected`, or `rejected` to filter explicitly; `status=open` is a legacy shortcut equivalent to `pending`; `songId` narrows to a single song.',
   })
   @ApiQuery({ name: 'songId', required: false, type: String })
-  @ApiQuery({ name: 'status', required: false, enum: ['pending', 'selected', 'rejected', 'open', 'all'] })
+  @ApiQuery({ name: 'status', required: false, enum: ['pending', 'selected', 'rejected', 'completed', 'cancelled', 'open', 'all'] })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'offset', required: false, type: Number })
   async list(
@@ -125,6 +125,18 @@ export class AdminChallengesController {
   })
   async reject(@Req() req: any, @Param('id') id: string) {
     const row = await this.challenges.reject(id, req.user.userId);
+    return this.challenges.toAdminPublic(row);
+  }
+
+  @AuditAction('challenge.cancel_orphaned', { targetType: 'challenge' })
+  @Post('admin/challenges/:id/cancel-orphaned')
+  @ApiOperation({
+    summary: 'Admin — remove an orphaned selected challenger',
+    description:
+      "Marks the submission `status=cancelled` when the Champion or Challenger performance has been deleted, so the row can no longer clog the Selected queue. Server-side re-verifies the orphan state — a still-promotable row cannot be cancelled through this endpoint. Distinct from `reject`: rejection is a quality decision on a pending row; cancellation is plumbing cleanup on a selected-but-unpromotable one.",
+  })
+  async cancelOrphaned(@Req() req: any, @Param('id') id: string) {
+    const row = await this.challenges.cancelOrphaned(id, req.user.userId);
     return this.challenges.toAdminPublic(row);
   }
 
