@@ -1,7 +1,7 @@
 // frontend/src/components/QrShareModal.tsx
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { qrImageUrl } from '@/lib/api';
 
@@ -13,6 +13,8 @@ interface Props {
 }
 
 export default function QrShareModal({ url, title, open, onClose }: Props) {
+  const [copied, setCopied] = useState(false);
+
   // ESC to close
   useEffect(() => {
     if (!open) return;
@@ -22,6 +24,12 @@ export default function QrShareModal({ url, title, open, onClose }: Props) {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [open, onClose]);
+
+  // Reset `copied` when the modal reopens so a stale "Copied!" state
+  // from a previous open never leaks into a fresh session.
+  useEffect(() => {
+    if (!open) setCopied(false);
+  }, [open]);
 
   if (!open) return null;
   // SSR guard: `createPortal` needs `document`. Even though this is a
@@ -33,6 +41,8 @@ export default function QrShareModal({ url, title, open, onClose }: Props) {
   const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch {
       // best-effort
     }
@@ -96,9 +106,14 @@ export default function QrShareModal({ url, title, open, onClose }: Props) {
           </a>
           <button
             onClick={copyLink}
-            className="px-3 py-2 rounded-md border border-stage-700/60 text-haze hover:text-white text-sm"
+            aria-live="polite"
+            className={`px-3 py-2 rounded-md border text-sm transition-colors ${
+              copied
+                ? 'border-green-500/50 bg-green-500/10 text-green-300'
+                : 'border-stage-700/60 text-haze hover:text-white'
+            }`}
           >
-            Copy link
+            {copied ? 'Copied!' : 'Copy link'}
           </button>
         </div>
       </div>

@@ -43,8 +43,26 @@ export default function AdminQrPage() {
   const previewSrc = qrImageUrl({ url: fullUrl, size, fgColor, bgColor });
 
   const embed = `<img src="${previewSrc}" alt="QR code for ${fullUrl}" />`;
-  const copyEmbed = () => navigator.clipboard.writeText(embed);
-  const copyUrl = () => navigator.clipboard.writeText(fullUrl);
+
+  // Transient "Copied!" state per button — matches the pattern used in
+  // BattleVotePanel and QrShareModal so users get consistent feedback
+  // across every copy-to-clipboard action.
+  const [copiedKey, setCopiedKey] = useState<'url' | 'embed' | null>(null);
+  const copyText = async (text: string, key: 'url' | 'embed') => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      setTimeout(
+        () => setCopiedKey((k) => (k === key ? null : k)),
+        2000,
+      );
+    } catch {
+      // best-effort — the clipboard API can reject on non-secure origins
+      // or when the tab hasn't been focused since load.
+    }
+  };
+  const copyEmbed = () => copyText(embed, 'embed');
+  const copyUrl = () => copyText(fullUrl, 'url');
 
   return (
     <AdminShell>
@@ -169,9 +187,14 @@ export default function AdminQrPage() {
               />
               <button
                 onClick={copyUrl}
-                className="px-3 py-2 rounded-md border border-stage-700/60 text-haze hover:text-white text-xs"
+                aria-live="polite"
+                className={`px-3 py-2 rounded-md border text-xs transition-colors ${
+                  copiedKey === 'url'
+                    ? 'border-green-500/50 bg-green-500/10 text-green-300'
+                    : 'border-stage-700/60 text-haze hover:text-white'
+                }`}
               >
-                Copy
+                {copiedKey === 'url' ? 'Copied!' : 'Copy'}
               </button>
             </div>
           </section>
@@ -225,9 +248,14 @@ export default function AdminQrPage() {
             />
             <button
               onClick={copyEmbed}
-              className="mt-2 px-3 py-1.5 rounded-md border border-stage-700/60 text-haze hover:text-white text-xs"
+              aria-live="polite"
+              className={`mt-2 px-3 py-1.5 rounded-md border text-xs transition-colors ${
+                copiedKey === 'embed'
+                  ? 'border-green-500/50 bg-green-500/10 text-green-300'
+                  : 'border-stage-700/60 text-haze hover:text-white'
+              }`}
             >
-              Copy embed
+              {copiedKey === 'embed' ? 'Copied!' : 'Copy embed'}
             </button>
           </div>
         </div>
