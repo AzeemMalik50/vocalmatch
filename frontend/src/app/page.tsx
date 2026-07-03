@@ -442,6 +442,12 @@ function LiveBattle() {
   const [battle, setBattle] = useState<BattleDto | null>(null);
   const [a, setA] = useState<VideoDto | null>(null);
   const [b, setB] = useState<VideoDto | null>(null);
+  // Song is needed so we can tell whether this is a first-ever battle for
+  // the song (no defending champion) vs. a title-defense (one side is the
+  // reigning Official Voice). Without this, both sides were labeled with
+  // Champion / Challenger roles even on a song's very first battle, where
+  // neither role applies yet.
+  const [song, setSong] = useState<SongDto | null>(null);
   // Bug #57 — the section used to fetch a single live battle and pretend
   // it was the only one. Track the other concurrent live battles
   // separately so we can render them as a compact grid below the
@@ -467,18 +473,21 @@ function LiveBattle() {
         setBattle(null);
         setA(null);
         setB(null);
+        setSong(null);
         setExtraBattles([]);
         return;
       }
       const featured = await api.getBattle(resp.items[0].id);
       setBattle(featured);
       setExtraBattles(resp.items.slice(1));
-      const [perfA, perfB] = await Promise.all([
+      const [perfA, perfB, songForBattle] = await Promise.all([
         api.getVideo(featured.performanceAId),
         api.getVideo(featured.performanceBId),
+        api.getSong(featured.songId).catch(() => null),
       ]);
       setA(perfA);
       setB(perfB);
+      setSong(songForBattle);
     } catch {
       // Non-fatal — section degrades to empty state.
     } finally {
@@ -519,8 +528,18 @@ function LiveBattle() {
               </h2>
             </div>
             <p className="text-sm md:text-base text-gray-300 max-w-xl">
-              Official Voice vs Challenger. Two singers, same song — vote
-              before the clock runs out.
+              {(() => {
+                // Only use the "Official Voice vs Challenger" framing when
+                // there's an actual reigning champion in this battle. For
+                // a song's very first battle there is no defender yet.
+                const championPerfId = song?.currentChampionPerformanceId;
+                const hasChampion =
+                  !!championPerfId &&
+                  (championPerfId === a?.id || championPerfId === b?.id);
+                return hasChampion
+                  ? 'Official Voice vs Challenger. Two singers, same song — vote before the clock runs out.'
+                  : 'Two singers, same song. Vote before the clock runs out — whoever wins is crowned the first Official Voice.';
+              })()}
             </p>
           </div>
         </div>
@@ -536,45 +555,71 @@ function LiveBattle() {
               The next one drops as soon as the admin pairs the next contender.
             </p>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <BattleSideCard
-              performance={a}
-              side="A"
-              label="Current Official Voice"
-              tone="red"
-            />
+        ) : (() => {
+          // Bug — the labels below were hardcoded to
+          // "Current Official Voice" / "Challenger", so on a song's
+          // very first battle (no crown established yet) both
+          // participants were mislabeled. Compute per-side roles from
+          // the song's `currentChampionPerformanceId`:
+          //   - matches side A → A is defender, B is challenger
+          //   - matches side B → B is defender, A is challenger
+          //     (rare — most challenge-promoted battles put champion
+          //      at side A, but admin-created first battles don't)
+          //   - matches neither / null → first battle, no defender;
+          //     both sides get a neutral "Contender" label.
+          const championPerfId = song?.currentChampionPerformanceId;
+          const labelA =
+            championPerfId === a.id
+              ? 'Current Official Voice'
+              : championPerfId === b.id
+                ? 'Challenger'
+                : 'Contender';
+          const labelB =
+            championPerfId === b.id
+              ? 'Current Official Voice'
+              : championPerfId === a.id
+                ? 'Challenger'
+                : 'Contender';
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <BattleSideCard
+                performance={a}
+                side="A"
+                label={labelA}
+                tone="red"
+              />
 
-            <div className="flex flex-col items-center justify-center gap-6">
-              <div className="text-6xl font-black text-white">VS</div>
-              <div className="bg-card/50 backdrop-blur border border-red-600/30 rounded-2xl p-8 w-full flex justify-center">
-                {/* Bug #65 — use the shared CountdownTimer so this
-                    surface is in lockstep with the admin + battle-
-                    detail pages. Was previously a bespoke 4-cell
-                    Days/Hrs/Mins/Secs block backed by a local
-                    setInterval, which drifted from the standard
-                    H:M:S formatting used everywhere else. */}
-                <CountdownTimer
-                  endsAt={battle.votingClosesAt}
-                  size="large"
-                />
+              <div className="flex flex-col items-center justify-center gap-6">
+                <div className="text-6xl font-black text-white">VS</div>
+                <div className="bg-card/50 backdrop-blur border border-red-600/30 rounded-2xl p-8 w-full flex justify-center">
+                  {/* Bug #65 — use the shared CountdownTimer so this
+                      surface is in lockstep with the admin + battle-
+                      detail pages. Was previously a bespoke 4-cell
+                      Days/Hrs/Mins/Secs block backed by a local
+                      setInterval, which drifted from the standard
+                      H:M:S formatting used everywhere else. */}
+                  <CountdownTimer
+                    endsAt={battle.votingClosesAt}
+                    size="large"
+                  />
+                </div>
+                <Link
+                  href={`/battle/${battle.id}`}
+                  className="w-full inline-flex items-center justify-center bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-lg uppercase tracking-widest transition"
+                >
+                  Watch Battle
+                </Link>
               </div>
-              <Link
-                href={`/battle/${battle.id}`}
-                className="w-full inline-flex items-center justify-center bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-lg uppercase tracking-widest transition"
-              >
-                Watch Battle
-              </Link>
-            </div>
 
-            <BattleSideCard
-              performance={b}
-              side="B"
-              label="Challenger"
-              tone="blue"
-            />
-          </div>
-        )}
+              <BattleSideCard
+                performance={b}
+                side="B"
+                label={labelB}
+                tone="blue"
+              />
+            </div>
+          );
+        })()}
 
         {/* Other concurrently-live battles. The featured card above is
             the marquee; this strip surfaces every other battle that's
