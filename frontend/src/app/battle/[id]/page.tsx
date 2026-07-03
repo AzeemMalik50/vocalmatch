@@ -279,11 +279,11 @@ export default function BattlePage() {
               />
             )}
           </div>
-          <h1 className="font-display font-black text-3xl md:text-5xl leading-tight mb-2">
+          <h1 className="font-display font-black text-3xl md:text-5xl leading-tight mb-2 break-words line-clamp-3">
             {battle.title || (song ? `Battle: ${song.title}` : 'A VocalMatch battle')}
           </h1>
           {song && (
-            <p className="text-haze">
+            <p className="text-haze break-words">
               <span className="text-haze/70">Centerstage Song:</span>{' '}
               <span className="font-semibold text-white">{song.title}</span>
               {song.artist && (

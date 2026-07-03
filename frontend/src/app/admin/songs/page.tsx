@@ -317,8 +317,8 @@ export default function AdminSongsPage() {
               className="bg-stage-900 border border-stage-600 rounded-xl p-4 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-start sm:justify-between gap-3"
             >
               <div className="min-w-0 w-full sm:w-auto sm:flex-1">
-                <p className="font-display font-bold text-lg">{s.title}</p>
-                <p className="text-sm text-haze">{s.artist}</p>
+                <p className="font-display font-bold text-lg break-words line-clamp-2">{s.title}</p>
+                <p className="text-sm text-haze break-words line-clamp-1">{s.artist}</p>
                 {s.currentChampionStreak > 0 && (
                   <p className="text-xs text-gold mt-1">
                     Defending Champion · streak {s.currentChampionStreak}

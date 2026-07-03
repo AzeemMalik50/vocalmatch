@@ -1213,9 +1213,16 @@ function ChampionSection() {
                   {champion ? `@${champion.username}` : 'The Reigning Voice'}
                 </h2>
               </div>
-              <div className="flex items-center gap-2">
-                <Crown className="w-5 h-5 text-yellow-500" />
-                <p className="text-yellow-500 font-bold uppercase tracking-widest">
+              {/* `items-start` (not `items-center`) so the crown icon
+                  aligns to the top when the title wraps to multiple
+                  lines instead of centering vertically to a tall block
+                  and drifting mid-paragraph. `min-w-0` on the <p>
+                  container lets the flex child actually shrink; without
+                  it, `break-words` on the span alone has no effect
+                  because the parent doesn't constrain its width. */}
+              <div className="flex items-start gap-2">
+                <Crown className="w-5 h-5 text-yellow-500 shrink-0 mt-1" />
+                <p className="min-w-0 text-yellow-500 font-bold uppercase tracking-widest break-words line-clamp-3">
                   Official Voice of{' '}
                   <span className="text-yellow-300">
                     {song.title}
@@ -2013,7 +2020,12 @@ function CrownAtRiskPanelView({
                 </h2>
                 <AlertTriangle className={`w-5 h-5 ${tone.text}`} />
               </div>
-              <p className="text-gray-400 text-sm uppercase tracking-widest mb-6">
+              {/* `break-words` breaks pathological unbroken titles
+                  (e.g. "AAAAAAA..."), `line-clamp-3` caps ordinary long
+                  titles at three lines with an ellipsis so a runaway
+                  song name (repeated words, joke titles) can't blow out
+                  the panel height and overlap the stat row below. */}
+              <p className="text-gray-400 text-sm uppercase tracking-widest mb-6 break-words line-clamp-3">
                 {subtitle}
               </p>
               {/* Bug #84 — was `flex items-center gap-6` with no
@@ -2288,11 +2300,11 @@ function DethronedPanelView({
                   Won {margin}%
                 </span>
               </div>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-2 text-balance">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-2 text-balance break-words line-clamp-3">
                 {subtitle}
               </h2>
               {latest.songTitle && (
-                <p className="text-gray-300 mb-6">
+                <p className="text-gray-300 mb-6 break-words line-clamp-2">
                   <span className="text-yellow-400 font-bold">
                     {latest.songTitle}
                   </span>
@@ -2468,11 +2480,11 @@ function RedPhoneWinnerPanel() {
                   Won {winner.winnerVotePercent}%
                 </span>
               </div>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-2 text-balance">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-2 text-balance break-words line-clamp-3">
                 {headline}
               </h2>
               {winner.songTitle && (
-                <p className="text-gray-300 mb-6">
+                <p className="text-gray-300 mb-6 break-words line-clamp-2">
                   on{' '}
                   <span className="text-red-300 font-bold">
                     {winner.songTitle}

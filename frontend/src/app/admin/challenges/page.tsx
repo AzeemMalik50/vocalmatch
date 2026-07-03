@@ -347,7 +347,7 @@ function ChallengeRow({
               </span>
             )}
           </p>
-          <p className="text-xs text-haze/70 mt-1">
+          <p className="text-xs text-haze/70 mt-1 break-words line-clamp-2">
             on{' '}
             <span className="text-white font-semibold">
               {challenge.song?.title ?? '—'}
