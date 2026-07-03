@@ -562,8 +562,15 @@ function SongPicker({
   // on narrow widths, pushing the Cancel button off the right edge.
   // `flex-wrap` + `min-w-0` on the select lets the row reflow onto a
   // second line so all three controls stay fully visible.
+  //
+  // Follow-up — the outer container needed an explicit width too. The
+  // parent row-action column has no width constraint, so a `flex-1`
+  // select stretched unbounded and shoved Save + Cancel past the
+  // `<li>`'s right border. `w-full sm:w-96 max-w-full` caps the
+  // picker at 384px on desktop while filling the full row width on
+  // mobile (where the actions column already sits on its own line).
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2 w-full sm:w-96 max-w-full">
       <select
         value={val}
         onChange={(e) => setVal(e.target.value)}
