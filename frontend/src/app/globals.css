@@ -184,6 +184,13 @@ html, body {
 ::-webkit-scrollbar-thumb { background: rgb(var(--c-scrollbar-thumb)); border-radius: 5px; }
 ::-webkit-scrollbar-thumb:hover { background: rgb(var(--c-scrollbar-thumb-hover)); }
 
+/* .scrollbar-hide — Tailwind's class is a no-op on WebKit without a
+   webkit-specific rule. The global ::-webkit-scrollbar above sets a
+   10px scrollbar on every scroller; this override zeroes it out for
+   opted-in containers (e.g. the horizontal card carousel on Safari). */
+.scrollbar-hide { scrollbar-width: none; -ms-overflow-style: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
 /* Number tabular */
 .tabular { font-variant-numeric: tabular-nums; }
 

@@ -1363,12 +1363,28 @@ function StageCarousel() {
   const scroll = (dir: 'left' | 'right') => {
     const el = document.getElementById('stage-scroll');
     if (!el) return;
-    // Bug #89 — was hard-coded 340px (one desktop card + gap). Now
-    // card width varies with viewport (full-vw on mobile, 320px on
-    // sm+), so use the scroller's own visible width as the step —
-    // mobile gets one card per click, desktop gets ~one screenful.
+    const inner = el.firstElementChild as HTMLElement | null;
+    if (!inner) return;
+    const cards = Array.from(inner.children) as HTMLElement[];
+    if (cards.length === 0) return;
+
+    // Bug #89 — was hard-coded 340px; then `clientWidth`. Both miss the
+    // 24px gap between cards, so on iOS Safari `scrollBy` + snap-mandatory
+    // race each other and leave the incoming card clipped. Compute the
+    // raw ~one-screen target, then snap it to the nearest card's left edge
+    // in JS so the landing position is deterministic on every browser.
     const step = el.clientWidth;
-    el.scrollBy({ left: dir === 'left' ? -step : step, behavior: 'smooth' });
+    const elLeft = el.getBoundingClientRect().left;
+    const offsets = cards.map(
+      (c) => el.scrollLeft + (c.getBoundingClientRect().left - elLeft),
+    );
+    const rawTarget = el.scrollLeft + (dir === 'right' ? step : -step);
+    const targetLeft = offsets.reduce(
+      (best, cur) =>
+        Math.abs(cur - rawTarget) < Math.abs(best - rawTarget) ? cur : best,
+      offsets[0],
+    );
+    el.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
   };
 
   return (
