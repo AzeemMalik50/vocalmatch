@@ -46,7 +46,20 @@ export default function AdminChallengesPage() {
   const [hasMore, setHasMore] = useState(false);
   const [nextOffset, setNextOffset] = useState(0);
   const [working, setWorking] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Per-row error map keyed by challenge id. Bug — errors used to land
+  // in a single top banner, which hid which row triggered the failure
+  // when the admin was scrolled below the fold or when multiple
+  // consecutive actions raised different errors. Inline per-row errors
+  // are self-locating and don't clobber each other.
+  const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
+  const setRowError = (id: string, message: string) =>
+    setRowErrors((prev) => ({ ...prev, [id]: message }));
+  const clearRowError = (id: string) =>
+    setRowErrors((prev) => {
+      if (!(id in prev)) return prev;
+      const { [id]: _dropped, ...rest } = prev;
+      return rest;
+    });
 
   const load = useCallback(
     async (reset: boolean) => {
@@ -109,13 +122,13 @@ export default function AdminChallengesPage() {
   );
 
   const handleSelect = async (id: string) => {
+    clearRowError(id);
     setWorking(id);
-    setError(null);
     try {
       const updated = await api.adminSelectChallenge(id);
       reconcileAfterStatusChange(updated);
     } catch (e: any) {
-      setError(e.message || 'Could not select challenge');
+      setRowError(id, e.message || 'Could not select challenge');
     } finally {
       setWorking(null);
     }
@@ -129,13 +142,13 @@ export default function AdminChallengesPage() {
       tone: 'danger',
     });
     if (!ok) return;
+    clearRowError(id);
     setWorking(id);
-    setError(null);
     try {
       const updated = await api.adminRejectChallenge(id);
       reconcileAfterStatusChange(updated);
     } catch (e: any) {
-      setError(e.message || 'Could not reject challenge');
+      setRowError(id, e.message || 'Could not reject challenge');
     } finally {
       setWorking(null);
     }
@@ -149,13 +162,13 @@ export default function AdminChallengesPage() {
       confirmLabel: 'Promote to battle',
     });
     if (!ok) return;
+    clearRowError(id);
     setWorking(id);
-    setError(null);
     try {
       const battle = await api.adminCreateBattleFromChallenge(id, {});
       router.push(`/admin/battles/${battle.id}`);
     } catch (e: any) {
-      setError(e.message || 'Could not create battle');
+      setRowError(id, e.message || 'Could not create battle');
       setWorking(null);
     }
   };
@@ -171,13 +184,13 @@ export default function AdminChallengesPage() {
       tone: 'danger',
     });
     if (!ok) return;
+    clearRowError(id);
     setWorking(id);
-    setError(null);
     try {
       const updated = await api.adminCancelOrphanedChallenge(id);
       reconcileAfterStatusChange(updated);
     } catch (e: any) {
-      setError(e.message || 'Could not remove challenge');
+      setRowError(id, e.message || 'Could not remove challenge');
     } finally {
       setWorking(null);
     }
@@ -213,12 +226,6 @@ export default function AdminChallengesPage() {
         ))}
       </div>
 
-      {error && (
-        <div className="mb-4 text-sm text-red-300 bg-red-950/40 border border-red-900/40 rounded-md px-4 py-3">
-          {error}
-        </div>
-      )}
-
       {loading ? (
         <TableRowsSkeleton rows={4} />
       ) : items.length === 0 ? (
@@ -234,10 +241,12 @@ export default function AdminChallengesPage() {
                 key={c.id}
                 challenge={c}
                 busy={working === c.id}
+                error={rowErrors[c.id]}
                 onSelect={() => handleSelect(c.id)}
                 onReject={() => handleReject(c.id)}
                 onPromote={() => handlePromote(c.id)}
                 onRemove={() => handleRemove(c.id)}
+                onDismissError={() => clearRowError(c.id)}
               />
             ))}
           </ul>
@@ -262,17 +271,21 @@ export default function AdminChallengesPage() {
 function ChallengeRow({
   challenge,
   busy,
+  error,
   onSelect,
   onReject,
   onPromote,
   onRemove,
+  onDismissError,
 }: {
   challenge: AdminChallengeDto;
   busy: boolean;
+  error?: string;
   onSelect: () => void;
   onReject: () => void;
   onPromote: () => void;
   onRemove: () => void;
+  onDismissError: () => void;
 }) {
   const showRemove =
     challenge.status === 'selected' &&
@@ -382,6 +395,28 @@ function ChallengeRow({
           </Link>
         )}
       </div>
+
+      {/* Inline row error — self-locating so admin doesn't have to guess
+          which row failed. Full-width so it always wraps to its own line
+          below the actions regardless of viewport. `role="alert"` +
+          `aria-live` ensures screen readers announce it on set. */}
+      {error && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="w-full mt-1 flex items-start justify-between gap-3 rounded-md border border-red-500/40 bg-red-500/10 text-red-200 px-3 py-2 text-xs"
+        >
+          <span className="flex-1">{error}</span>
+          <button
+            type="button"
+            onClick={onDismissError}
+            aria-label="Dismiss error"
+            className="shrink-0 text-red-300 hover:text-white text-base leading-none"
+          >
+            ×
+          </button>
+        </div>
+      )}
     </li>
   );
 }
