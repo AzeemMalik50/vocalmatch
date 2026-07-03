@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Nav from '@/components/Nav';
 import { StageLoader } from '@/components/Loaders';
@@ -52,6 +53,16 @@ function UploadForm() {
   const searchParams = useSearchParams();
   const challengeMode = searchParams?.get('challenge') === '1';
   const prefilledSongId = searchParams?.get('songId') ?? '';
+  // Where to send the user if they abandon the upload and want to go
+  // back. Only same-origin paths (starting with `/` but NOT `//`) are
+  // accepted so a crafted URL can't open-redirect a signed-in user
+  // off-site. Null when the caller didn't supply one — the back
+  // affordance is only rendered when we have a valid target.
+  const rawReturnTo = searchParams?.get('returnTo') ?? '';
+  const returnTo =
+    rawReturnTo.startsWith('/') && !rawReturnTo.startsWith('//')
+      ? rawReturnTo
+      : null;
 
   const [title, setTitle] = useState('');
   const [songs, setSongs] = useState<SongDto[]>([]);
@@ -86,16 +97,17 @@ function UploadForm() {
       // Preserve the challenge intent through the login bounce so the user
       // lands back on the same upload-as-challenge flow after signing in.
       const here = `/upload${
-        challengeMode || prefilledSongId
+        challengeMode || prefilledSongId || returnTo
           ? `?${new URLSearchParams({
               ...(challengeMode ? { challenge: '1' } : {}),
               ...(prefilledSongId ? { songId: prefilledSongId } : {}),
+              ...(returnTo ? { returnTo } : {}),
             }).toString()}`
           : ''
       }`;
       router.push(`/login?next=${encodeURIComponent(here)}`);
     }
-  }, [authLoading, user, router, challengeMode, prefilledSongId]);
+  }, [authLoading, user, router, challengeMode, prefilledSongId, returnTo]);
 
   // Load the active Centerstage Songs catalog. The picker is the one source of
   // truth — performances must link to a song id so the battle-create endpoint
@@ -479,6 +491,21 @@ function UploadForm() {
     <>
       <Nav />
       <main className="relative z-10 max-w-2xl mx-auto px-6 py-16">
+        {/* Back-to-origin affordance — rendered whenever the caller
+            supplied a `returnTo` query (currently the Challenge CTA
+            on battle detail pages). Sits above the eyebrow so it's
+            the very first thing a user sees on land, matching the
+            iOS convention of a top-left back arrow. Uses <Link> so
+            the destination hydrates client-side without a full
+            page reload. */}
+        {returnTo && (
+          <Link
+            href={returnTo}
+            className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.25em] text-haze hover:text-white mb-4"
+          >
+            ← Back to battle
+          </Link>
+        )}
         <p className="text-xs uppercase tracking-[0.3em] text-spotlight font-bold mb-3">
           {challengeMode ? 'Red Phone challenge' : 'New performance'}
         </p>

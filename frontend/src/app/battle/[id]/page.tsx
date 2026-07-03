@@ -507,7 +507,18 @@ function ChallengeCta({ song, authed }: { song: SongDto; authed: boolean }) {
 
   // Authed users go straight to upload; unauthed users go to login with the
   // upload page (challenge mode) as the post-login destination.
-  const uploadHref = `/upload?songId=${encodeURIComponent(song.id)}&challenge=1`;
+  //
+  // `returnTo` threads the originating battle URL through the challenge
+  // flow so the upload page can render a "Back to battle" link. Without
+  // this, the user has to walk back through Home to find the specific
+  // battle they were about to challenge. `typeof window` guard keeps
+  // this working during SSR (returnTo just falls back to root there —
+  // the client render will hydrate with the real URL).
+  const returnTo =
+    typeof window !== 'undefined' ? window.location.pathname : '';
+  const uploadHref = `/upload?songId=${encodeURIComponent(song.id)}&challenge=1${
+    returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : ''
+  }`;
   const href = authed
     ? uploadHref
     : `/login?next=${encodeURIComponent(uploadHref)}`;
