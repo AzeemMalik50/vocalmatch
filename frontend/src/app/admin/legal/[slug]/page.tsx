@@ -62,9 +62,33 @@ export default function AdminLegalEditPage() {
     };
   }, [slug]);
 
+  // Dirty check derived from the last-loaded server state. After a
+  // successful publish, `page` is reloaded and this naturally resets
+  // to `false`, so we don't need a separate `pristine` flag.
+  //
+  // Normalization matters here: HTML textareas silently normalize CRLF
+  // (`\r\n`) to LF (`\n`), and stored markdown often carries a trailing
+  // newline that a round-trip through the textarea can drop. Without
+  // this normalization, a strict `!==` fired on every fresh load and
+  // the Save button stayed enabled with nothing meaningful changed.
+  const originalTitle = page?.title ?? '';
+  const originalBody = page?.currentVersion?.bodyMarkdown ?? '';
+  const normalize = (s: string) => s.replace(/\r\n/g, '\n').replace(/\s+$/, '');
+  const isDirty =
+    normalize(title) !== normalize(originalTitle) ||
+    normalize(body) !== normalize(originalBody);
+
   const onSave = async () => {
     setError(null);
     setSavedMessage(null);
+    if (!isDirty) {
+      // Defensive: the Save button is disabled when clean, but a stale
+      // click (state settling between reload and dirty flip) or a
+      // devtools nudge should still be rejected so we don't create
+      // duplicate no-op versions in the audit history.
+      setError('No changes to save. Edit the title or body first.');
+      return;
+    }
     if (title.trim().length === 0) {
       setError('Title is required.');
       return;
@@ -158,13 +182,28 @@ export default function AdminLegalEditPage() {
             /legal/{page.slug}
           </p>
         </div>
-        <button
-          onClick={onSave}
-          disabled={saving}
-          className="px-5 py-2.5 rounded-md bg-spotlight text-white font-semibold hover:bg-spotlight/90 disabled:opacity-50"
-        >
-          {saving ? 'Publishing…' : 'Save new version'}
-        </button>
+        <div className="flex flex-col items-end gap-1">
+          <button
+            onClick={onSave}
+            disabled={saving || !isDirty}
+            title={
+              !isDirty
+                ? 'No changes to save — edit the title or body first.'
+                : undefined
+            }
+            className="px-5 py-2.5 rounded-md bg-spotlight text-white font-semibold hover:bg-spotlight/90 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving ? 'Publishing…' : 'Save new version'}
+          </button>
+          <span
+            className={`text-[11px] uppercase tracking-[0.2em] ${
+              isDirty ? 'text-gold' : 'text-haze/50'
+            }`}
+            aria-live="polite"
+          >
+            {isDirty ? 'Unsaved changes' : 'No changes'}
+          </span>
+        </div>
       </header>
 
       {error && (
