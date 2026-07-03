@@ -999,7 +999,7 @@ export const api = {
   adminListChallenges: (
     params: {
       songId?: string;
-      status?: ChallengeStatus | 'all';
+      status?: ChallengeStatus | 'all' | 'needs_decision';
       limit?: number;
       offset?: number;
     } = {},

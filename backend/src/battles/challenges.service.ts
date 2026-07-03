@@ -223,7 +223,14 @@ export class ChallengesService {
 
   async listForAdmin(opts: {
     songId?: string;
-    status?: ChallengeStatus | 'open' | 'all'; // 'open' = pending only (actionable); 'all' = no status filter
+    // 'open' = pending only (actionable); 'all' = no status filter;
+    // 'needs_decision' = joined view — the challenge is `selected`
+    // and its resulting battle is currently in `needs_decision`
+    // (tie awaiting admin resolution). Not a real ChallengeStatus,
+    // but the admin Red Phone page treats it as a pseudo-tab so
+    // tied challenge-derived battles are reachable from there
+    // without walking through the Battles admin index.
+    status?: ChallengeStatus | 'open' | 'all' | 'needs_decision';
     limit?: number;
     offset?: number;
   }) {
@@ -246,9 +253,15 @@ export class ChallengesService {
     // New semantics — each tab is its own slice:
     //   - 'open' → pending only (actionable queue, no overlap with Selected)
     //   - 'all'  → no status filter (truly returns pending + selected + rejected)
+    //   - 'needs_decision' → selected challenges whose resulting battle
+    //                        is currently awaiting an admin tie-break
     //   - explicit pending/selected/rejected → exact filter
     if (opts.status === 'open') {
       qb.andWhere('c.status = :status', { status: 'pending' });
+    } else if (opts.status === 'needs_decision') {
+      qb.innerJoin('battles', 'b', 'b.id = c."resultingBattleId"')
+        .andWhere('c.status = :cstatus', { cstatus: 'selected' })
+        .andWhere('b.status = :bstatus', { bstatus: 'needs_decision' });
     } else if (opts.status && opts.status !== 'all') {
       qb.andWhere('c.status = :status', { status: opts.status });
     }

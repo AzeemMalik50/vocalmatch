@@ -10,7 +10,7 @@ import { useConfirm } from '@/lib/confirm-context';
 
 const PAGE_SIZE = 20;
 
-type FilterStatus = ChallengeStatus | 'all';
+type FilterStatus = ChallengeStatus | 'all' | 'needs_decision';
 
 // Bug #10 follow-up — the previous "Open" tab returned pending + selected,
 // then was tightened to pending-only, which made it visually identical to
@@ -18,9 +18,15 @@ type FilterStatus = ChallengeStatus | 'all';
 // maps to exactly one underlying state, and "All" is the no-filter view.
 // "Completed" added so finalized rows (selected → battle resolved) have a
 // dedicated lane rather than only surfacing in "All".
+// "Needs Decision" is a pseudo-filter (not a challenge status): joins on the
+// resulting battle and surfaces challenge submissions whose linked battle
+// is currently `needs_decision`. Without this the only way to reach tied
+// Red Phone battles was through the Battles admin index, which admins had
+// no reason to check while working the Red Phone queue.
 const FILTERS: { value: FilterStatus; label: string }[] = [
   { value: 'pending', label: 'Pending' },
   { value: 'selected', label: 'Selected' },
+  { value: 'needs_decision', label: 'Needs decision' },
   { value: 'completed', label: 'Completed' },
   { value: 'rejected', label: 'Rejected' },
   // Terminal lane for `selected` rows an admin removed after the Champion

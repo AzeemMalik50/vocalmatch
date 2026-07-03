@@ -76,12 +76,12 @@ export class AdminChallengesController {
       'Admin only. With no `status` query, returns every submission (pending + selected + rejected) — this is what the admin UI\'s "All" tab uses. Pass `status=pending`, `selected`, or `rejected` to filter explicitly; `status=open` is a legacy shortcut equivalent to `pending`; `songId` narrows to a single song.',
   })
   @ApiQuery({ name: 'songId', required: false, type: String })
-  @ApiQuery({ name: 'status', required: false, enum: ['pending', 'selected', 'rejected', 'completed', 'cancelled', 'open', 'all'] })
+  @ApiQuery({ name: 'status', required: false, enum: ['pending', 'selected', 'rejected', 'completed', 'cancelled', 'open', 'all', 'needs_decision'] })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'offset', required: false, type: Number })
   async list(
     @Query('songId') songId?: string,
-    @Query('status') status?: ChallengeStatus | 'open' | 'all',
+    @Query('status') status?: ChallengeStatus | 'open' | 'all' | 'needs_decision',
     @Query('limit') limitRaw?: string,
     @Query('offset') offsetRaw?: string,
   ) {
