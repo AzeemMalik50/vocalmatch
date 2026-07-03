@@ -102,6 +102,13 @@ html, body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
+  /* Defensive: the app never intends to scroll horizontally. Without
+     this, any child that accidentally overflows (fixed-width nav item,
+     stray absolute-positioned decoration, etc.) turns the whole page
+     into a horizontal scroller on mobile Safari. `overflow-x: hidden`
+     on <body> doesn't break vertical `position: sticky` because the
+     vertical scroll container stays on <html>. */
+  overflow-x: hidden;
 }
 
 .font-display {
