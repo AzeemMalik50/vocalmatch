@@ -666,7 +666,10 @@ function LiveBattleSkeleton() {
       <div className="flex flex-col items-center justify-center gap-6">
         <div className="text-6xl font-black text-white/30">VS</div>
         <div className="bg-card/50 backdrop-blur border border-border rounded-2xl p-8 w-full">
-          <div className="grid grid-cols-4 gap-4 text-center">
+          {/* Countdown skeleton: 4 units (days/hours/mins/secs). On mobile
+              they wrap to 2×2 so each cell has room for the large digits;
+              from the `sm` breakpoint up, the row lays flat as 1×4. */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i}>
                 <div className="h-8 w-full skeleton rounded mb-2" />
@@ -2663,7 +2666,7 @@ function ShareCard({
           <div
             role="group"
             aria-label="Share to a platform"
-            className="grid grid-cols-5 gap-1.5 border-t border-yellow-500/15 pt-3"
+            className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 border-t border-yellow-500/15 pt-3"
           >
             {/* TikTok — copy-only with a small `Copy` corner badge so
                 the action is visually unambiguous on every device

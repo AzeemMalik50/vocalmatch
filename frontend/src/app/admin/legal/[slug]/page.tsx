@@ -224,8 +224,12 @@ export default function AdminLegalEditPage() {
 
       <section className="mt-10">
         <h2 className="text-lg font-display text-white mb-3">Version History</h2>
-        <div className="rounded-lg border border-stage-700/60 overflow-hidden">
-          <table className="w-full text-left text-sm">
+        {/* Horizontal-scroll shell so the Version / Published / By /
+            Preview columns stay reachable on mobile — body's
+            `overflow-x: hidden` (globals.css) would otherwise clip the
+            right side silently. */}
+        <div className="rounded-lg border border-stage-700/60 overflow-x-auto scrollbar-hide">
+          <table className="w-full min-w-[560px] text-left text-sm">
             <thead className="bg-stage-900/60 text-haze uppercase text-xs tracking-wider">
               <tr>
                 <th className="px-4 py-3">Version</th>
