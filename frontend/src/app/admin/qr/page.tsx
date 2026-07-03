@@ -179,7 +179,7 @@ export default function AdminQrPage() {
 
         {/* Right: preview + download */}
         <div>
-          <div className="rounded-lg border border-stage-700/60 p-6 bg-stage-900/40 flex items-center justify-center">
+          <div className="rounded-lg border border-stage-700 p-6 bg-stage-900/40 flex items-center justify-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={previewSrc}

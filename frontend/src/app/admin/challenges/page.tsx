@@ -287,7 +287,7 @@ function ChallengeRow({
             ? showRemove
               ? 'border-red-500/40'
               : 'border-gold/40'
-            : 'border-stage-700/60 opacity-70'
+            : 'border-stage-600 opacity-70'
       }`}
     >
       {/* Left: video preview + meta */}

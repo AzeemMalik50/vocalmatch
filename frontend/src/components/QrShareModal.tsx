@@ -56,7 +56,7 @@ export default function QrShareModal({ url, title, open, onClose }: Props) {
       aria-modal="true"
     >
       <div
-        className="bg-stage-900 border border-stage-700/60 rounded-lg p-6 max-w-md w-full"
+        className="bg-stage-900 border border-stage-600 rounded-lg p-6 max-w-md w-full"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex items-start justify-between mb-4">

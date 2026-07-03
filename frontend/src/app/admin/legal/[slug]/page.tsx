@@ -216,7 +216,7 @@ export default function AdminLegalEditPage() {
           <p className="text-xs uppercase tracking-[0.25em] text-haze mb-2">
             {previewTitle}
           </p>
-          <div className="border border-stage-700/60 rounded-md p-5 bg-stage-900/40 max-h-[640px] overflow-y-auto">
+          <div className="border border-stage-600 rounded-md p-5 bg-stage-900/40 max-h-[640px] overflow-y-auto">
             <LegalContent markdown={previewMarkdown} />
           </div>
         </div>
@@ -228,7 +228,7 @@ export default function AdminLegalEditPage() {
             Preview columns stay reachable on mobile — body's
             `overflow-x: hidden` (globals.css) would otherwise clip the
             right side silently. */}
-        <div className="rounded-lg border border-stage-700/60 overflow-x-auto scrollbar-hide">
+        <div className="rounded-lg border border-stage-700 overflow-x-auto scrollbar-hide">
           <table className="w-full min-w-[560px] text-left text-sm">
             <thead className="bg-stage-900/60 text-haze uppercase text-xs tracking-wider">
               <tr>

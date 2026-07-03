@@ -372,7 +372,7 @@ export default function BattlePage() {
             </p>
           </div>
         ) : (
-          <div className="bg-stage-900 border border-stage-700 rounded-2xl p-8">
+          <div className="bg-stage-900 border border-stage-600 rounded-2xl p-8">
             <StageLoader message="Tuning in to both performers…" />
           </div>
         )}

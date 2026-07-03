@@ -64,7 +64,7 @@ export default function FeaturedBattle({ fallback }: Props) {
   const { battle, song, performanceA, performanceB } = data;
 
   return (
-    <div className="relative bg-stage-900 border border-stage-700 rounded-2xl p-5 sm:p-6 md:p-8 overflow-hidden">
+    <div className="relative bg-stage-900 border border-stage-600 rounded-2xl p-5 sm:p-6 md:p-8 overflow-hidden">
       <div className="absolute -top-20 -right-20 w-48 h-48 md:w-64 md:h-64 rounded-full bg-spotlight/20 blur-3xl" />
       <div className="relative z-10">
         <div className="flex items-center gap-2 mb-3">

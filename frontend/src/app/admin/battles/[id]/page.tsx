@@ -282,7 +282,7 @@ export default function AdminBattleDetailPage() {
 
       {/* Action bar */}
       {(battle.status === 'live' || battle.status === 'needs_decision') && (
-        <div className="mb-6 bg-stage-900 border border-stage-700/60 rounded-xl p-4 flex flex-wrap items-center gap-2">
+        <div className="mb-6 bg-stage-900 border border-stage-600 rounded-xl p-4 flex flex-wrap items-center gap-2">
           {battle.status === 'live' && (
             <>
               <button
@@ -406,7 +406,7 @@ export default function AdminBattleDetailPage() {
       </div>
 
       {/* Meta panel */}
-      <div className="bg-stage-900 border border-stage-700/60 rounded-xl p-5 grid sm:grid-cols-2 gap-4 text-sm">
+      <div className="bg-stage-900 border border-stage-600 rounded-xl p-5 grid sm:grid-cols-2 gap-4 text-sm">
         <Meta label="Battle ID" value={<code className="text-xs">{battle.id}</code>} />
         <Meta
           label="Total votes"

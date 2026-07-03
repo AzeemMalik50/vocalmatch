@@ -134,7 +134,7 @@ export default function VideoDetailPage() {
               <BattleContextBanner video={video} />
             )}
 
-            <div className="bg-stage-900 border border-stage-700 rounded-xl overflow-hidden">
+            <div className="bg-stage-900 border border-stage-600 rounded-xl overflow-hidden">
               <div className="aspect-video bg-black">
                 <video
                   src={video.url}
@@ -272,7 +272,7 @@ function BattleContextBanner({ video }: { video: VideoDto }) {
 
   if (isCancelled) {
     return (
-      <div className="mb-6 bg-stage-900 border border-stage-700/60 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-6 bg-stage-900 border border-stage-600 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-[10px] uppercase tracking-widest font-bold text-haze/70 mb-1">
             Battle cancelled
