@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import AdminShell from '@/components/AdminShell';
@@ -39,6 +39,17 @@ export default function AdminLegalEditPage() {
     | null
     | { versionNumber: number; bodyMarkdown: string }
   >(null);
+  // Track which Version History row is mid-fetch so its Preview button
+  // shows a loading label — makes the click feel responsive on slow
+  // networks (bug — click looked dead because the preview panel updates
+  // above the fold and users didn't see anything happen).
+  const [loadingVersion, setLoadingVersion] = useState<number | null>(null);
+  // Ref to the preview panel so we can scroll it into view + flash a
+  // highlight ring when a historical version loads. Without this the
+  // preview swap happens in the two-column grid above the version
+  // history table — off-screen for anyone scrolled to click Preview.
+  const previewPanelRef = useRef<HTMLDivElement | null>(null);
+  const [flashPreview, setFlashPreview] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -126,15 +137,31 @@ export default function AdminLegalEditPage() {
   };
 
   const loadHistorical = async (versionNumber: number) => {
+    if (loadingVersion !== null) return;
     setError(null);
+    setLoadingVersion(versionNumber);
     try {
       const v = await api.adminGetLegalVersion(slug, versionNumber);
       setHistoricalPreview({
         versionNumber: v.versionNumber,
         bodyMarkdown: v.bodyMarkdown,
       });
+      // After the state settles, scroll the preview panel into view and
+      // pulse a highlight ring so the swap is visible regardless of
+      // where the admin clicked from. `requestAnimationFrame` waits one
+      // paint so the ref points at the freshly-rendered panel.
+      requestAnimationFrame(() => {
+        previewPanelRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+        setFlashPreview(true);
+        setTimeout(() => setFlashPreview(false), 1200);
+      });
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Could not load version');
+    } finally {
+      setLoadingVersion(null);
     }
   };
 
@@ -255,7 +282,14 @@ export default function AdminLegalEditPage() {
           <p className="text-xs uppercase tracking-[0.25em] text-haze mb-2">
             {previewTitle}
           </p>
-          <div className="border border-stage-600 rounded-md p-5 bg-stage-900/40 max-h-[640px] overflow-y-auto">
+          <div
+            ref={previewPanelRef}
+            className={`border rounded-md p-5 bg-stage-900/40 max-h-[640px] overflow-y-auto transition-all duration-300 ${
+              flashPreview
+                ? 'border-spotlight ring-2 ring-spotlight/40'
+                : 'border-stage-600'
+            }`}
+          >
             <LegalContent markdown={previewMarkdown} />
           </div>
         </div>
@@ -299,9 +333,14 @@ export default function AdminLegalEditPage() {
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => loadHistorical(v.versionNumber)}
-                        className="text-spotlight hover:underline"
+                        disabled={loadingVersion !== null}
+                        className="text-spotlight hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
                       >
-                        Preview
+                        {loadingVersion === v.versionNumber
+                          ? 'Loading…'
+                          : historicalPreview?.versionNumber === v.versionNumber
+                            ? 'Previewing ✓'
+                            : 'Preview'}
                       </button>
                     </td>
                   </tr>
