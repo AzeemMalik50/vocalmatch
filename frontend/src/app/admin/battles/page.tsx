@@ -311,7 +311,7 @@ function BattleRow({
     // Returns a div now (was a li) so the parent ul can wrap each row in
     // its own li for focus highlighting; nesting <li> inside <li> would
     // be invalid HTML.
-    <div className="relative bg-stage-900 border border-stage-700/60 rounded-xl p-4 md:p-5 hover:border-spotlight/40 transition-colors">
+    <div className="relative bg-stage-900 border border-stage-600 rounded-xl p-4 md:p-5 hover:border-spotlight/40 transition-colors">
       {/* Full-card click target. Sits behind action buttons (z-0 vs z-10)
           so clicks on Close/Cancel/Resolve don't trigger navigation. */}
       <Link

@@ -388,7 +388,7 @@ function PerformanceSelect({
         const v = performances.find((p) => p.id === value);
         if (!v) return null;
         return (
-          <div className="bg-stage-900 border border-stage-700/60 rounded-lg p-3 flex gap-3">
+          <div className="bg-stage-900 border border-stage-600 rounded-lg p-3 flex gap-3">
             {v.thumbnailUrl && (
               // eslint-disable-next-line @next/next/no-img-element
               <img

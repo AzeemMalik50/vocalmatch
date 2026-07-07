@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Nav from '@/components/Nav';
 import { StageLoader } from '@/components/Loaders';
@@ -52,6 +53,16 @@ function UploadForm() {
   const searchParams = useSearchParams();
   const challengeMode = searchParams?.get('challenge') === '1';
   const prefilledSongId = searchParams?.get('songId') ?? '';
+  // Where to send the user if they abandon the upload and want to go
+  // back. Only same-origin paths (starting with `/` but NOT `//`) are
+  // accepted so a crafted URL can't open-redirect a signed-in user
+  // off-site. Null when the caller didn't supply one — the back
+  // affordance is only rendered when we have a valid target.
+  const rawReturnTo = searchParams?.get('returnTo') ?? '';
+  const returnTo =
+    rawReturnTo.startsWith('/') && !rawReturnTo.startsWith('//')
+      ? rawReturnTo
+      : null;
 
   const [title, setTitle] = useState('');
   const [songs, setSongs] = useState<SongDto[]>([]);
@@ -73,6 +84,21 @@ function UploadForm() {
   const [progress, setProgress] = useState(0); // 0..100
   const [uploaded, setUploaded] = useState(0); // bytes
   const handleRef = useRef<UploadHandle | null>(null);
+  // Bug — if the user hit Cancel just as the server finished saving the
+  // upload, `handle.cancel()` was a no-op (XHR already resolved) but the
+  // main submit's `await handle.promise` was still pending. It resolved
+  // with a real `created` object and the code then went on to submit the
+  // challenge and navigate — before the cancel-path's deleteVideo could
+  // catch up. Net effect: user saw "Cancelled" toast but the performance
+  // was live in their profile. This ref lets the post-await path detect
+  // that cancellation happened during the race and bail cleanly.
+  const cancelledRef = useRef(false);
+  // Ref on the song-picker wrapper so we can detect taps outside the
+  // dropdown and close it. Without this the picker had no dismiss
+  // mechanism at all — the only way to close it was to select an item
+  // or blur the input by tabbing away, and mobile taps outside kept
+  // it stuck open.
+  const songPickerRef = useRef<HTMLDivElement | null>(null);
   const confirm = useConfirm();
 
   useEffect(() => {
@@ -80,16 +106,17 @@ function UploadForm() {
       // Preserve the challenge intent through the login bounce so the user
       // lands back on the same upload-as-challenge flow after signing in.
       const here = `/upload${
-        challengeMode || prefilledSongId
+        challengeMode || prefilledSongId || returnTo
           ? `?${new URLSearchParams({
               ...(challengeMode ? { challenge: '1' } : {}),
               ...(prefilledSongId ? { songId: prefilledSongId } : {}),
+              ...(returnTo ? { returnTo } : {}),
             }).toString()}`
           : ''
       }`;
       router.push(`/login?next=${encodeURIComponent(here)}`);
     }
-  }, [authLoading, user, router, challengeMode, prefilledSongId]);
+  }, [authLoading, user, router, challengeMode, prefilledSongId, returnTo]);
 
   // Load the active Centerstage Songs catalog. The picker is the one source of
   // truth — performances must link to a song id so the battle-create endpoint
@@ -200,6 +227,35 @@ function UploadForm() {
       cancelled = true;
     };
   }, [challengeMode, songId]);
+
+  // Close the song picker on:
+  //   - a tap outside the picker wrapper (mousedown/touchstart, so it
+  //     fires before the tap resolves to a focus event that would
+  //     re-open the picker via the input's onFocus)
+  //   - Escape key press (keyboard-user parity)
+  // Only wired when the picker is actually open so we're not paying
+  // for a document-level listener on every keystroke of the rest of
+  // the form.
+  useEffect(() => {
+    if (!songPickerOpen) return;
+    const onPointerDown = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node | null;
+      if (target && songPickerRef.current && !songPickerRef.current.contains(target)) {
+        setSongPickerOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSongPickerOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('touchstart', onPointerDown, { passive: true });
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('touchstart', onPointerDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [songPickerOpen]);
 
   // "Dirty" state for the Reset button — true if the user has touched any
   // field beyond what the URL prefilled. Drives both the visible-state of
@@ -335,6 +391,7 @@ function UploadForm() {
     // All validation passed — now it's safe to flip into the uploading
     // state. From here, the only way back is the real cancel path or a
     // success/error response from the upload itself.
+    cancelledRef.current = false;
     setSubmitting(true);
     setProgress(0);
     setUploaded(0);
@@ -363,6 +420,17 @@ function UploadForm() {
 
     try {
       const created = await handle.promise;
+      // Cancel-during-final-stage race: if the user hit Cancel while the
+      // server was finalising this upload, `cancelledRef` was flipped in
+      // the interim. The cancel handler already scheduled a deleteVideo
+      // on this `created` id, so we must NOT go on to submit a challenge
+      // or navigate to the video page — that would leave the challenge
+      // linked to a video the cancel path is about to delete (or worse,
+      // succeed racing the delete). Bail here; the cancel handler owns
+      // cleanup + state reset.
+      if (cancelledRef.current) {
+        return;
+      }
       setProgress(100);
 
       // Challenge mode: register the upload as a Red Phone submission for
@@ -398,6 +466,10 @@ function UploadForm() {
 
       router.push(`/v/${created.id}`);
     } catch (e: any) {
+      // Cancellation-triggered abort throws too — swallow silently so
+      // the user doesn't see an error toast on top of the "Cancelled"
+      // message. The cancel handler has already reset submit state.
+      if (cancelledRef.current) return;
       setErr(e.message);
       setSubmitting(false);
       setProgress(0);
@@ -414,6 +486,12 @@ function UploadForm() {
   const cancel = () => {
     const handle = handleRef.current;
     if (!handle) return;
+    // Flag first — the main submit's post-await code checks this and
+    // bails before running challenge-submit or navigate. Order matters:
+    // if we set this after calling `handle.cancel()`, a synchronous
+    // resolution of the promise (already-completed XHR) could race
+    // ahead of the flag and land us on the video page.
+    cancelledRef.current = true;
     handle.cancel();
     handle.promise
       .then((created) => {
@@ -444,6 +522,21 @@ function UploadForm() {
     <>
       <Nav />
       <main className="relative z-10 max-w-2xl mx-auto px-6 py-16">
+        {/* Back-to-origin affordance — rendered whenever the caller
+            supplied a `returnTo` query (currently the Challenge CTA
+            on battle detail pages). Sits above the eyebrow so it's
+            the very first thing a user sees on land, matching the
+            iOS convention of a top-left back arrow. Uses <Link> so
+            the destination hydrates client-side without a full
+            page reload. */}
+        {returnTo && (
+          <Link
+            href={returnTo}
+            className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.25em] text-haze hover:text-white mb-4"
+          >
+            ← Back to battle
+          </Link>
+        )}
         <p className="text-xs uppercase tracking-[0.3em] text-spotlight font-bold mb-3">
           {challengeMode ? 'Red Phone challenge' : 'New performance'}
         </p>
@@ -490,7 +583,7 @@ function UploadForm() {
                 at least one before you can upload a performance.
               </div>
             ) : (
-              <div className="relative">
+              <div className="relative" ref={songPickerRef}>
                 {selectedSong ? (
                   // Bug #61 — when the user lands here via challenge mode
                   // with a song pre-filled from the URL (`?challenge=1&songId=…`,
@@ -588,6 +681,17 @@ function UploadForm() {
                         setSongPickerOpen(true);
                       }}
                       onFocus={() => setSongPickerOpen(true)}
+                      // Tap-again-to-close: if the picker is already
+                      // open and the user taps the input, close it.
+                      // `preventDefault` on mousedown keeps focus
+                      // where it is so onFocus doesn't immediately
+                      // re-open the picker on the next tick.
+                      onMouseDown={(e) => {
+                        if (songPickerOpen) {
+                          e.preventDefault();
+                          setSongPickerOpen(false);
+                        }
+                      }}
                       placeholder="Search the catalog by title or artist"
                       className="w-full px-4 py-3 bg-stage-900 border border-stage-700 rounded-md focus:outline-none focus:border-spotlight transition-colors"
                     />

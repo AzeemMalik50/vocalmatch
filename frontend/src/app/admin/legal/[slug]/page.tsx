@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import AdminShell from '@/components/AdminShell';
@@ -39,6 +39,17 @@ export default function AdminLegalEditPage() {
     | null
     | { versionNumber: number; bodyMarkdown: string }
   >(null);
+  // Track which Version History row is mid-fetch so its Preview button
+  // shows a loading label — makes the click feel responsive on slow
+  // networks (bug — click looked dead because the preview panel updates
+  // above the fold and users didn't see anything happen).
+  const [loadingVersion, setLoadingVersion] = useState<number | null>(null);
+  // Ref to the preview panel so we can scroll it into view + flash a
+  // highlight ring when a historical version loads. Without this the
+  // preview swap happens in the two-column grid above the version
+  // history table — off-screen for anyone scrolled to click Preview.
+  const previewPanelRef = useRef<HTMLDivElement | null>(null);
+  const [flashPreview, setFlashPreview] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,9 +73,33 @@ export default function AdminLegalEditPage() {
     };
   }, [slug]);
 
+  // Dirty check derived from the last-loaded server state. After a
+  // successful publish, `page` is reloaded and this naturally resets
+  // to `false`, so we don't need a separate `pristine` flag.
+  //
+  // Normalization matters here: HTML textareas silently normalize CRLF
+  // (`\r\n`) to LF (`\n`), and stored markdown often carries a trailing
+  // newline that a round-trip through the textarea can drop. Without
+  // this normalization, a strict `!==` fired on every fresh load and
+  // the Save button stayed enabled with nothing meaningful changed.
+  const originalTitle = page?.title ?? '';
+  const originalBody = page?.currentVersion?.bodyMarkdown ?? '';
+  const normalize = (s: string) => s.replace(/\r\n/g, '\n').replace(/\s+$/, '');
+  const isDirty =
+    normalize(title) !== normalize(originalTitle) ||
+    normalize(body) !== normalize(originalBody);
+
   const onSave = async () => {
     setError(null);
     setSavedMessage(null);
+    if (!isDirty) {
+      // Defensive: the Save button is disabled when clean, but a stale
+      // click (state settling between reload and dirty flip) or a
+      // devtools nudge should still be rejected so we don't create
+      // duplicate no-op versions in the audit history.
+      setError('No changes to save. Edit the title or body first.');
+      return;
+    }
     if (title.trim().length === 0) {
       setError('Title is required.');
       return;
@@ -102,15 +137,31 @@ export default function AdminLegalEditPage() {
   };
 
   const loadHistorical = async (versionNumber: number) => {
+    if (loadingVersion !== null) return;
     setError(null);
+    setLoadingVersion(versionNumber);
     try {
       const v = await api.adminGetLegalVersion(slug, versionNumber);
       setHistoricalPreview({
         versionNumber: v.versionNumber,
         bodyMarkdown: v.bodyMarkdown,
       });
+      // After the state settles, scroll the preview panel into view and
+      // pulse a highlight ring so the swap is visible regardless of
+      // where the admin clicked from. `requestAnimationFrame` waits one
+      // paint so the ref points at the freshly-rendered panel.
+      requestAnimationFrame(() => {
+        previewPanelRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+        setFlashPreview(true);
+        setTimeout(() => setFlashPreview(false), 1200);
+      });
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Could not load version');
+    } finally {
+      setLoadingVersion(null);
     }
   };
 
@@ -158,13 +209,28 @@ export default function AdminLegalEditPage() {
             /legal/{page.slug}
           </p>
         </div>
-        <button
-          onClick={onSave}
-          disabled={saving}
-          className="px-5 py-2.5 rounded-md bg-spotlight text-white font-semibold hover:bg-spotlight/90 disabled:opacity-50"
-        >
-          {saving ? 'Publishing…' : 'Save new version'}
-        </button>
+        <div className="flex flex-col items-end gap-1">
+          <button
+            onClick={onSave}
+            disabled={saving || !isDirty}
+            title={
+              !isDirty
+                ? 'No changes to save — edit the title or body first.'
+                : undefined
+            }
+            className="px-5 py-2.5 rounded-md bg-spotlight text-white font-semibold hover:bg-spotlight/90 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving ? 'Publishing…' : 'Save new version'}
+          </button>
+          <span
+            className={`text-[11px] uppercase tracking-[0.2em] ${
+              isDirty ? 'text-gold' : 'text-haze/50'
+            }`}
+            aria-live="polite"
+          >
+            {isDirty ? 'Unsaved changes' : 'No changes'}
+          </span>
+        </div>
       </header>
 
       {error && (
@@ -216,7 +282,14 @@ export default function AdminLegalEditPage() {
           <p className="text-xs uppercase tracking-[0.25em] text-haze mb-2">
             {previewTitle}
           </p>
-          <div className="border border-stage-700/60 rounded-md p-5 bg-stage-900/40 max-h-[640px] overflow-y-auto">
+          <div
+            ref={previewPanelRef}
+            className={`border rounded-md p-5 bg-stage-900/40 max-h-[640px] overflow-y-auto transition-all duration-300 ${
+              flashPreview
+                ? 'border-spotlight ring-2 ring-spotlight/40'
+                : 'border-stage-600'
+            }`}
+          >
             <LegalContent markdown={previewMarkdown} />
           </div>
         </div>
@@ -224,8 +297,12 @@ export default function AdminLegalEditPage() {
 
       <section className="mt-10">
         <h2 className="text-lg font-display text-white mb-3">Version History</h2>
-        <div className="rounded-lg border border-stage-700/60 overflow-hidden">
-          <table className="w-full text-left text-sm">
+        {/* Horizontal-scroll shell so the Version / Published / By /
+            Preview columns stay reachable on mobile — body's
+            `overflow-x: hidden` (globals.css) would otherwise clip the
+            right side silently. */}
+        <div className="rounded-lg border border-stage-700 overflow-x-auto scrollbar-hide">
+          <table className="w-full min-w-[560px] text-left text-sm">
             <thead className="bg-stage-900/60 text-haze uppercase text-xs tracking-wider">
               <tr>
                 <th className="px-4 py-3">Version</th>
@@ -256,9 +333,14 @@ export default function AdminLegalEditPage() {
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => loadHistorical(v.versionNumber)}
-                        className="text-spotlight hover:underline"
+                        disabled={loadingVersion !== null}
+                        className="text-spotlight hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
                       >
-                        Preview
+                        {loadingVersion === v.versionNumber
+                          ? 'Loading…'
+                          : historicalPreview?.versionNumber === v.versionNumber
+                            ? 'Previewing ✓'
+                            : 'Preview'}
                       </button>
                     </td>
                   </tr>

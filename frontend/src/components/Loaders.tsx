@@ -124,7 +124,7 @@ export function FullPageLoader({
  */
 export function BattleCardSkeleton() {
   return (
-    <div className="bg-stage-900 border border-stage-700/60 rounded-xl p-5 space-y-3">
+    <div className="bg-stage-900 border border-stage-600 rounded-xl p-5 space-y-3">
       <div className="flex items-center gap-2">
         <Spinner size="sm" />
         <SkeletonBlock className="h-3 w-12" />
@@ -160,7 +160,7 @@ export function BattleCardGridSkeleton({ count = 3 }: { count?: number }) {
  */
 export function FeaturedBattleSkeleton() {
   return (
-    <div className="relative bg-stage-900 border border-stage-700 rounded-2xl p-6 overflow-hidden">
+    <div className="relative bg-stage-900 border border-stage-600 rounded-2xl p-6 overflow-hidden">
       <div className="flex items-center gap-2 mb-3">
         <Spinner size="sm" />
         <SkeletonBlock className="h-3 w-20" />
@@ -204,7 +204,7 @@ export function BattlePageSkeleton() {
         <PerformancePaneSkeleton side="A" />
         <PerformancePaneSkeleton side="B" />
       </div>
-      <div className="bg-stage-900 border border-stage-700 rounded-2xl p-6 md:p-8 space-y-4">
+      <div className="bg-stage-900 border border-stage-600 rounded-2xl p-6 md:p-8 space-y-4">
         <SkeletonBlock className="h-8 w-1/2 mx-auto" />
         <SkeletonBlock className="h-3 w-1/3 mx-auto" />
         <div className="grid grid-cols-2 gap-3 pt-2">
@@ -244,7 +244,7 @@ export function TableRowsSkeleton({ rows = 5 }: { rows?: number }) {
       {Array.from({ length: rows }).map((_, i) => (
         <div
           key={i}
-          className="bg-stage-900 border border-stage-700/60 rounded-xl p-4 flex items-center gap-3"
+          className="bg-stage-900 border border-stage-600 rounded-xl p-4 flex items-center gap-3"
         >
           <SkeletonBlock className="h-9 w-9" rounded="full" />
           <div className="flex-1 space-y-1.5">

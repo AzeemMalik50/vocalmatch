@@ -54,6 +54,51 @@ export function qrImageUrl(opts: {
   return `${API_URL}/qr?${params.toString()}`;
 }
 
+/**
+ * Force-download a file from a URL. The `download` attribute on `<a>`
+ * only works when the resource is same-origin; the QR endpoint lives
+ * on the API domain (different origin than the frontend), so a plain
+ * `<a href download>` silently opens the image inline instead. Fetch
+ * the bytes into a Blob, wrap in an object URL, click a synthetic
+ * anchor. Works cross-origin as long as the endpoint's CORS response
+ * permits the fetch — which the QR endpoint already does since the
+ * modal's `<img src>` preview loads through the same CORS rule.
+ */
+export async function downloadFile(url: string, filename: string) {
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Download failed (HTTP ${res.status})`);
+  }
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = objectUrl;
+  a.download = filename;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // Safari needs the object URL to stay alive briefly after the click
+  // resolves, otherwise the download aborts on some versions.
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+}
+
+/**
+ * Rich error subclass so callers (specifically the auth refresh path) can
+ * tell an HTTP 401 apart from a network/CORS/abort failure. Without this,
+ * `refresh()` treated a fetch aborted by Safari during F5 unload as an
+ * auth failure and silently logged the user out — see auth-context's
+ * refresh() for the consumer.
+ */
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
@@ -75,7 +120,10 @@ async function request<T>(
     const msg =
       (data && (data.message || data.error)) ||
       `Request failed (${res.status})`;
-    throw new Error(Array.isArray(msg) ? msg.join(', ') : msg);
+    throw new ApiError(
+      Array.isArray(msg) ? msg.join(', ') : msg,
+      res.status,
+    );
   }
   return data;
 }
@@ -528,7 +576,11 @@ export type ChallengeStatus =
   // Terminal state set by the backend once the resulting battle has
   // finalized (completed or cancelled). Released from the per-song
   // queue so a new challenger can take the same song.
-  | 'completed';
+  | 'completed'
+  // Terminal state — admin removed a `selected` submission whose
+  // Champion or Challenger performance was deleted, so it could
+  // no longer be promoted. Also released from the per-song queue.
+  | 'cancelled';
 
 /** Lightweight shape returned to the user (their own submissions). */
 export interface ChallengeSubmissionDto {
@@ -561,6 +613,13 @@ export interface AdminChallengeDto {
     url: string;
   } | null;
   status: ChallengeStatus;
+  /**
+   * Backend flag — true when this `selected` row can no longer be promoted
+   * because the Champion or Challenger performance has been soft-deleted.
+   * Only populated for `selected` rows with no linked battle; false for
+   * every other status. Drives the admin Remove button.
+   */
+  isOrphaned: boolean;
   createdAt: string;
   decidedAt: string | null;
   decidedByAdminId: string | null;
@@ -940,7 +999,7 @@ export const api = {
   adminListChallenges: (
     params: {
       songId?: string;
-      status?: ChallengeStatus | 'all';
+      status?: ChallengeStatus | 'all' | 'needs_decision';
       limit?: number;
       offset?: number;
     } = {},
@@ -963,6 +1022,10 @@ export const api = {
     }),
   adminRejectChallenge: (id: string) =>
     request<AdminChallengeDto>(`/admin/challenges/${id}/reject`, {
+      method: 'POST',
+    }),
+  adminCancelOrphanedChallenge: (id: string) =>
+    request<AdminChallengeDto>(`/admin/challenges/${id}/cancel-orphaned`, {
       method: 'POST',
     }),
   adminCreateBattleFromChallenge: (

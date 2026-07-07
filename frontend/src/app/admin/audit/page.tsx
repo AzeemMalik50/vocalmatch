@@ -95,8 +95,13 @@ export default function AdminAuditLogPage() {
         </div>
       )}
 
-      <div className="rounded-lg border border-stage-700/60 overflow-hidden">
-        <table className="w-full text-left text-sm">
+      {/* Horizontal-scroll shell — five columns (When / Admin / Action /
+          Target / Payload) can't compress into an iPhone-portrait
+          viewport, and body's `overflow-x: hidden` would silently clip
+          the rightmost ones without this. `min-w-[860px]` on the table
+          keeps columns readable before the shell scrolls. */}
+      <div className="rounded-lg border border-stage-700 overflow-x-auto scrollbar-hide">
+        <table className="w-full min-w-[860px] text-left text-sm">
           <thead className="bg-stage-900/60 text-haze uppercase text-xs tracking-wider">
             <tr>
               <th className="px-4 py-3">When</th>

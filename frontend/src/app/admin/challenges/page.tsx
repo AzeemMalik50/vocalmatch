@@ -10,7 +10,7 @@ import { useConfirm } from '@/lib/confirm-context';
 
 const PAGE_SIZE = 20;
 
-type FilterStatus = ChallengeStatus | 'all';
+type FilterStatus = ChallengeStatus | 'all' | 'needs_decision';
 
 // Bug #10 follow-up — the previous "Open" tab returned pending + selected,
 // then was tightened to pending-only, which made it visually identical to
@@ -18,11 +18,21 @@ type FilterStatus = ChallengeStatus | 'all';
 // maps to exactly one underlying state, and "All" is the no-filter view.
 // "Completed" added so finalized rows (selected → battle resolved) have a
 // dedicated lane rather than only surfacing in "All".
+// "Needs Decision" is a pseudo-filter (not a challenge status): joins on the
+// resulting battle and surfaces challenge submissions whose linked battle
+// is currently `needs_decision`. Without this the only way to reach tied
+// Red Phone battles was through the Battles admin index, which admins had
+// no reason to check while working the Red Phone queue.
 const FILTERS: { value: FilterStatus; label: string }[] = [
   { value: 'pending', label: 'Pending' },
   { value: 'selected', label: 'Selected' },
+  { value: 'needs_decision', label: 'Needs decision' },
   { value: 'completed', label: 'Completed' },
   { value: 'rejected', label: 'Rejected' },
+  // Terminal lane for `selected` rows an admin removed after the Champion
+  // or Challenger performance was deleted. Kept distinct from Rejected so
+  // the audit trail separates "we said no" from "plumbing fell apart".
+  { value: 'cancelled', label: 'Cancelled' },
   { value: 'all', label: 'All' },
 ];
 
@@ -42,7 +52,20 @@ export default function AdminChallengesPage() {
   const [hasMore, setHasMore] = useState(false);
   const [nextOffset, setNextOffset] = useState(0);
   const [working, setWorking] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Per-row error map keyed by challenge id. Bug — errors used to land
+  // in a single top banner, which hid which row triggered the failure
+  // when the admin was scrolled below the fold or when multiple
+  // consecutive actions raised different errors. Inline per-row errors
+  // are self-locating and don't clobber each other.
+  const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
+  const setRowError = (id: string, message: string) =>
+    setRowErrors((prev) => ({ ...prev, [id]: message }));
+  const clearRowError = (id: string) =>
+    setRowErrors((prev) => {
+      if (!(id in prev)) return prev;
+      const { [id]: _dropped, ...rest } = prev;
+      return rest;
+    });
 
   const load = useCallback(
     async (reset: boolean) => {
@@ -105,13 +128,13 @@ export default function AdminChallengesPage() {
   );
 
   const handleSelect = async (id: string) => {
+    clearRowError(id);
     setWorking(id);
-    setError(null);
     try {
       const updated = await api.adminSelectChallenge(id);
       reconcileAfterStatusChange(updated);
     } catch (e: any) {
-      setError(e.message || 'Could not select challenge');
+      setRowError(id, e.message || 'Could not select challenge');
     } finally {
       setWorking(null);
     }
@@ -125,13 +148,13 @@ export default function AdminChallengesPage() {
       tone: 'danger',
     });
     if (!ok) return;
+    clearRowError(id);
     setWorking(id);
-    setError(null);
     try {
       const updated = await api.adminRejectChallenge(id);
       reconcileAfterStatusChange(updated);
     } catch (e: any) {
-      setError(e.message || 'Could not reject challenge');
+      setRowError(id, e.message || 'Could not reject challenge');
     } finally {
       setWorking(null);
     }
@@ -145,13 +168,36 @@ export default function AdminChallengesPage() {
       confirmLabel: 'Promote to battle',
     });
     if (!ok) return;
+    clearRowError(id);
     setWorking(id);
-    setError(null);
     try {
       const battle = await api.adminCreateBattleFromChallenge(id, {});
       router.push(`/admin/battles/${battle.id}`);
     } catch (e: any) {
-      setError(e.message || 'Could not create battle');
+      setRowError(id, e.message || 'Could not create battle');
+      setWorking(null);
+    }
+  };
+
+  const handleRemove = async (id: string) => {
+    const ok = await confirm({
+      title: 'Remove this orphaned challenger?',
+      message:
+        "The Champion's performance is no longer available, so this challenge can never be promoted.",
+      detail:
+        'The challenger will be notified and the song will be free for a new challenger once a new champion appears.',
+      confirmLabel: 'Remove',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    clearRowError(id);
+    setWorking(id);
+    try {
+      const updated = await api.adminCancelOrphanedChallenge(id);
+      reconcileAfterStatusChange(updated);
+    } catch (e: any) {
+      setRowError(id, e.message || 'Could not remove challenge');
+    } finally {
       setWorking(null);
     }
   };
@@ -186,12 +232,6 @@ export default function AdminChallengesPage() {
         ))}
       </div>
 
-      {error && (
-        <div className="mb-4 text-sm text-red-300 bg-red-950/40 border border-red-900/40 rounded-md px-4 py-3">
-          {error}
-        </div>
-      )}
-
       {loading ? (
         <TableRowsSkeleton rows={4} />
       ) : items.length === 0 ? (
@@ -207,9 +247,12 @@ export default function AdminChallengesPage() {
                 key={c.id}
                 challenge={c}
                 busy={working === c.id}
+                error={rowErrors[c.id]}
                 onSelect={() => handleSelect(c.id)}
                 onReject={() => handleReject(c.id)}
                 onPromote={() => handlePromote(c.id)}
+                onRemove={() => handleRemove(c.id)}
+                onDismissError={() => clearRowError(c.id)}
               />
             ))}
           </ul>
@@ -234,24 +277,36 @@ export default function AdminChallengesPage() {
 function ChallengeRow({
   challenge,
   busy,
+  error,
   onSelect,
   onReject,
   onPromote,
+  onRemove,
+  onDismissError,
 }: {
   challenge: AdminChallengeDto;
   busy: boolean;
+  error?: string;
   onSelect: () => void;
   onReject: () => void;
   onPromote: () => void;
+  onRemove: () => void;
+  onDismissError: () => void;
 }) {
+  const showRemove =
+    challenge.status === 'selected' &&
+    !challenge.resultingBattleId &&
+    challenge.isOrphaned;
   return (
     <li
       className={`bg-stage-900 border rounded-xl p-4 md:p-5 flex flex-wrap items-start justify-between gap-4 ${
         challenge.status === 'pending'
           ? 'border-spotlight/30'
           : challenge.status === 'selected'
-            ? 'border-gold/40'
-            : 'border-stage-700/60 opacity-70'
+            ? showRemove
+              ? 'border-red-500/40'
+              : 'border-gold/40'
+            : 'border-stage-600 opacity-70'
       }`}
     >
       {/* Left: video preview + meta */}
@@ -269,6 +324,11 @@ function ChallengeRow({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <StatusBadge status={challenge.status} />
+            {showRemove && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] uppercase tracking-widest font-bold bg-red-500/15 text-red-300 border border-red-500/40 rounded">
+                Champion unavailable
+              </span>
+            )}
             <span className="text-xs text-haze tabular-nums">
               {new Date(challenge.createdAt).toLocaleDateString()}
             </span>
@@ -293,7 +353,7 @@ function ChallengeRow({
               </span>
             )}
           </p>
-          <p className="text-xs text-haze/70 mt-1">
+          <p className="text-xs text-haze/70 mt-1 break-words line-clamp-2">
             on{' '}
             <span className="text-white font-semibold">
               {challenge.song?.title ?? '—'}
@@ -317,9 +377,19 @@ function ChallengeRow({
             </ActionButton>
           </>
         )}
-        {challenge.status === 'selected' && !challenge.resultingBattleId && (
-          <ActionButton onClick={onPromote} disabled={busy} variant="gold">
-            {busy ? 'Promoting…' : 'Promote → battle'}
+        {/* Promote is only offered while the pairing is still valid;
+            once orphaned, the Remove action replaces it so admin can
+            clean the queue without hitting the promote-time error. */}
+        {challenge.status === 'selected' &&
+          !challenge.resultingBattleId &&
+          !challenge.isOrphaned && (
+            <ActionButton onClick={onPromote} disabled={busy} variant="gold">
+              {busy ? 'Promoting…' : 'Promote → battle'}
+            </ActionButton>
+          )}
+        {showRemove && (
+          <ActionButton onClick={onRemove} disabled={busy} variant="danger">
+            {busy ? 'Removing…' : 'Remove'}
           </ActionButton>
         )}
         {challenge.status === 'selected' && challenge.resultingBattleId && (
@@ -331,6 +401,28 @@ function ChallengeRow({
           </Link>
         )}
       </div>
+
+      {/* Inline row error — self-locating so admin doesn't have to guess
+          which row failed. Full-width so it always wraps to its own line
+          below the actions regardless of viewport. `role="alert"` +
+          `aria-live` ensures screen readers announce it on set. */}
+      {error && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="w-full mt-1 flex items-start justify-between gap-3 rounded-md border border-red-500/40 bg-red-500/10 text-red-200 px-3 py-2 text-xs"
+        >
+          <span className="flex-1">{error}</span>
+          <button
+            type="button"
+            onClick={onDismissError}
+            aria-label="Dismiss error"
+            className="shrink-0 text-red-300 hover:text-white text-base leading-none"
+          >
+            ×
+          </button>
+        </div>
+      )}
     </li>
   );
 }
@@ -343,7 +435,9 @@ function StatusBadge({ status }: { status: ChallengeStatus }) {
         ? 'bg-gold/15 text-gold border-gold/40'
         : status === 'completed'
           ? 'bg-stage-800 text-haze/80 border-stage-700'
-          : 'bg-stage-800 text-haze border-stage-700';
+          : status === 'cancelled'
+            ? 'bg-red-500/10 text-red-300 border-red-500/30'
+            : 'bg-stage-800 text-haze border-stage-700';
   return (
     <span
       className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] uppercase tracking-widest font-bold rounded border ${tone}`}

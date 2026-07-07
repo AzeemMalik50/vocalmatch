@@ -4,6 +4,11 @@ import * as streamifier from 'streamifier';
 
 @Injectable()
 export class CloudinaryService {
+  // `||` (not `??`) so an empty-string env var also falls back to the default —
+  // CI/CD pipelines that set every var explicitly often pass `""` for unset values.
+  private readonly folderPrefix =
+    process.env.CLOUDINARY_FOLDER_PREFIX?.replace(/\/$/, '') || 'vocalmatch';
+
   constructor() {
     cloudinary.config({
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -17,7 +22,7 @@ export class CloudinaryService {
       const stream = cloudinary.uploader.upload_stream(
         {
           resource_type: 'video',
-          folder: 'vocalmatch/videos',
+          folder: `${this.folderPrefix}/videos`,
           eager: [
             {
               format: 'jpg',
@@ -54,7 +59,7 @@ export class CloudinaryService {
       const stream = cloudinary.uploader.upload_stream(
         {
           resource_type: 'image',
-          folder: `vocalmatch/${subfolder}`,
+          folder: `${this.folderPrefix}/${subfolder}`,
           transformation: [
             {
               width: 512,

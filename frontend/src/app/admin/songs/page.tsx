@@ -233,7 +233,7 @@ export default function AdminSongsPage() {
       {mode && (
         <form
           onSubmit={submit}
-          className="bg-stage-900 border border-stage-700/60 rounded-xl p-5 mb-8 space-y-4 max-w-2xl"
+          className="bg-stage-900 border border-stage-600 rounded-xl p-5 mb-8 space-y-4 max-w-2xl"
         >
           <p className="text-xs uppercase tracking-widest font-bold text-haze">
             {mode === 'new' ? 'New song' : 'Edit song'}
@@ -314,11 +314,11 @@ export default function AdminSongsPage() {
           {songs.map((s) => (
             <li
               key={s.id}
-              className="bg-stage-900 border border-stage-700/60 rounded-xl p-4 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-start sm:justify-between gap-3"
+              className="bg-stage-900 border border-stage-600 rounded-xl p-4 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-start sm:justify-between gap-3"
             >
               <div className="min-w-0 w-full sm:w-auto sm:flex-1">
-                <p className="font-display font-bold text-lg">{s.title}</p>
-                <p className="text-sm text-haze">{s.artist}</p>
+                <p className="font-display font-bold text-lg break-words line-clamp-2">{s.title}</p>
+                <p className="text-sm text-haze break-words line-clamp-1">{s.artist}</p>
                 {s.currentChampionStreak > 0 && (
                   <p className="text-xs text-gold mt-1">
                     Defending Champion · streak {s.currentChampionStreak}

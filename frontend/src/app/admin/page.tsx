@@ -130,7 +130,7 @@ export default function AdminOverviewPage() {
                 <Link
                   key={b.id}
                   href={`/admin/battles/${b.id}`}
-                  className="block bg-stage-900 border border-stage-700/60 rounded-xl p-4 hover:border-spotlight/40 transition-colors"
+                  className="block bg-stage-900 border border-stage-600 rounded-xl p-4 hover:border-spotlight/40 transition-colors"
                 >
                   <p className="font-semibold">{b.title || 'Untitled battle'}</p>
                   <p className="text-xs text-haze mt-1 tabular-nums">
@@ -156,11 +156,11 @@ export default function AdminOverviewPage() {
               {songs.slice(0, 5).map((s) => (
                 <div
                   key={s.id}
-                  className="flex items-center justify-between bg-stage-900 border border-stage-700/60 rounded-xl p-4"
+                  className="flex items-center justify-between bg-stage-900 border border-stage-600 rounded-xl p-4"
                 >
-                  <div>
-                    <p className="font-semibold">{s.title}</p>
-                    <p className="text-xs text-haze mt-0.5">{s.artist}</p>
+                  <div className="min-w-0 flex-1 pr-3">
+                    <p className="font-semibold break-words line-clamp-2">{s.title}</p>
+                    <p className="text-xs text-haze mt-0.5 break-words line-clamp-1">{s.artist}</p>
                   </div>
                   <span
                     className={`text-[10px] uppercase tracking-widest font-bold ${

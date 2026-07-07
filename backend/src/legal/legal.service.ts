@@ -123,7 +123,11 @@ export class LegalService {
   }
 
   async listAdmin(): Promise<AdminLegalPageSummaryDto[]> {
-    const pages = await this.pages.find();
+    // Order by most-recently-updated first so a page an admin just
+    // edited surfaces at the top of the list. Without this the driver's
+    // implicit ordering (insertion / physical row order) wins, and a
+    // freshly-published page can appear below untouched seeded ones.
+    const pages = await this.pages.find({ order: { updatedAt: 'DESC' } });
     const out: AdminLegalPageSummaryDto[] = [];
     for (const p of pages) {
       const v = p.currentVersionId

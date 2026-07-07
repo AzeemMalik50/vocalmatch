@@ -279,11 +279,11 @@ export default function BattlePage() {
               />
             )}
           </div>
-          <h1 className="font-display font-black text-3xl md:text-5xl leading-tight mb-2">
+          <h1 className="font-display font-black text-3xl md:text-5xl leading-tight mb-2 break-words line-clamp-3">
             {battle.title || (song ? `Battle: ${song.title}` : 'A VocalMatch battle')}
           </h1>
           {song && (
-            <p className="text-haze">
+            <p className="text-haze break-words">
               <span className="text-haze/70">Centerstage Song:</span>{' '}
               <span className="font-semibold text-white">{song.title}</span>
               {song.artist && (
@@ -312,37 +312,22 @@ export default function BattlePage() {
           </div>
         )}
 
-        {perfError && (
-          <div className="bg-red-950/30 border border-red-900/40 rounded-lg p-3 text-sm text-red-300 mb-4">
-            {perfError}
-          </div>
-        )}
+        {/* Previously a redundant red banner echoed the pane-level
+            "Performance X is unavailable" line. Removed so viewers see
+            the clear removed-performance explanation once (below the
+            video panes) instead of the same fact twice. */}
 
         {/* The two videos */}
         <div className="grid md:grid-cols-2 gap-4 md:gap-6 mb-8">
           {performanceA ? (
-            <PerformancePane
-              performance={performanceA}
-              side="A"
-              isDefendingChampion={
-                !!song?.currentChampionPerformanceId &&
-                song.currentChampionPerformanceId === performanceA.id
-              }
-            />
+            <PerformancePane performance={performanceA} side="A" />
           ) : perfErrorA ? (
             <PerformancePaneUnavailable side="A" message={perfErrorA} />
           ) : (
             <PerformancePaneSkeleton side="A" />
           )}
           {performanceB ? (
-            <PerformancePane
-              performance={performanceB}
-              side="B"
-              isDefendingChampion={
-                !!song?.currentChampionPerformanceId &&
-                song.currentChampionPerformanceId === performanceB.id
-              }
-            />
+            <PerformancePane performance={performanceB} side="B" />
           ) : perfErrorB ? (
             <PerformancePaneUnavailable side="B" message={perfErrorB} />
           ) : (
@@ -351,9 +336,13 @@ export default function BattlePage() {
         </div>
 
         {/* Vote panel — needs both performances loaded. When either
-            side failed to load (e.g. soft-deleted media) we replace the
-            indefinite "loading" state with a clear explanation so the
-            page doesn't appear stuck. */}
+            side failed to load (e.g. admin soft-deleted the video) we
+            replace the indefinite "loading" state with an explicit
+            explanation so the page doesn't appear stuck AND the affected
+            performer / audience know why voting stopped. Copy tuned to
+            match Vincent's spec — clear, plain, tells the viewer to
+            contact the admin for more info rather than implying an
+            automatic notification. */}
         {performanceA && performanceB ? (
           <BattleVotePanel
             battle={battle}
@@ -364,15 +353,16 @@ export default function BattlePage() {
         ) : perfError ? (
           <div className="bg-stage-900 border border-red-900/40 rounded-2xl p-8 text-center">
             <p className="font-display text-xl font-bold text-white mb-2">
-              Voting is paused for this battle.
+              Voting for this battle has been closed.
             </p>
-            <p className="text-sm text-haze">
-              One or both performance videos are no longer available. An admin
-              has been notified — check back later or browse other live battles.
+            <p className="text-sm text-haze max-w-lg mx-auto leading-relaxed">
+              {perfErrorA && perfErrorB
+                ? 'Both performances have been removed. Please contact the administrator for more information.'
+                : 'One of the performances has been removed, so this battle can no longer accept votes. Please contact the administrator for more information.'}
             </p>
           </div>
         ) : (
-          <div className="bg-stage-900 border border-stage-700 rounded-2xl p-8">
+          <div className="bg-stage-900 border border-stage-600 rounded-2xl p-8">
             <StageLoader message="Tuning in to both performers…" />
           </div>
         )}
@@ -381,13 +371,22 @@ export default function BattlePage() {
             Only shown when:
               - the song has a current champion (someone to dethrone)
               - the viewer isn't that champion (no self-challenge)
-              - the viewer isn't already a participant in this battle */}
+              - the viewer isn't already a participant in this battle
+
+            Bug — the previous gate also required BOTH `performanceA` and
+            `performanceB` to have loaded, which effectively hid the CTA
+            whenever either side was soft-deleted (the fetch throws for
+            deleted videos). That's wrong for the "losing performance
+            deleted" case: the champion is crowned, their performance is
+            intact, and new challengers should absolutely still be able
+            to queue. The uploader-participation checks use optional
+            chaining so a null performance side no longer blocks the
+            render — it just can't identify a participant on that side,
+            which is fine (backend does the real gate at submission). */}
         {song?.currentChampionUserId &&
-          performanceA &&
-          performanceB &&
           user?.id !== song.currentChampionUserId &&
-          user?.id !== performanceA.uploader?.id &&
-          user?.id !== performanceB.uploader?.id && (
+          user?.id !== performanceA?.uploader?.id &&
+          user?.id !== performanceB?.uploader?.id && (
             <ChallengeCta song={song} authed={!!user} />
           )}
 
@@ -512,7 +511,18 @@ function ChallengeCta({ song, authed }: { song: SongDto; authed: boolean }) {
 
   // Authed users go straight to upload; unauthed users go to login with the
   // upload page (challenge mode) as the post-login destination.
-  const uploadHref = `/upload?songId=${encodeURIComponent(song.id)}&challenge=1`;
+  //
+  // `returnTo` threads the originating battle URL through the challenge
+  // flow so the upload page can render a "Back to battle" link. Without
+  // this, the user has to walk back through Home to find the specific
+  // battle they were about to challenge. `typeof window` guard keeps
+  // this working during SSR (returnTo just falls back to root there —
+  // the client render will hydrate with the real URL).
+  const returnTo =
+    typeof window !== 'undefined' ? window.location.pathname : '';
+  const uploadHref = `/upload?songId=${encodeURIComponent(song.id)}&challenge=1${
+    returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : ''
+  }`;
   const href = authed
     ? uploadHref
     : `/login?next=${encodeURIComponent(uploadHref)}`;
@@ -603,23 +613,20 @@ function PerformancePaneUnavailable({
 function PerformancePane({
   performance,
   side,
-  isDefendingChampion,
 }: {
   performance: VideoDto;
   side: 'A' | 'B';
-  isDefendingChampion?: boolean;
 }) {
   const accent = side === 'A' ? 'border-spotlight/30' : 'border-gold/30';
   return (
     <div className={`relative bg-stage-900 border-2 ${accent} rounded-xl overflow-hidden`}>
-      {/* Champion identity: a single, unmissable badge so returning visitors
-          instantly recognize who's defending. Drives prestige. */}
-      {isDefendingChampion && (
-        <span className="absolute top-3 left-3 z-10 inline-flex items-center gap-1 px-2 py-1 text-[10px] uppercase tracking-widest font-bold rounded-full bg-gold text-stage-950 shadow-lg">
-          <span aria-hidden="true">👑</span>
-          Defending Champion
-        </span>
-      )}
+      {/* Champion badges intentionally removed from this pane. The prior
+          "👑 Defending Champion" overlay biased viewers toward the sitting
+          champion on live battles (implies the outcome is already decided)
+          and on completed battles it competed with the actual winner
+          indicator for attention. Championship context still lives on the
+          Home page's ChampionSection and the singer's profile — the
+          battle page focuses on THIS battle. */}
       <div className="aspect-video bg-stage-950">
         <video
           key={performance.id}
@@ -664,11 +671,10 @@ function PerformancePane({
               )}
             </span>
             @{performance.uploader.username}
-            {performance.uploader.championTitle && (
-              <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-widest bg-gold/15 text-gold rounded">
-                {performance.uploader.championTitle}
-              </span>
-            )}
+            {/* championTitle pill removed on the battle page — it implies
+                the participant has already won when the outcome of THIS
+                battle is what the page is about. Still shown on singer
+                profile pages and on video detail pages. */}
             {performance.uploader.currentStreak >= 2 && (
               <span
                 className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-widest bg-gold/15 text-gold rounded"

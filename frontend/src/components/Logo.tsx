@@ -15,7 +15,12 @@ interface Props {
 const SIZE_CLASS: Record<NonNullable<Props['size']>, string> = {
   sm: 'h-10 w-32',
   md: 'h-14 w-44',
-  lg: 'h-20 w-64',
+  // `lg` is used only on the home page. On mobile it drops to `md`
+  // dimensions so the header row (logo + bell + upload + avatar) fits
+  // an iPhone-portrait viewport — otherwise the avatar gets clipped
+  // and the whole layout overflows horizontally. Full `lg` from the
+  // `sm` breakpoint up.
+  lg: 'h-14 w-44 sm:h-20 sm:w-64',
 };
 
 export default function Logo({ size = 'md' }: Props) {

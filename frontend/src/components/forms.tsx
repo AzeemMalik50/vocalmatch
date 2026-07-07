@@ -78,12 +78,19 @@ export function Select({
   placeholder,
 }: SelectProps) {
   return (
-    <div className="relative">
+    <div className="relative">can w
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`${baseInput} appearance-none pr-10 cursor-pointer`}
+        className={`${baseInput} appearance-none cursor-pointer ${
+          value ? 'pr-16' : 'pr-10'
+        }`}
       >
+        {/* Placeholder stays `disabled` — it's a "no choice" hint, not
+            a real option. Clearing happens via the dedicated × button
+            below, which is a clearer affordance than making the
+            placeholder itself selectable (users kept picking it by
+            accident from list scrollers on mobile). */}
         {placeholder && (
           <option value="" disabled>
             {placeholder}
@@ -95,6 +102,22 @@ export function Select({
           </option>
         ))}
       </select>
+      {/* Clear button — only rendered when a real value is set so it
+          doesn't clutter the empty state. Sits to the left of the
+          chevron and toggles the field back to the empty-string
+          sentinel that every caller treats as "no selection".
+          `pointer-events-auto` overrides any parent listeners that
+          might swallow the click. */}
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange('')}
+          aria-label="Clear selection"
+          className="absolute right-9 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full text-haze/70 hover:text-white hover:bg-stage-800 transition-colors text-sm leading-none pointer-events-auto"
+        >
+          ×
+        </button>
+      )}
       <svg
         className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-haze/60"
         width="16"
@@ -191,7 +214,14 @@ export function Button({
     variant === 'primary'
       ? 'bg-spotlight text-white hover:bg-spotlight-dim shadow-lg shadow-spotlight/30 disabled:shadow-none'
       : variant === 'secondary'
-      ? 'bg-stage-800 border border-stage-700 hover:border-stage-600'
+      ? // Bug — the previous `border-stage-700` on a `bg-stage-800` background
+        // gave a delta of ~25 points against the near-black card background
+        // (matches the low-visibility pattern fixed on card borders app-wide).
+        // Combined with no explicit `text-*` (which inherited the body's muted
+        // grey), the button read as disabled. Bump the border to `stage-600`
+        // and pin text to white so the label pops; hover strengthens with the
+        // spotlight accent.
+        'bg-stage-800 border border-stage-600 text-white hover:bg-stage-700 hover:border-spotlight/60'
       : 'text-haze';
 
   return (

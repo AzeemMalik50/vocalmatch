@@ -161,7 +161,7 @@ export default function AdminPerformancesPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-stage-900/60 border border-stage-700/60 rounded-xl p-3 mb-5 flex flex-wrap items-center gap-3">
+      <div className="bg-stage-900/60 border border-stage-600 rounded-xl p-3 mb-5 flex flex-wrap items-center gap-3">
         <input
           type="search"
           value={search}
@@ -316,7 +316,7 @@ function PerformanceRow({
       className={`bg-stage-900 border rounded-xl p-4 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-start sm:justify-between gap-3 ${
         perf.deletedAt
           ? 'border-red-500/30 opacity-60'
-          : 'border-stage-700/60'
+          : 'border-stage-600'
       }`}
     >
       <div className="min-w-0 w-full sm:w-auto sm:flex-1">
@@ -331,7 +331,14 @@ function PerformanceRow({
               Deleted
             </span>
           )}
-          {perf.activeBattleId && (
+          {/* "In active battle" is a lock-status hint for admins deciding
+              whether they can safely reassign the song. It's meaningless
+              when the performance is already deleted — a deleted row can't
+              be reassigned regardless of what battle it used to be in,
+              and showing both labels reads as a contradiction ("deleted
+              AND live"). Suppress it on soft-deleted rows so only the
+              terminal state renders. */}
+          {perf.activeBattleId && !perf.deletedAt && (
             <Link
               href={`/admin/battles/${perf.activeBattleId}`}
               title="Locked while a live or tie-pending battle uses this performance"
@@ -555,8 +562,15 @@ function SongPicker({
   // on narrow widths, pushing the Cancel button off the right edge.
   // `flex-wrap` + `min-w-0` on the select lets the row reflow onto a
   // second line so all three controls stay fully visible.
+  //
+  // Follow-up — the outer container needed an explicit width too. The
+  // parent row-action column has no width constraint, so a `flex-1`
+  // select stretched unbounded and shoved Save + Cancel past the
+  // `<li>`'s right border. `w-full sm:w-96 max-w-full` caps the
+  // picker at 384px on desktop while filling the full row width on
+  // mobile (where the actions column already sits on its own line).
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2 w-full sm:w-96 max-w-full">
       <select
         value={val}
         onChange={(e) => setVal(e.target.value)}
