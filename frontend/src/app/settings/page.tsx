@@ -570,6 +570,10 @@ function SignOutEverywhereSection({
 }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+  // Timestamp of the last successful sign-out — drives a persistent
+  // "just signed out" state on the button so the click has an
+  // unmissable visual acknowledgement. Cleared on unmount / reload.
+  const [lastCompletedAt, setLastCompletedAt] = useState<Date | null>(null);
   const confirm = useConfirm();
 
   const click = async () => {
@@ -586,7 +590,11 @@ function SignOutEverywhereSection({
     try {
       const { token } = await api.signOutEverywhere();
       onTokenRotated(token);
-      setMsg({ kind: 'ok', text: 'Other sessions signed out.' });
+      setLastCompletedAt(new Date());
+      setMsg({
+        kind: 'ok',
+        text: 'Other sessions signed out. Any device that was signed in with this account will need to sign in again.',
+      });
     } catch (e: any) {
       setMsg({ kind: 'err', text: e.message });
     } finally {
@@ -594,16 +602,89 @@ function SignOutEverywhereSection({
     }
   };
 
+  const justSignedOut = !!lastCompletedAt;
+
+  // Styled to match the Delete account section (red-boxed danger
+  // zone). Both are session-affecting actions the user should treat as
+  // deliberate; using the same visual palette groups them consistently
+  // and makes the confirmation feedback stand out against the same
+  // red-tinted backdrop.
   return (
-    <Section
-      title="Sign out everywhere else"
-      subtitle="Useful if you've signed in on a shared computer or lost a device."
-    >
-      <FormResult msg={msg} />
-      <Button type="button" variant="secondary" loading={busy} onClick={click}>
-        Sign out other sessions
-      </Button>
-    </Section>
+    <section className="bg-red-950/40 border border-red-700/60 rounded-2xl p-6 md:p-8">
+      <div className="mb-5">
+        <h2 className="font-display text-xl font-bold text-red-100">
+          Sign out everywhere else
+        </h2>
+        <p className="text-sm text-red-100/85 mt-1 leading-relaxed">
+          Useful if you&rsquo;ve signed in on a shared computer or lost a
+          device. You&rsquo;ll stay signed in here; every other browser and
+          device using this account will be logged out.
+        </p>
+      </div>
+
+      {/* Prominent success banner once a sign-out completes. Persists
+          for the rest of the session so the acknowledgement is
+          unmissable, and includes the timestamp so the user can
+          confirm the action ran. */}
+      {justSignedOut && msg?.kind === 'ok' && (
+        <div className="mb-5 flex items-start gap-3 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            className="w-5 h-5 text-emerald-300 shrink-0 mt-0.5"
+          >
+            <path d="M20 6L9 17l-5-5" />
+          </svg>
+          <div className="flex-1">
+            <p className="font-bold text-emerald-50">
+              Other sessions signed out
+            </p>
+            <p className="mt-0.5 text-emerald-100/85 leading-snug">
+              {msg.text}
+            </p>
+            <p className="mt-1 text-xs text-emerald-100/60 tabular-nums">
+              Completed at {lastCompletedAt!.toLocaleString()}
+            </p>
+          </div>
+        </div>
+      )}
+      {msg?.kind === 'err' && (
+        <p className="mb-5 text-sm text-red-100 bg-red-900/40 border border-red-800/60 rounded-md px-4 py-3">
+          {msg.text}
+        </p>
+      )}
+
+      <button
+        type="button"
+        onClick={click}
+        disabled={busy || justSignedOut}
+        className="px-5 py-3 text-sm font-bold border border-red-500/70 text-red-100 hover:bg-red-900/40 rounded-md transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {busy
+          ? 'Signing out…'
+          : justSignedOut
+            ? '✓ Signed out — other sessions are locked out'
+            : 'Sign out other sessions'}
+      </button>
+      {justSignedOut && (
+        <button
+          type="button"
+          onClick={() => {
+            setLastCompletedAt(null);
+            setMsg(null);
+          }}
+          className="mt-3 block text-xs font-bold text-red-200/80 hover:text-red-100 transition-colors"
+        >
+          Reset — sign out again if a new device appears
+        </button>
+      )}
+    </section>
   );
 }
 
