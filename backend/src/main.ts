@@ -80,6 +80,7 @@ async function bootstrap() {
       // Allowed in BOTH dev and prod: our own domain / subdomains and
       // this project's named Vercel previews. Wide-open `*.vercel.app`
       // stays dev-only below.
+      //
       if (VOCALMATCH_APEX.test(origin)) return callback(null, true);
       if (PROJECT_VERCEL_PREVIEW.test(origin)) return callback(null, true);
 
