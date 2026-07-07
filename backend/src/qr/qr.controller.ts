@@ -35,11 +35,16 @@ class QrQueryDto {
   @MaxLength(2048)
   url: string;
 
+  // Cap raised from 2000 → 4096 so the admin QR Toolkit's 2048px
+  // preset stops 400-ing (the preview `<img>` renders as broken when
+  // the backend rejects the request). 4096 covers poster / large-print
+  // use cases; a 4096-square PNG at error-correction H is ~800KB which
+  // is well within the existing throttle envelope.
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(64)
-  @Max(2000)
+  @Max(4096)
   size?: number;
 
   @IsOptional()
