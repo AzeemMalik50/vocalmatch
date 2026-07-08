@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import AdminShell from '@/components/AdminShell';
 import { TableRowsSkeleton } from '@/components/Loaders';
 import { api, AdminUserDto } from '@/lib/api';
@@ -33,7 +33,21 @@ export default function AdminUsersPage() {
     return () => clearTimeout(t);
   }, [search]);
 
+  // Race-condition guard — debounce alone doesn't stop out-of-order
+  // responses. If the user types "az", waits, then types "azeem",
+  // a slow "az" fetch could resolve after the "azeem" fetch and
+  // overwrite the correct results with stale matches. Every fetch
+  // captures the request id and only writes back if it's still current.
+  const requestIdRef = useRef(0);
+
   const load = async (term: string) => {
+    const id = ++requestIdRef.current;
+    // Clear immediately so previous-search results don't linger under
+    // the new query term. The empty state is fine — it flips to
+    // results the moment they land.
+    setUsers([]);
+    setHasMore(false);
+    setNextOffset(0);
     setLoading(true);
     try {
       const resp = await api.adminListUsers({
@@ -41,16 +55,20 @@ export default function AdminUsersPage() {
         limit: PAGE_SIZE,
         offset: 0,
       });
+      if (id !== requestIdRef.current) return;
       setUsers(resp.items);
       setHasMore(resp.hasMore);
       setNextOffset(resp.nextOffset ?? 0);
     } finally {
-      setLoading(false);
+      if (id === requestIdRef.current) setLoading(false);
     }
   };
 
   const loadMore = async () => {
     if (loadingMore || !hasMore) return;
+    // Same counter — a new search mid-pagination must not append the
+    // old query's next page onto the new query's list.
+    const id = ++requestIdRef.current;
     setLoadingMore(true);
     try {
       const resp = await api.adminListUsers({
@@ -58,11 +76,12 @@ export default function AdminUsersPage() {
         limit: PAGE_SIZE,
         offset: nextOffset,
       });
+      if (id !== requestIdRef.current) return;
       setUsers((prev) => [...prev, ...resp.items]);
       setHasMore(resp.hasMore);
       setNextOffset(resp.nextOffset ?? nextOffset + PAGE_SIZE);
     } finally {
-      setLoadingMore(false);
+      if (id === requestIdRef.current) setLoadingMore(false);
     }
   };
 

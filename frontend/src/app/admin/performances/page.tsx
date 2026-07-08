@@ -51,6 +51,14 @@ export default function AdminPerformancesPage() {
       .catch(() => setSongs([]));
   }, []);
 
+  // Race-condition guard — three independent filter axes (search,
+  // missingSong, includeDeleted) mean an admin can flip several
+  // toggles in quick succession. Each fetch captures the request id;
+  // stale responses that resolve after a newer filter change are
+  // discarded so the previous filter's rows never flash under the
+  // new filter state.
+  const requestIdRef = useRef(0);
+
   // Bug #32 — "Load more" appeared dead because `load` was memoized
   // with stale `items` and `offset` closures (they weren't in the
   // dependency list). Switched to functional setItems + read the
@@ -58,6 +66,14 @@ export default function AdminPerformancesPage() {
   // truly advances pagination.
   const load = useCallback(
     async (reset: boolean) => {
+      const id = ++requestIdRef.current;
+      if (reset) {
+        // Clear immediately so the previous filter's rows don't flash
+        // under the new filter state. Also resets pagination cursor.
+        setItems([]);
+        setHasMore(false);
+        setOffset(0);
+      }
       setLoading(true);
       try {
         const currentOffset = reset ? 0 : offset;
@@ -68,13 +84,15 @@ export default function AdminPerformancesPage() {
           limit: PAGE_SIZE,
           offset: currentOffset,
         });
+        // Stale-response guard.
+        if (id !== requestIdRef.current) return;
         setItems((prev) =>
           reset ? resp.items : [...prev, ...resp.items],
         );
         setHasMore(resp.hasMore);
         setOffset(resp.nextOffset ?? currentOffset + PAGE_SIZE);
       } finally {
-        setLoading(false);
+        if (id === requestIdRef.current) setLoading(false);
       }
     },
     // `offset` intentionally in deps so "Load more" sees the latest

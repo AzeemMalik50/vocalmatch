@@ -1,7 +1,7 @@
 // frontend/src/app/admin/audit/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import AdminShell from '@/components/AdminShell';
 import { api, AdminAuditLogEntryDto } from '@/lib/api';
 
@@ -23,9 +23,25 @@ export default function AdminAuditLogPage() {
   // Expanded payload rows
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
+  // Race-condition guard — three filter inputs (action / target type
+  // / target ID) can be changed independently. An admin who types
+  // fast could kick off a second Apply before the first completes;
+  // if the older response resolves last it would overwrite the newer
+  // one. Each fetch captures the request id and stale responses are
+  // discarded on landing.
+  const requestIdRef = useRef(0);
+
   const load = async (offset = 0, append = false) => {
+    const id = ++requestIdRef.current;
     if (append) setLoadingMore(true);
-    else setLoading(true);
+    else {
+      // Clear the previous filter's rows immediately so they don't
+      // linger under the new filter Apply. Pagination cursor resets.
+      setItems([]);
+      setHasMore(false);
+      setNextOffset(0);
+      setLoading(true);
+    }
     setError(null);
     try {
       const resp = await api.adminListAuditLog({
@@ -35,14 +51,18 @@ export default function AdminAuditLogPage() {
         targetType: targetTypeFilter || undefined,
         targetId: targetIdFilter || undefined,
       });
+      if (id !== requestIdRef.current) return;
       setItems((prev) => (append ? [...prev, ...resp.items] : resp.items));
       setHasMore(resp.hasMore);
       setNextOffset(resp.nextOffset);
     } catch (e: any) {
+      if (id !== requestIdRef.current) return;
       setError(e?.message ?? 'Failed to load audit log');
     } finally {
-      if (append) setLoadingMore(false);
-      else setLoading(false);
+      if (id === requestIdRef.current) {
+        if (append) setLoadingMore(false);
+        else setLoading(false);
+      }
     }
   };
 

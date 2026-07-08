@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import AdminShell from '@/components/AdminShell';
@@ -67,10 +67,27 @@ export default function AdminChallengesPage() {
       return rest;
     });
 
+  // Race-condition guard for rapid tab switching (Pending ↔ Selected
+  // ↔ Needs decision). Each fetch captures an id; stale responses that
+  // resolve after a newer tab click are discarded so the old tab's
+  // rows can never flash under the new tab's label.
+  const requestIdRef = useRef(0);
+
   const load = useCallback(
     async (reset: boolean) => {
-      if (reset) setLoading(true);
-      else setLoadingMore(true);
+      const id = ++requestIdRef.current;
+      if (reset) {
+        // Clear immediately — the pill highlight moves the moment the
+        // admin clicks a new tab, and the list has to match. Any
+        // in-flight request for the previous tab is invalidated by
+        // the counter bump and its response will be discarded.
+        setItems([]);
+        setHasMore(false);
+        setNextOffset(0);
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
       try {
         // Read nextOffset off the closure — useCallback depends on it
         // below so this value is always current.
@@ -80,6 +97,9 @@ export default function AdminChallengesPage() {
           limit: PAGE_SIZE,
           offset: nextOff,
         });
+        // Stale-response guard: a rapid tab switch will have bumped
+        // the counter. Discard.
+        if (id !== requestIdRef.current) return;
         // Functional updater so we don't capture `items` in the closure.
         // Without this, subsequent Load More clicks would spread an empty
         // (stale) items array, replacing the on-screen rows with just the
@@ -88,8 +108,13 @@ export default function AdminChallengesPage() {
         setHasMore(resp.hasMore);
         setNextOffset(resp.nextOffset ?? nextOff + PAGE_SIZE);
       } finally {
-        if (reset) setLoading(false);
-        else setLoadingMore(false);
+        // Only the latest request may clear its own loading flag; a
+        // stale one that resolved late must not turn off a spinner
+        // that belongs to a newer, still-in-flight request.
+        if (id === requestIdRef.current) {
+          if (reset) setLoading(false);
+          else setLoadingMore(false);
+        }
       }
     },
     // nextOffset MUST be in the deps so paged "Load more" advances past

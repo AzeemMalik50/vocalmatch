@@ -75,6 +75,14 @@ function AdminBattlesPageInner() {
   const [working, setWorking] = useState<string | null>(null);
   const confirm = useConfirm();
   const focusedRef = useRef<HTMLLIElement | null>(null);
+  // Monotonically-increasing request id. Every list fetch captures the
+  // id at dispatch and only writes its response back into state when
+  // its id still matches. Guards against the tab-flicker bug — an
+  // admin rapidly switching Selected ↔ Needs Decision could see the
+  // previous tab's rows flash under the new tab if a slower earlier
+  // response resolved after a newer one. With this guard, stale
+  // responses are silently discarded.
+  const requestIdRef = useRef(0);
 
   // Resolve the focused battle's actual status the first time we mount
   // with `?focus=`, so the filter lands on the right tab regardless of
@@ -106,8 +114,35 @@ function AdminBattlesPageInner() {
     }
   }, [focusId, loading, items]);
 
-  const load = async (status: FilterStatus, source: SourceFilter) => {
-    setLoading(true);
+  /**
+   * Load the current page of battles.
+   *
+   * `reset` distinguishes the *why* of the reload:
+   *   true  — filter/tab changed → clear old items immediately + show
+   *           the skeleton so the admin never sees the previous tab's
+   *           rows under a new tab label.
+   *   false — silent background refetch (lobby SSE, post-action) →
+   *           keep the current list on screen and swap when the
+   *           response lands, so an admin who's mid-scroll doesn't get
+   *           yanked back to a full-page skeleton on every real-time
+   *           event.
+   */
+  const load = async (
+    status: FilterStatus,
+    source: SourceFilter,
+    reset: boolean = true,
+  ) => {
+    const id = ++requestIdRef.current;
+    if (reset) {
+      // Clear immediately — the pill highlight moves the moment the
+      // admin clicks a new tab, and the list below has to match. Any
+      // in-flight response for the OLD tab is invalidated by the
+      // request-id bump above and will be discarded when it lands.
+      setItems([]);
+      setHasMore(false);
+      setNextOffset(0);
+      setLoading(true);
+    }
     try {
       const resp = await api.listBattles({
         status: status === 'all' ? undefined : status,
@@ -115,16 +150,25 @@ function AdminBattlesPageInner() {
         limit: PAGE_SIZE,
         offset: 0,
       });
+      // Stale response guard — a rapid tab switch (or a lobby event
+      // that fired mid-fetch) will have bumped the counter. Ignore.
+      if (id !== requestIdRef.current) return;
       setItems(resp.items);
       setHasMore(resp.hasMore);
       setNextOffset(resp.nextOffset ?? 0);
     } finally {
-      setLoading(false);
+      // Only the latest request may flip the loading spinner off; a
+      // stale one that resolved late must not clear a spinner that
+      // belongs to a newer, still-in-flight request.
+      if (id === requestIdRef.current) setLoading(false);
     }
   };
 
   const loadMore = async () => {
     if (loadingMore || !hasMore) return;
+    // Same request-id counter — a tab switch mid-pagination must not
+    // append the old tab's next page onto the new tab's list.
+    const id = ++requestIdRef.current;
     setLoadingMore(true);
     try {
       const resp = await api.listBattles({
@@ -133,23 +177,28 @@ function AdminBattlesPageInner() {
         limit: PAGE_SIZE,
         offset: nextOffset,
       });
+      if (id !== requestIdRef.current) return;
       setItems((prev) => [...prev, ...resp.items]);
       setHasMore(resp.hasMore);
       setNextOffset(resp.nextOffset ?? nextOffset + PAGE_SIZE);
     } finally {
-      setLoadingMore(false);
+      if (id === requestIdRef.current) setLoadingMore(false);
     }
   };
 
   useEffect(() => {
-    load(filter, sourceFilter);
+    // Filter/tab change: reset = true so old rows clear instantly.
+    void load(filter, sourceFilter, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter, sourceFilter]);
 
   // Real-time refresh — any battle lifecycle (create / cancel / close /
-  // tie) re-fetches the current filter view so the list never goes stale.
+  // tie) re-fetches the current filter view so the list never goes
+  // stale. `reset = false` so the admin's current view isn't yanked
+  // into a full-page skeleton on every SSE tick — the new data slides
+  // in when it arrives.
   useLobby(() => {
-    void load(filter, sourceFilter);
+    void load(filter, sourceFilter, false);
   });
 
   const handleClose = async (id: string) => {
@@ -162,7 +211,9 @@ function AdminBattlesPageInner() {
     setWorking(id);
     try {
       await api.closeBattle(id);
-      await load(filter, sourceFilter);
+      // Silent refetch — the admin just clicked a button, no need to
+      // flash the skeleton on top of that already-obvious feedback.
+      await load(filter, sourceFilter, false);
     } finally {
       setWorking(null);
     }
@@ -181,7 +232,7 @@ function AdminBattlesPageInner() {
     setWorking(id);
     try {
       await api.cancelBattle(id);
-      await load(filter, sourceFilter);
+      await load(filter, sourceFilter, false);
     } finally {
       setWorking(null);
     }
@@ -270,7 +321,7 @@ function AdminBattlesPageInner() {
                     busy={working === b.id}
                     onClose={() => handleClose(b.id)}
                     onCancel={() => handleCancel(b.id)}
-                    onResolved={() => load(filter, sourceFilter)}
+                    onResolved={() => load(filter, sourceFilter, false)}
                   />
                 </li>
               );
