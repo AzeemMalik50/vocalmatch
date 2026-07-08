@@ -560,34 +560,24 @@ function SongPicker({
 
   // Bug #39 — the previous `flex` row overflowed the parent container
   // on narrow widths, pushing the Cancel button off the right edge.
-  // `flex-wrap` + `min-w-0` on the select lets the row reflow onto a
+  // `flex-wrap` + `min-w-0` on the trigger let the row reflow onto a
   // second line so all three controls stay fully visible.
   //
   // Follow-up — the outer container needed an explicit width too. The
-  // parent row-action column has no width constraint, so a `flex-1`
-  // select stretched unbounded and shoved Save + Cancel past the
-  // `<li>`'s right border. `w-full sm:w-96 max-w-full` caps the
-  // picker at 384px on desktop while filling the full row width on
-  // mobile (where the actions column already sits on its own line).
+  // parent row-action column has no width constraint, so an unbounded
+  // trigger would shove Save + Cancel past the `<li>`'s right border.
+  // Caps the picker at `sm:w-96` on desktop while filling the full row
+  // width on mobile (where the actions column already sits on its own
+  // line). The dropdown popup itself is decoupled from this width so
+  // long song titles can render fully in the list — see SongCombobox.
   return (
     <div className="flex flex-wrap items-center gap-2 w-full sm:w-96 max-w-full">
-      <select
+      <SongCombobox
         value={val}
-        onChange={(e) => setVal(e.target.value)}
-        className="min-w-0 flex-1 max-w-full px-3 py-1.5 text-xs bg-stage-900 border border-stage-700 rounded-md focus:outline-none focus:border-spotlight"
-      >
-        <option value="">(clear song link)</option>
-        { showRetiredCurrent && currentSong && (
-          <option value={currentSong.id} disabled>
-            {currentSong.title} — {currentSong.artist} (retired)
-          </option>
-        )}
-        {activeSongs.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.title} — {s.artist}
-          </option>
-        ))}
-      </select>
+        onChange={setVal}
+        activeSongs={activeSongs}
+        showRetiredCurrent={showRetiredCurrent ? currentSong : null}
+      />
       <button
         type="button"
         onClick={() => onPick(val || null)}
@@ -602,6 +592,220 @@ function SongPicker({
       >
         Cancel
       </button>
+    </div>
+  );
+}
+
+/**
+ * Searchable song picker for the reassign row. Replaces the native
+ * `<select>` because:
+ *   1. The native dropdown was rendered at the trigger's width, so
+ *      long song titles were truncated in the popup. QA data with a
+ *      pathological "Zubin Garg Zubin Garg…" style repeated title
+ *      exposed this loudly.
+ *   2. There was no way to type-to-search across 25+ songs — admins
+ *      had to scroll and read every option.
+ *
+ * This combobox: (a) shows a filter input inside the popup, (b) opens
+ * *wider* than the trigger (`min-w-[24rem]`) so long titles fit,
+ * (c) wraps titles instead of truncating, and (d) supports keyboard
+ * nav (arrows, enter, escape).
+ */
+function SongCombobox({
+  value,
+  onChange,
+  activeSongs,
+  showRetiredCurrent,
+}: {
+  value: string;
+  onChange: (id: string) => void;
+  activeSongs: SongDto[];
+  showRetiredCurrent: SongDto | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [activeIdx, setActiveIdx] = useState(0);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const selected =
+    activeSongs.find((s) => s.id === value) ??
+    (showRetiredCurrent && showRetiredCurrent.id === value ? showRetiredCurrent : null);
+
+  // Filtered list. Includes the "(clear song link)" sentinel at the top
+  // and any retired current selection as a disabled row. Type-ahead
+  // filters by title OR artist so admins can find "Selena Gomez" fast.
+  const q = query.trim().toLowerCase();
+  const matches = q
+    ? activeSongs.filter(
+        (s) =>
+          s.title.toLowerCase().includes(q) ||
+          s.artist.toLowerCase().includes(q),
+      )
+    : activeSongs;
+
+  // Close on outside click / Escape.
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  // Reset the highlighted row every time the filter changes so the
+  // first visible match is always the enter-key default.
+  useEffect(() => {
+    setActiveIdx(0);
+  }, [q]);
+
+  // Focus the filter input as soon as the popup opens.
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
+
+  const pick = (id: string) => {
+    onChange(id);
+    setOpen(false);
+    setQuery('');
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // +1 accounts for the "(clear song link)" row at index 0.
+    const total = matches.length + 1;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIdx((i) => (i + 1) % total);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIdx((i) => (i - 1 + total) % total);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (activeIdx === 0) pick('');
+      else pick(matches[activeIdx - 1].id);
+    }
+  };
+
+  return (
+    <div ref={containerRef} className="relative min-w-0 flex-1 max-w-full">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full text-left px-3 py-1.5 text-xs bg-stage-900 border border-stage-700 rounded-md focus:outline-none focus:border-spotlight flex items-center justify-between gap-2"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span className="truncate">
+          {selected
+            ? `${selected.title} — ${selected.artist}${
+                selected.status === 'retired' ? ' (retired)' : ''
+              }`
+            : '(clear song link)'}
+        </span>
+        <svg
+          width="10"
+          height="10"
+          viewBox="0 0 10 10"
+          fill="none"
+          aria-hidden="true"
+          className="shrink-0 text-haze"
+        >
+          <path
+            d="M2 3.5l3 3 3-3"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          className="absolute z-30 mt-1 left-0 w-full min-w-[24rem] max-w-[36rem] bg-stage-900 border border-stage-600 rounded-md shadow-xl overflow-hidden"
+          role="listbox"
+        >
+          <div className="p-2 border-b border-stage-700">
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={onKeyDown}
+              placeholder="Search title or artist…"
+              className="w-full px-2 py-1.5 text-xs bg-stage-950 border border-stage-700 rounded focus:outline-none focus:border-spotlight"
+            />
+          </div>
+          <ul className="max-h-64 overflow-y-auto py-1 text-xs">
+            {/* Clear-link sentinel — always available. */}
+            <li>
+              <button
+                type="button"
+                onClick={() => pick('')}
+                onMouseEnter={() => setActiveIdx(0)}
+                className={`w-full text-left px-3 py-1.5 italic text-haze hover:bg-stage-800 ${
+                  activeIdx === 0 ? 'bg-stage-800' : ''
+                }`}
+              >
+                (clear song link)
+              </button>
+            </li>
+
+            {/* Retired current selection — visible so admins know why
+                their old choice can't be reused, but not selectable. */}
+            {showRetiredCurrent && (
+              <li>
+                <div
+                  className="w-full px-3 py-1.5 text-haze/40 cursor-not-allowed break-words"
+                  aria-disabled="true"
+                >
+                  {showRetiredCurrent.title} — {showRetiredCurrent.artist}{' '}
+                  <span className="text-[10px] uppercase tracking-widest">
+                    (retired)
+                  </span>
+                </div>
+              </li>
+            )}
+
+            {matches.length === 0 ? (
+              <li className="px-3 py-2 text-haze/60">No songs match.</li>
+            ) : (
+              matches.map((s, i) => {
+                const idx = i + 1;
+                const isHighlighted = activeIdx === idx;
+                const isSelected = s.id === value;
+                return (
+                  <li key={s.id}>
+                    <button
+                      type="button"
+                      onClick={() => pick(s.id)}
+                      onMouseEnter={() => setActiveIdx(idx)}
+                      className={`w-full text-left px-3 py-1.5 break-words hover:bg-stage-800 ${
+                        isHighlighted ? 'bg-stage-800' : ''
+                      } ${isSelected ? 'text-spotlight font-semibold' : ''}`}
+                      role="option"
+                      aria-selected={isSelected}
+                    >
+                      <span className="block">{s.title}</span>
+                      <span className="block text-[10px] text-haze/70 uppercase tracking-wider">
+                        {s.artist}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
