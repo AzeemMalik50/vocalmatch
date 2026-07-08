@@ -356,6 +356,20 @@ function BattleRow({
               <>Awaiting your decision</>
             )}
           </p>
+          {/* Engagement stats — admin-only. Total votes + Side A vs Side B
+              so admins can scan-spot high-engagement battles without
+              opening each row. Rendered only when the backend populated
+              the fields (admin-authenticated) and there is at least one
+              vote to talk about; a fresh 0–0 live battle stays clean. */}
+          {battle.totalVotes !== null &&
+            battle.voteCountA !== null &&
+            battle.voteCountB !== null && (
+              <VoteStats
+                total={battle.totalVotes}
+                a={battle.voteCountA}
+                b={battle.voteCountB}
+              />
+            )}
         </div>
 
         {/* Action buttons re-enable pointer events and sit above the link. */}
@@ -375,6 +389,53 @@ function BattleRow({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * At-a-glance engagement row for the admin battle card. Shows total
+ * votes plus a Side A / Side B split with a slim proportional bar so
+ * the admin can visually gauge which battles are tight vs. lopsided
+ * without opening each one.
+ */
+function VoteStats({ total, a, b }: { total: number; a: number; b: number }) {
+  // Zero-vote battles skip the split bar — a 0/0 divisor would render
+  // a solid Side-B bar and lie about the state. Show the counts only.
+  const percentA = total > 0 ? Math.round((a / total) * 100) : 0;
+  const percentB = total > 0 ? 100 - percentA : 0;
+  const leading =
+    a > b ? 'A' : b > a ? 'B' : total > 0 ? 'tie' : 'none';
+  return (
+    <div className="mt-2 flex flex-col gap-1 max-w-xs">
+      <div className="flex items-center gap-3 text-xs tabular-nums">
+        <span className="font-bold text-white">
+          {total.toLocaleString()} {total === 1 ? 'vote' : 'votes'}
+        </span>
+        <span className="text-haze">·</span>
+        <span
+          className={
+            leading === 'A' ? 'font-bold text-spotlight' : 'text-haze'
+          }
+        >
+          A {a.toLocaleString()}
+        </span>
+        <span className="text-haze/50">vs</span>
+        <span
+          className={leading === 'B' ? 'font-bold text-gold' : 'text-haze'}
+        >
+          B {b.toLocaleString()}
+        </span>
+      </div>
+      {total > 0 && (
+        <div
+          className="flex h-1 w-full overflow-hidden rounded-full bg-stage-800"
+          aria-hidden="true"
+        >
+          <div className="bg-spotlight" style={{ width: `${percentA}%` }} />
+          <div className="bg-gold" style={{ width: `${percentB}%` }} />
+        </div>
+      )}
     </div>
   );
 }

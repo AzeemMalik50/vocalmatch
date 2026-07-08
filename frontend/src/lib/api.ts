@@ -531,7 +531,11 @@ export interface BattleDto {
   closedAt: string | null;
 }
 
-/** List items intentionally hide standings — only the detail endpoint reveals them. */
+/** List items intentionally hide standings — only the detail endpoint reveals them.
+ *  Admin exception: when the caller is an admin, the backend populates
+ *  voteCountA / voteCountB / totalVotes on each summary so the admin
+ *  battles list can render engagement stats on the card. Non-admin
+ *  callers always receive `null` for these three fields. */
 export interface BattleSummaryDto {
   id: string;
   songId: string;
@@ -551,6 +555,12 @@ export interface BattleSummaryDto {
    * admin battles list.
    */
   fromChallenge: boolean;
+  /** Admin-only. `null` for non-admin callers. */
+  voteCountA: number | null;
+  /** Admin-only. `null` for non-admin callers. */
+  voteCountB: number | null;
+  /** Admin-only. `null` for non-admin callers. */
+  totalVotes: number | null;
 }
 
 export interface AdminUserDto {
