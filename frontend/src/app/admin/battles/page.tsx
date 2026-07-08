@@ -342,20 +342,38 @@ function BattleRow({
           <p className="font-display font-bold text-lg">
             {battle.title || 'Untitled battle'}
           </p>
-          <p className="text-xs text-haze mt-1 tabular-nums">
+          {/* Timeline row — always show when voting opened (Started),
+              then the status-specific companion line. Lets admins see
+              start + close windows side by side without opening the
+              detail page, matching the timeline metadata available
+              elsewhere in the console. */}
+          <div className="text-xs text-haze mt-1 tabular-nums space-y-0.5">
+            <p>
+              <span className="text-haze/60">Started:</span>{' '}
+              {new Date(battle.votingOpensAt).toLocaleString()}
+            </p>
             {battle.status === 'live' && (
-              <>Closes {new Date(battle.votingClosesAt).toLocaleString()}</>
+              <p>
+                <span className="text-haze/60">Closes:</span>{' '}
+                {new Date(battle.votingClosesAt).toLocaleString()}
+              </p>
             )}
             {battle.status === 'completed' && battle.closedAt && (
-              <>Completed {new Date(battle.closedAt).toLocaleString()}</>
+              <p>
+                <span className="text-haze/60">Completed:</span>{' '}
+                {new Date(battle.closedAt).toLocaleString()}
+              </p>
             )}
             {battle.status === 'cancelled' && battle.closedAt && (
-              <>Cancelled {new Date(battle.closedAt).toLocaleString()}</>
+              <p>
+                <span className="text-haze/60">Cancelled:</span>{' '}
+                {new Date(battle.closedAt).toLocaleString()}
+              </p>
             )}
             {battle.status === 'needs_decision' && (
-              <>Awaiting your decision</>
+              <p>Awaiting your decision</p>
             )}
-          </p>
+          </div>
           {/* Engagement stats — admin-only. Total votes + Side A vs Side B
               so admins can scan-spot high-engagement battles without
               opening each row. Rendered only when the backend populated
