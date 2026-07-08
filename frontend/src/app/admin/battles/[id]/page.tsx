@@ -263,16 +263,20 @@ export default function AdminBattleDetailPage() {
             />
           )}
         </div>
-        <h1 className="font-display font-black text-3xl md:text-4xl mb-2">
+        <h1 className="font-display font-black text-3xl md:text-4xl mb-2 break-words line-clamp-3">
           {/* Bug #56 — fallback must match the list page's so the same
               battle reads the same name in both places. New battles
               always carry a real title (backend auto-generates one
               from the song on create); only legacy null-title rows
-              hit this fallback. */}
+              hit this fallback.
+              break-words + line-clamp-3 so admin-authored titles or
+              auto-generated titles built from a very long song name
+              wrap inside the header column instead of overflowing the
+              action bar to the right. */}
           {battle.title || 'Untitled battle'}
         </h1>
         {song && (
-          <p className="text-haze text-sm">
+          <p className="text-haze text-sm break-words">
             <span className="text-haze/60">Centerstage Song:</span>{' '}
             <span className="font-semibold text-white">{song.title}</span>
             {song.artist && <span className="text-haze/60"> · {song.artist}</span>}
