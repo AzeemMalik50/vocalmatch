@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Nav from '@/components/Nav';
 import QrShareModal from '@/components/QrShareModal';
 import InlineQrCard from '@/components/InlineQrCard';
@@ -34,9 +34,17 @@ import { useReconnectRefetch } from '@/lib/useReconnectRefetch';
  */
 export default function BattlePage() {
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { user } = useAuth();
   const id = params?.id;
+  // Bug — scanning the "Scan to Vote" QR landed the visitor on the
+  // exact same battle page that renders the same QR card, so the
+  // page instructed them to scan again. The QR now embeds `?src=qr`,
+  // and when we detect that param on arrival we suppress the
+  // "Scan to Vote" affordances (inline QR card + Share as QR button)
+  // so the scanned visitor sees the vote UI, not a recursive prompt.
+  const arrivedViaQr = searchParams?.get('src') === 'qr';
 
   const [battle, setBattle] = useState<BattleDto | null>(null);
   const [song, setSong] = useState<SongDto | null>(null);
@@ -54,9 +62,19 @@ export default function BattlePage() {
   // Computed client-side after hydration so the QR encodes the real
   // current host (localhost in dev, vocalmatch.com in prod). null during
   // SSR — InlineQrCard skips rendering until it lands.
+  //
+  // `battleUrl` is the canonical share URL (copied by the Share button
+  // and used for `navigator.share`). `qrTargetUrl` appends `?src=qr`
+  // so when a scanned visitor lands, `arrivedViaQr` fires and the
+  // recursive "Scan to Vote" affordance is hidden.
   const [battleUrl, setBattleUrl] = useState<string | null>(null);
+  const [qrTargetUrl, setQrTargetUrl] = useState<string | null>(null);
   useEffect(() => {
-    if (id) setBattleUrl(`${window.location.origin}/battle/${id}`);
+    if (id) {
+      const clean = `${window.location.origin}/battle/${id}`;
+      setBattleUrl(clean);
+      setQrTargetUrl(`${clean}?src=qr`);
+    }
   }, [id]);
 
   const load = useCallback(async () => {
@@ -171,7 +189,12 @@ export default function BattlePage() {
 
   const handleShare = useCallback(async () => {
     if (typeof window === 'undefined') return;
-    const url = window.location.href;
+    // Prefer the canonical URL over `window.location.href` — the latter
+    // would carry `?src=qr` (or any other tracking param) into a shared
+    // link, which then propagates the flag onward and hides QR
+    // affordances for the next recipient too. `battleUrl` is the clean
+    // canonical form.
+    const url = battleUrl ?? window.location.href;
     const title =
       battle?.title || (song ? `VocalMatch battle: ${song.title}` : 'VocalMatch battle');
     const text = song?.title
@@ -195,7 +218,7 @@ export default function BattlePage() {
     } catch {
       // Last-ditch: select-and-copy is not worth the complexity here.
     }
-  }, [battle, song]);
+  }, [battle, song, battleUrl]);
 
   if (topLevelError) {
     return (
@@ -264,19 +287,28 @@ export default function BattlePage() {
               </svg>
               {shareState === 'copied' ? 'Link copied' : 'Share'}
             </button>
-            <button
-              type="button"
-              onClick={() => setQrOpen(true)}
-              className="inline-flex items-center gap-2 px-3 py-1.5 text-xs uppercase tracking-widest font-bold rounded-full border border-stage-700 bg-stage-900 text-haze hover:text-white hover:border-stage-500 transition-colors"
-            >
-              Share as QR
-            </button>
-            {battleUrl && (
-              <InlineQrCard
-                url={battleUrl}
-                title="Share this battle"
-                label="Scan to vote"
-              />
+            {/* QR affordances are suppressed when the visitor arrived
+                via a QR scan (`?src=qr`). Landing on the vote page and
+                being told to scan it again is confusing — they already
+                scanned. Non-QR visitors keep both affordances so they
+                can share the battle onward. */}
+            {!arrivedViaQr && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setQrOpen(true)}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 text-xs uppercase tracking-widest font-bold rounded-full border border-stage-700 bg-stage-900 text-haze hover:text-white hover:border-stage-500 transition-colors"
+                >
+                  Share as QR
+                </button>
+                {qrTargetUrl && (
+                  <InlineQrCard
+                    url={qrTargetUrl}
+                    title="Share this battle"
+                    label="Scan to vote"
+                  />
+                )}
+              </>
             )}
           </div>
           <h1 className="font-display font-black text-3xl md:text-5xl leading-tight mb-2 break-words line-clamp-3">
@@ -401,11 +433,11 @@ export default function BattlePage() {
         </div>
       </main>
 
-      {battleUrl && (
+      {qrTargetUrl && (
         <QrShareModal
           open={qrOpen}
           onClose={() => setQrOpen(false)}
-          url={battleUrl}
+          url={qrTargetUrl}
           title="Share this battle"
         />
       )}
