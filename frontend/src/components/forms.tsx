@@ -78,19 +78,14 @@ export function Select({
   placeholder,
 }: SelectProps) {
   return (
-    <div className="relative">can w
+    <div className="relative">
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={`${baseInput} appearance-none cursor-pointer ${
-          value ? 'pr-16' : 'pr-10'
+          value ? 'pr-20' : 'pr-10'
         }`}
       >
-        {/* Placeholder stays `disabled` — it's a "no choice" hint, not
-            a real option. Clearing happens via the dedicated × button
-            below, which is a clearer affordance than making the
-            placeholder itself selectable (users kept picking it by
-            accident from list scrollers on mobile). */}
         {placeholder && (
           <option value="" disabled>
             {placeholder}
@@ -102,20 +97,14 @@ export function Select({
           </option>
         ))}
       </select>
-      {/* Clear button — only rendered when a real value is set so it
-          doesn't clutter the empty state. Sits to the left of the
-          chevron and toggles the field back to the empty-string
-          sentinel that every caller treats as "no selection".
-          `pointer-events-auto` overrides any parent listeners that
-          might swallow the click. */}
       {value && (
         <button
           type="button"
           onClick={() => onChange('')}
           aria-label="Clear selection"
-          className="absolute right-9 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full text-haze/70 hover:text-white hover:bg-stage-800 transition-colors text-sm leading-none pointer-events-auto"
+          className="absolute right-9 top-1/2 -translate-y-1/2 text-xs font-semibold uppercase tracking-wider text-haze/70 hover:text-spotlight hover:underline transition-colors pointer-events-auto"
         >
-          ×
+          Clear
         </button>
       )}
       <svg
