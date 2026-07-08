@@ -2021,14 +2021,14 @@ function CrownAtRiskPanelView({
                   against flex-shrinking them out of frame when the row
                   is tight. Gap widened to `gap-3` so the icons don't
                   crowd the wrapped text. */}
-              <div className="flex items-center gap-3 mb-3">
-                <AlertTriangle className={`w-7 h-7 md:w-8 md:h-8 shrink-0 ${tone.text}`} />
+              <div className="flex items-center justify-center md:justify-start gap-2 sm:gap-3 mb-3">
+                <AlertTriangle className={`w-5 h-5 sm:w-7 sm:h-7 md:w-8 md:h-8 shrink-0 ${tone.text}`} />
                 <h2
-                  className={`text-2xl md:text-3xl font-black ${tone.text} tracking-widest uppercase`}
+                  className={`text-lg sm:text-2xl md:text-3xl font-black ${tone.text} tracking-wider sm:tracking-widest uppercase whitespace-nowrap`}
                 >
                   {eyebrow}
                 </h2>
-                <AlertTriangle className={`w-7 h-7 md:w-8 md:h-8 shrink-0 ${tone.text}`} />
+                <AlertTriangle className={`w-5 h-5 sm:w-7 sm:h-7 md:w-8 md:h-8 shrink-0 ${tone.text}`} />
               </div>
               {/* `break-words` breaks pathological unbroken titles
                   (e.g. "AAAAAAA..."), `line-clamp-3` caps ordinary long
