@@ -388,6 +388,26 @@ function UploadForm() {
       return;
     }
 
+    // Live re-check the Centerstage Song status right before we start
+    // the upload. The catalog was fetched on mount and never re-polled,
+    // so a song that an admin retires while the user is filling the
+    // form still shows as selected. Catching it here saves the user a
+    // full multipart upload just to receive a rejection. If this
+    // lookup itself fails (network, 404), fall through — the backend
+    // guard in VideosService.create() is the source of truth and will
+    // still reject the submission.
+    try {
+      const fresh = await api.getSong(songId);
+      if (fresh.status !== 'active') {
+        setErr(
+          `"${fresh.title}" was retired while you were on this page. Please pick another Centerstage Song.`,
+        );
+        return;
+      }
+    } catch {
+      /* fall through to backend guard */
+    }
+
     // All validation passed — now it's safe to flip into the uploading
     // state. From here, the only way back is the real cancel path or a
     // success/error response from the upload itself.

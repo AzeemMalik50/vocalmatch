@@ -6,6 +6,7 @@ import { CloudinaryService } from './cloudinary.service';
 import { Video } from './video.entity';
 import { VideoView } from './video-view.entity';
 import { Battle } from '../battles/battle.entity';
+import { Song } from '../songs/song.entity';
 import { AuthModule } from '../auth/auth.module';
 import { BattlesModule } from '../battles/battles.module';
 import { LegalModule } from '../legal/legal.module';
@@ -13,11 +14,14 @@ import { LegalModule } from '../legal/legal.module';
 @Module({
   // Battle entity is registered locally so VideosService can query it for the
   // "used in battle?" soft-delete check without going through BattlesModule.
+  // Song entity is registered locally too so VideosService can guard against
+  // "user selected a Centerstage Song that was retired mid-form" without a
+  // circular dep on SongsModule.
   // We *also* import BattlesModule (forwardRef'd because BattlesModule depends
   // on the Video entity) so VideosController can call BattlesService to attach
   // battle context to /videos/:id responses.
   imports: [
-    TypeOrmModule.forFeature([Video, VideoView, Battle]),
+    TypeOrmModule.forFeature([Video, VideoView, Battle, Song]),
     AuthModule,
     forwardRef(() => BattlesModule),
     LegalModule,
