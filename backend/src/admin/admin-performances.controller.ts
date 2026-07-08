@@ -87,21 +87,20 @@ export class AdminPerformancesController {
       .skip(offset);
 
     // "Show Deleted" semantics:
-    //   - off (default) → only active rows           (deletedAt IS NULL)
-    //   - on            → active AND deleted rows    (no filter)
+    //   - off (default) → only active rows    (deletedAt IS NULL)
+    //   - on            → only deleted rows   (deletedAt IS NOT NULL)
     //
-    // Bug #45 originally changed this to "deleted-only when checked",
-    // which broke the combination of filters reported here: with
-    // "Missing song only" + "Show deleted" both on, the query became
-    // `deletedAt IS NOT NULL AND songId IS NULL`, which returned no
-    // rows whenever no soft-deleted performance also lacked a song —
-    // so the missing-song results visibly "disappeared" when the
-    // admin added the Show Deleted toggle. Additive semantics match
-    // every other "Show X" checkbox in the app and keep filter
-    // combinations behaving predictably (each filter narrows the
-    // result set independently rather than excluding entire
-    // categories).
-    if (!(includeDeleted === 'true' || includeDeleted === '1')) {
+    // QA re-report: additive semantics ("also include deleted") were
+    // confusing — an admin ticking "Show deleted" expects to see the
+    // deleted list, not deleted mixed on top of every active row.
+    // Reverted to exclusive semantics. When combined with
+    // `missingSong=true`, the AND is honest — the intersection may be
+    // empty and the empty state will tell the admin so. Toggling this
+    // filter off restores the default active-only view.
+    const showDeleted = includeDeleted === 'true' || includeDeleted === '1';
+    if (showDeleted) {
+      qb.andWhere('v.deletedAt IS NOT NULL');
+    } else {
       qb.andWhere('v.deletedAt IS NULL');
     }
     if (missingSong === 'true' || missingSong === '1') {

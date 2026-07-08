@@ -102,7 +102,15 @@ export class BattlesService {
       );
     }
     const closesAt = new Date(dto.votingClosesAt);
-    const opensAt = dto.votingOpensAt ? new Date(dto.votingOpensAt) : new Date();
+    // Track whether we're auto-defaulting `opensAt` to "now" or using an
+    // explicit caller value. When auto-defaulted, we re-sample "now" just
+    // before save and pin `createdAt` to the same instant so the two
+    // never disagree (previously `new Date()` was captured here, then a
+    // few `await`s later TypeORM's `@CreateDateColumn` stamped `createdAt`
+    // ~1s later — producing the "voting opens 1 second BEFORE creation"
+    // bug reported by QA).
+    const opensExplicit = !!dto.votingOpensAt;
+    let opensAt = opensExplicit ? new Date(dto.votingOpensAt!) : new Date();
     if (closesAt <= opensAt) {
       throw new BadRequestException('votingClosesAt must be after votingOpensAt');
     }
@@ -163,6 +171,14 @@ export class BattlesService {
     // for promoted challenges), so going forward `battle.title` is
     // always populated and both list + detail render identically.
     const explicitTitle = dto.title?.trim() || null;
+    // Re-sample "now" for auto-defaulted opens so it reflects the actual
+    // moment of creation (after all validation awaits), and pin
+    // `createdAt` to the same instant so the pair is byte-identical.
+    // When the caller supplied `votingOpensAt` (e.g. a scheduled future
+    // start), leave `createdAt` unset — TypeORM's `@CreateDateColumn`
+    // will stamp it, and a difference between "row created now" and
+    // "voting starts in the future" is legitimate.
+    if (!opensExplicit) opensAt = new Date();
     const battle = this.battles.create({
       songId: dto.songId,
       title: explicitTitle ?? `Battle · ${song.title}`,
@@ -172,6 +188,7 @@ export class BattlesService {
       votingClosesAt: closesAt,
       status: 'live',
       createdByAdminId: adminId,
+      ...(opensExplicit ? {} : { createdAt: opensAt }),
     });
     const saved = await this.battles.save(battle);
 

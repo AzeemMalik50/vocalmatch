@@ -59,13 +59,28 @@ async function bootstrap() {
   const PROJECT_VERCEL_PREVIEW =
     /^https:\/\/vocalmatch(?:-[a-z0-9-]+)?\.vercel\.app$/;
 
+  // The production apex domain plus every subdomain under it. Matches:
+  //   https://vocalmatch.com
+  //   https://www.vocalmatch.com
+  //   https://api-dev.vocalmatch.com
+  //   https://app.vocalmatch.com
+  //   any-multi.level.vocalmatch.com
+  // Anchored ^…$ prevents lookalike bypasses like
+  //   https://vocalmatch.com.evil.com  (extra trailing hostname parts)
+  //   https://evilvocalmatch.com       (missing subdomain separator)
+  // Allowed in BOTH dev and prod because we control this domain.
+  const VOCALMATCH_APEX =
+    /^https:\/\/(?:[a-z0-9-]+\.)*vocalmatch\.com$/;
+
   app.enableCors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) return callback(null, true);
 
-      // Allowed in BOTH dev and prod: only this project's named Vercel
-      // previews. Wide-open `*.vercel.app` stays dev-only below.
+      // Allowed in BOTH dev and prod: our own domain / subdomains and
+      // this project's named Vercel previews. Wide-open `*.vercel.app`
+      // stays dev-only below.
+      if (VOCALMATCH_APEX.test(origin)) return callback(null, true);
       if (PROJECT_VERCEL_PREVIEW.test(origin)) return callback(null, true);
 
       if (!isProd) {

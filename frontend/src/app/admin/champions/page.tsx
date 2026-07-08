@@ -116,7 +116,7 @@ export default function AdminChampionsPage() {
                 {open.map(({ song }) => (
                   <li
                     key={song.id}
-                    className="bg-stage-900 border border-stage-700/60 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3"
+                    className="bg-stage-900 border border-stage-600 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3"
                   >
                     <div className="min-w-0 flex items-center gap-3">
                       <Music

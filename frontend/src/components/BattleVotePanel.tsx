@@ -117,7 +117,7 @@ export default function BattleVotePanel({
   };
 
   return (
-    <div className="bg-stage-900 border border-stage-700 rounded-2xl p-6 md:p-8">
+    <div className="bg-stage-900 border border-stage-600 rounded-2xl p-6 md:p-8">
       {/* Vote buttons (live state) */}
       {isLive && !battle.requesterHasVoted && (
         <>

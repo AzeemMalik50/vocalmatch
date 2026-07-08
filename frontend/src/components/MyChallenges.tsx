@@ -126,7 +126,12 @@ export default function MyChallenges() {
                     {new Date(c.createdAt).toLocaleDateString()}
                   </span>
                 </div>
-                <p className="text-sm">
+                {/* break-words + line-clamp-2 so long song titles wrap
+                    inside the profile card and never bleed past the
+                    row's right edge (which used to happen for
+                    absurdly-long titles or titles containing a very
+                    long word / URL). */}
+                <p className="text-sm break-words line-clamp-2">
                   <span className="text-haze/60">Song:</span>{' '}
                   <span className="font-bold">
                     {songsById.get(c.songId)?.title ?? '—'}

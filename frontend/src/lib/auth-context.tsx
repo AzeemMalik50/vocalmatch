@@ -8,7 +8,7 @@ import {
   ReactNode,
   useCallback,
 } from 'react';
-import { AuthUser, api } from './api';
+import { AuthUser, ApiError, api } from './api';
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -105,9 +105,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
       localStorage.setItem('vm_user', JSON.stringify(merged));
       setUser(merged);
-    } catch {
-      // token invalid → silent logout
-      logout();
+    } catch (err) {
+      // Bug — the catch used to fire logout() on ANY failure. Safari
+      // cancels in-flight fetches when the user presses F5, and the
+      // aborted `/me` promise rejected with a network error. That
+      // wiped vm_token from localStorage before the new page loaded,
+      // logging the user out on refresh. Only actual HTTP 401 means
+      // the token is invalid; a network/CORS/abort error should leave
+      // the cached session alone so the next call can retry.
+      const status = err instanceof ApiError ? err.status : null;
+      if (status === 401 || status === 403) {
+        logout();
+      }
+      // Otherwise: swallow silently. The cached user in state and
+      // localStorage is still authoritative; the next page mount /
+      // successful request will reconcile.
     }
   }, []);
 

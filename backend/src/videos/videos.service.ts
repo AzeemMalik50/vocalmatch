@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
@@ -9,6 +10,7 @@ import { Video, VideoCategory, VideoVisibility } from './video.entity';
 import { VideoView } from './video-view.entity';
 import { CloudinaryService } from './cloudinary.service';
 import { Battle } from '../battles/battle.entity';
+import { Song } from '../songs/song.entity';
 
 export type VideoSort = 'newest' | 'most_viewed' | 'trending';
 
@@ -36,6 +38,7 @@ export class VideosService {
     @InjectRepository(Video) private readonly videos: Repository<Video>,
     @InjectRepository(VideoView) private readonly videoViews: Repository<VideoView>,
     @InjectRepository(Battle) private readonly battles: Repository<Battle>,
+    @InjectRepository(Song) private readonly songs: Repository<Song>,
     private readonly cloudinary: CloudinaryService,
   ) {}
 
@@ -52,6 +55,29 @@ export class VideosService {
     uploadAckTermsVersionId?: string | null;
     uploadAckAt?: Date | null;
   }) {
+    // Race-condition guard — the Upload Performance form fetches the
+    // Centerstage catalog on mount and doesn't re-poll, so a user who
+    // leaves the page open while an admin retires the same song in
+    // another session would otherwise submit a performance tied to a
+    // retired song (invisible catalog entry, unmatched forever). Verify
+    // the song is still `active` BEFORE we push the file to Cloudinary
+    // so a doomed upload never wastes bandwidth or an asset slot.
+    if (params.songId) {
+      const song = await this.songs.findOne({
+        where: { id: params.songId },
+      });
+      if (!song) {
+        throw new NotFoundException(
+          'The selected Centerstage Song no longer exists. Please pick another song.',
+        );
+      }
+      if (song.status !== 'active') {
+        throw new ConflictException(
+          `"${song.title}" was retired while you were on this page. Please pick another Centerstage Song.`,
+        );
+      }
+    }
+
     const upload = await this.cloudinary.uploadVideo(params.fileBuffer);
 
     const video = this.videos.create({

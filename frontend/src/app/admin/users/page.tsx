@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import AdminShell from '@/components/AdminShell';
 import { TableRowsSkeleton } from '@/components/Loaders';
 import { api, AdminUserDto } from '@/lib/api';
@@ -33,7 +33,21 @@ export default function AdminUsersPage() {
     return () => clearTimeout(t);
   }, [search]);
 
+  // Race-condition guard — debounce alone doesn't stop out-of-order
+  // responses. If the user types "az", waits, then types "azeem",
+  // a slow "az" fetch could resolve after the "azeem" fetch and
+  // overwrite the correct results with stale matches. Every fetch
+  // captures the request id and only writes back if it's still current.
+  const requestIdRef = useRef(0);
+
   const load = async (term: string) => {
+    const id = ++requestIdRef.current;
+    // Clear immediately so previous-search results don't linger under
+    // the new query term. The empty state is fine — it flips to
+    // results the moment they land.
+    setUsers([]);
+    setHasMore(false);
+    setNextOffset(0);
     setLoading(true);
     try {
       const resp = await api.adminListUsers({
@@ -41,16 +55,20 @@ export default function AdminUsersPage() {
         limit: PAGE_SIZE,
         offset: 0,
       });
+      if (id !== requestIdRef.current) return;
       setUsers(resp.items);
       setHasMore(resp.hasMore);
       setNextOffset(resp.nextOffset ?? 0);
     } finally {
-      setLoading(false);
+      if (id === requestIdRef.current) setLoading(false);
     }
   };
 
   const loadMore = async () => {
     if (loadingMore || !hasMore) return;
+    // Same counter — a new search mid-pagination must not append the
+    // old query's next page onto the new query's list.
+    const id = ++requestIdRef.current;
     setLoadingMore(true);
     try {
       const resp = await api.adminListUsers({
@@ -58,11 +76,12 @@ export default function AdminUsersPage() {
         limit: PAGE_SIZE,
         offset: nextOffset,
       });
+      if (id !== requestIdRef.current) return;
       setUsers((prev) => [...prev, ...resp.items]);
       setHasMore(resp.hasMore);
       setNextOffset(resp.nextOffset ?? nextOffset + PAGE_SIZE);
     } finally {
-      setLoadingMore(false);
+      if (id === requestIdRef.current) setLoadingMore(false);
     }
   };
 
@@ -123,10 +142,13 @@ export default function AdminUsersPage() {
       {loading ? (
         <TableRowsSkeleton rows={5} />
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto scrollbar-hide">
+          {/* `min-w-[760px]` guards against the six columns (User / Email
+              / Admin / Songwriter / Battles / Wins) collapsing into
+              unreadable cells before the horizontal scroll kicks in. */}
+          <table className="w-full min-w-[760px] text-sm">
             <thead>
-              <tr className="text-left text-xs uppercase tracking-widest text-haze/70 border-b border-stage-700/60">
+              <tr className="text-left text-xs uppercase tracking-widest text-haze/70 border-b border-stage-600">
                 <th className="px-3 py-2">User</th>
                 <th className="px-3 py-2">Email</th>
                 <th className="px-3 py-2 text-center">Admin</th>
@@ -137,7 +159,7 @@ export default function AdminUsersPage() {
             </thead>
             <tbody>
               {users.map((u) => (
-                <tr key={u.id} className="border-b border-stage-700/30 hover:bg-stage-900/40">
+                <tr key={u.id} className="border-b border-stage-600/50 hover:bg-stage-900/40">
                   <td className="px-3 py-3">
                     <div className="flex items-center gap-2">
                       {u.avatarUrl ? (

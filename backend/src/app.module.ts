@@ -18,6 +18,7 @@ import { StatsModule } from './stats/stats.module';
 import { LegalModule } from './legal/legal.module';
 import { SecurityModule } from './security/security.module';
 import { QrModule } from './qr/qr.module';
+import { HealthController } from './health/health.controller';
 
 // ─── Entities (registered with TypeORM at the root) ───────────────
 import { User } from './users/user.entity';
@@ -65,7 +66,15 @@ const entities = [
             // disabled in production so a stray entity edit can't silently
             // ALTER prod columns. From Phase 3 onward, all schema moves happen
             // through hand-written migrations.
-            synchronize: process.env.NODE_ENV !== 'production',
+            //
+            // Escape hatch: `TYPEORM_SYNCHRONIZE=true` forces synchronize on
+            // even when NODE_ENV=production. Used exactly ONCE on QA /
+            // staging to bootstrap the empty database, then turned back
+            // OFF. Never leave this on in real prod — a stray entity edit
+            // would silently reshape the schema.
+            synchronize:
+              process.env.TYPEORM_SYNCHRONIZE === 'true' ||
+              process.env.NODE_ENV !== 'production',
             ssl: { rejectUnauthorized: false },
           }
         : {
@@ -91,6 +100,7 @@ const entities = [
     SecurityModule,
     QrModule,
   ],
+  controllers: [HealthController],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],

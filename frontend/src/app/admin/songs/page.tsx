@@ -27,6 +27,14 @@ export default function AdminSongsPage() {
   const [form, setForm] = useState<SongFormState>(empty);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Per-field validation errors. HTML5 `required` accepts whitespace-only
+  // input (" " passes), so we run our own trim-based check on submit and
+  // render the message inline under the offending field. Errors clear as
+  // the user types so a stale message never lingers on a now-valid field.
+  const [fieldErrors, setFieldErrors] = useState<{
+    title?: string;
+    artist?: string;
+  }>({});
   // Action-result error (toggle Retire / Activate). Separate from the
   // form-level `error` so it can render as a sticky banner at the top
   // of the list — the toggle click happens mid-scroll and a plain
@@ -100,11 +108,22 @@ export default function AdminSongsPage() {
     setMode(null);
     setForm(empty);
     setError(null);
+    setFieldErrors({});
   };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.title.trim() || !form.artist.trim()) return;
+    // Trim-first validation — HTML5 `required` treats a single space as
+    // valid, so we catch whitespace-only submissions here and surface
+    // an inline "X is required" message instead of silently returning.
+    const nextFieldErrors: { title?: string; artist?: string } = {};
+    if (!form.title.trim()) nextFieldErrors.title = 'Title is required.';
+    if (!form.artist.trim()) nextFieldErrors.artist = 'Artist is required.';
+    if (nextFieldErrors.title || nextFieldErrors.artist) {
+      setFieldErrors(nextFieldErrors);
+      return;
+    }
+    setFieldErrors({});
     setSubmitting(true);
     setError(null);
     try {
@@ -233,29 +252,47 @@ export default function AdminSongsPage() {
       {mode && (
         <form
           onSubmit={submit}
-          className="bg-stage-900 border border-stage-700/60 rounded-xl p-5 mb-8 space-y-4 max-w-2xl"
+          className="bg-stage-900 border border-stage-600 rounded-xl p-5 mb-8 space-y-4 max-w-2xl"
         >
           <p className="text-xs uppercase tracking-widest font-bold text-haze">
             {mode === 'new' ? 'New song' : 'Edit song'}
           </p>
-          <Field label="Title" required>
+          <Field label="Title" required error={fieldErrors.title}>
             <input
               type="text"
               required
               maxLength={200}
+              aria-invalid={!!fieldErrors.title}
               value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              className="w-full px-3 py-2.5 bg-stage-950 border border-stage-700 rounded-md focus:outline-none focus:border-spotlight transition-colors"
+              onChange={(e) => {
+                setForm({ ...form, title: e.target.value });
+                if (fieldErrors.title)
+                  setFieldErrors((prev) => ({ ...prev, title: undefined }));
+              }}
+              className={`w-full px-3 py-2.5 bg-stage-950 border rounded-md focus:outline-none transition-colors ${
+                fieldErrors.title
+                  ? 'border-red-500 focus:border-red-400'
+                  : 'border-stage-700 focus:border-spotlight'
+              }`}
             />
           </Field>
-          <Field label="Artist" required>
+          <Field label="Artist" required error={fieldErrors.artist}>
             <input
               type="text"
               required
               maxLength={200}
+              aria-invalid={!!fieldErrors.artist}
               value={form.artist}
-              onChange={(e) => setForm({ ...form, artist: e.target.value })}
-              className="w-full px-3 py-2.5 bg-stage-950 border border-stage-700 rounded-md focus:outline-none focus:border-spotlight transition-colors"
+              onChange={(e) => {
+                setForm({ ...form, artist: e.target.value });
+                if (fieldErrors.artist)
+                  setFieldErrors((prev) => ({ ...prev, artist: undefined }));
+              }}
+              className={`w-full px-3 py-2.5 bg-stage-950 border rounded-md focus:outline-none transition-colors ${
+                fieldErrors.artist
+                  ? 'border-red-500 focus:border-red-400'
+                  : 'border-stage-700 focus:border-spotlight'
+              }`}
             />
           </Field>
           <Field label="Backing track URL (optional)">
@@ -314,11 +351,11 @@ export default function AdminSongsPage() {
           {songs.map((s) => (
             <li
               key={s.id}
-              className="bg-stage-900 border border-stage-700/60 rounded-xl p-4 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-start sm:justify-between gap-3"
+              className="bg-stage-900 border border-stage-600 rounded-xl p-4 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-start sm:justify-between gap-3"
             >
               <div className="min-w-0 w-full sm:w-auto sm:flex-1">
-                <p className="font-display font-bold text-lg">{s.title}</p>
-                <p className="text-sm text-haze">{s.artist}</p>
+                <p className="font-display font-bold text-lg break-words line-clamp-2">{s.title}</p>
+                <p className="text-sm text-haze break-words line-clamp-1">{s.artist}</p>
                 {s.currentChampionStreak > 0 && (
                   <p className="text-xs text-gold mt-1">
                     Defending Champion · streak {s.currentChampionStreak}
@@ -402,10 +439,12 @@ export default function AdminSongsPage() {
 function Field({
   label,
   required,
+  error,
   children,
 }: {
   label: string;
   required?: boolean;
+  error?: string | null;
   children: React.ReactNode;
 }) {
   return (
@@ -414,6 +453,11 @@ function Field({
         {label} {required && <span className="text-spotlight">*</span>}
       </label>
       {children}
+      {error && (
+        <p role="alert" className="mt-1.5 text-xs text-red-400">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

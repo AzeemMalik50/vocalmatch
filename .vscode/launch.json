@@ -1,0 +1,70 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // Runs `nest start --debug --watch` from the backend/ folder and
+      // attaches VS Code's debugger. Breakpoints work directly on the
+      // TypeScript source — no need to attach to a running process.
+      // Watch mode auto-restarts on save.
+      "name": "Debug backend (Nest)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "start:debug"],
+      "cwd": "${workspaceFolder}/backend",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "sourceMaps": true,
+      "protocol": "inspector",
+      // Ignore internal Node + framework code when stepping through so
+      // "Step Into" lands in YOUR code, not deep in nodemailer or Nest.
+      "skipFiles": [
+        "<node_internals>/**",
+        "${workspaceFolder}/backend/node_modules/**"
+      ],
+      "envFile": "${workspaceFolder}/backend/.env"
+    },
+    {
+      // Alternative: attach to a backend that's already running with the
+      // inspector enabled. Useful if you want to launch nest from a
+      // terminal (npm run start:debug) and just attach VS Code on top —
+      // handy when the terminal shows richer logs than the Debug Console.
+      "name": "Attach to running backend",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "restart": true,
+      "cwd": "${workspaceFolder}/backend",
+      "sourceMaps": true,
+      "skipFiles": [
+        "<node_internals>/**",
+        "${workspaceFolder}/backend/node_modules/**"
+      ]
+    },
+    {
+      // Debug a single Jest test file — open the .spec.ts, then run
+      // this config. Runs only that file, breaks on breakpoints in
+      // both the test and the code under test.
+      "name": "Debug current Jest test file",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "jest",
+        "--runInBand",
+        "--no-cache",
+        "--config",
+        "${workspaceFolder}/backend/package.json",
+        "${fileBasenameNoExtension}"
+      ],
+      "cwd": "${workspaceFolder}/backend",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "sourceMaps": true,
+      "skipFiles": [
+        "<node_internals>/**",
+        "${workspaceFolder}/backend/node_modules/**"
+      ]
+    }
+  ]
+}

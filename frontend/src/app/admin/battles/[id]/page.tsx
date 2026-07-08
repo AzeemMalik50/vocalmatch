@@ -263,16 +263,20 @@ export default function AdminBattleDetailPage() {
             />
           )}
         </div>
-        <h1 className="font-display font-black text-3xl md:text-4xl mb-2">
+        <h1 className="font-display font-black text-3xl md:text-4xl mb-2 break-words line-clamp-3">
           {/* Bug #56 — fallback must match the list page's so the same
               battle reads the same name in both places. New battles
               always carry a real title (backend auto-generates one
               from the song on create); only legacy null-title rows
-              hit this fallback. */}
+              hit this fallback.
+              break-words + line-clamp-3 so admin-authored titles or
+              auto-generated titles built from a very long song name
+              wrap inside the header column instead of overflowing the
+              action bar to the right. */}
           {battle.title || 'Untitled battle'}
         </h1>
         {song && (
-          <p className="text-haze text-sm">
+          <p className="text-haze text-sm break-words">
             <span className="text-haze/60">Centerstage Song:</span>{' '}
             <span className="font-semibold text-white">{song.title}</span>
             {song.artist && <span className="text-haze/60"> · {song.artist}</span>}
@@ -282,7 +286,7 @@ export default function AdminBattleDetailPage() {
 
       {/* Action bar */}
       {(battle.status === 'live' || battle.status === 'needs_decision') && (
-        <div className="mb-6 bg-stage-900 border border-stage-700/60 rounded-xl p-4 flex flex-wrap items-center gap-2">
+        <div className="mb-6 bg-stage-900 border border-stage-600 rounded-xl p-4 flex flex-wrap items-center gap-2">
           {battle.status === 'live' && (
             <>
               <button
@@ -406,7 +410,7 @@ export default function AdminBattleDetailPage() {
       </div>
 
       {/* Meta panel */}
-      <div className="bg-stage-900 border border-stage-700/60 rounded-xl p-5 grid sm:grid-cols-2 gap-4 text-sm">
+      <div className="bg-stage-900 border border-stage-600 rounded-xl p-5 grid sm:grid-cols-2 gap-4 text-sm">
         <Meta label="Battle ID" value={<code className="text-xs">{battle.id}</code>} />
         <Meta
           label="Total votes"
@@ -562,11 +566,9 @@ function ParticipantCard({
             className="inline-flex items-center gap-2 text-sm text-haze hover:text-white"
           >
             @{performance.uploader.username}
-            {performance.uploader.championTitle && (
-              <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-widest bg-gold/15 text-gold rounded">
-                {performance.uploader.championTitle}
-              </span>
-            )}
+            {/* championTitle pill removed on the admin battle page — same
+                reasoning as the user-facing battle page: the row is about
+                THIS battle, not the participant's existing crowns. */}
           </Link>
         ) : unavailable && fallbackUser ? (
           // Winner snapshot only — the uploader of a non-winning deleted

@@ -138,7 +138,17 @@ export class SongsService {
    * Clamped to [5, 100]. Risk level bands:
    *   71-100 LOW   |  41-70 MODERATE  |  21-40 HIGH  |  0-20 CRITICAL
    *
-   * Returns null fields when there isn't enough data (no prior battle).
+   * The "tight last win" signal is only evaluated when the last battle
+   * gathered at least MIN_VOTES_FOR_MARGIN_SIGNAL votes total. Below
+   * that, the sample is too small to be meaningful — an admin-resolved
+   * 1-1 tie or a QA-scenario 0-0 completion would otherwise show as a
+   * "0% margin" and trigger the -15 penalty, producing the confusing
+   * "0 pending + 0% margin = 85% survival" state that was reported as
+   * a bug. Real close battles (10+ votes with < 10% margin) still
+   * apply the penalty as intended.
+   *
+   * Returns null fields when there isn't enough data (no prior battle,
+   * or last battle didn't reach the vote threshold).
    */
   async computeRisk(songId: string): Promise<SongRisk> {
     const [pendingChallengers, lastBattle] = await Promise.all([
@@ -154,10 +164,11 @@ export class SongsService {
     let survival = 100;
     survival -= Math.min(pendingChallengers * 10, 60);
 
+    const MIN_VOTES_FOR_MARGIN_SIGNAL = 10;
     let lastMargin: number | null = null;
     if (lastBattle) {
       const total = lastBattle.voteCountA + lastBattle.voteCountB;
-      if (total > 0) {
+      if (total >= MIN_VOTES_FOR_MARGIN_SIGNAL) {
         const diff = Math.abs(lastBattle.voteCountA - lastBattle.voteCountB);
         lastMargin = Math.round((diff / total) * 100);
         if (lastMargin < 10) survival -= 15;

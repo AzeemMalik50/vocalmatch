@@ -92,7 +92,7 @@ export default function ProfilePage() {
 
         {profile && (
           <>
-            <div className="relative bg-gradient-to-br from-stage-800 via-stage-900 to-stage-950 border border-stage-700 rounded-2xl overflow-hidden mb-12">
+            <div className="relative bg-gradient-to-br from-stage-800 via-stage-900 to-stage-950 border border-stage-600 rounded-2xl overflow-hidden mb-12">
               <div
                 className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-spotlight/10 blur-3xl pointer-events-none"
               />

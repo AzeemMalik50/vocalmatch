@@ -195,7 +195,7 @@ function LiveBattleCard({
   return (
     <Link
       href={`/battle/${battle.id}`}
-      className="group block bg-stage-900 border border-stage-700/60 rounded-xl p-5 hover:border-spotlight/50 transition-colors"
+      className="group block bg-stage-900 border border-stage-600 rounded-xl p-5 hover:border-spotlight/50 transition-colors"
     >
       <div className="flex items-center gap-2 mb-3">
         <span className="relative flex h-2 w-2">

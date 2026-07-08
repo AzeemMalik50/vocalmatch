@@ -75,6 +75,14 @@ function AdminBattlesPageInner() {
   const [working, setWorking] = useState<string | null>(null);
   const confirm = useConfirm();
   const focusedRef = useRef<HTMLLIElement | null>(null);
+  // Monotonically-increasing request id. Every list fetch captures the
+  // id at dispatch and only writes its response back into state when
+  // its id still matches. Guards against the tab-flicker bug — an
+  // admin rapidly switching Selected ↔ Needs Decision could see the
+  // previous tab's rows flash under the new tab if a slower earlier
+  // response resolved after a newer one. With this guard, stale
+  // responses are silently discarded.
+  const requestIdRef = useRef(0);
 
   // Resolve the focused battle's actual status the first time we mount
   // with `?focus=`, so the filter lands on the right tab regardless of
@@ -106,8 +114,35 @@ function AdminBattlesPageInner() {
     }
   }, [focusId, loading, items]);
 
-  const load = async (status: FilterStatus, source: SourceFilter) => {
-    setLoading(true);
+  /**
+   * Load the current page of battles.
+   *
+   * `reset` distinguishes the *why* of the reload:
+   *   true  — filter/tab changed → clear old items immediately + show
+   *           the skeleton so the admin never sees the previous tab's
+   *           rows under a new tab label.
+   *   false — silent background refetch (lobby SSE, post-action) →
+   *           keep the current list on screen and swap when the
+   *           response lands, so an admin who's mid-scroll doesn't get
+   *           yanked back to a full-page skeleton on every real-time
+   *           event.
+   */
+  const load = async (
+    status: FilterStatus,
+    source: SourceFilter,
+    reset: boolean = true,
+  ) => {
+    const id = ++requestIdRef.current;
+    if (reset) {
+      // Clear immediately — the pill highlight moves the moment the
+      // admin clicks a new tab, and the list below has to match. Any
+      // in-flight response for the OLD tab is invalidated by the
+      // request-id bump above and will be discarded when it lands.
+      setItems([]);
+      setHasMore(false);
+      setNextOffset(0);
+      setLoading(true);
+    }
     try {
       const resp = await api.listBattles({
         status: status === 'all' ? undefined : status,
@@ -115,16 +150,25 @@ function AdminBattlesPageInner() {
         limit: PAGE_SIZE,
         offset: 0,
       });
+      // Stale response guard — a rapid tab switch (or a lobby event
+      // that fired mid-fetch) will have bumped the counter. Ignore.
+      if (id !== requestIdRef.current) return;
       setItems(resp.items);
       setHasMore(resp.hasMore);
       setNextOffset(resp.nextOffset ?? 0);
     } finally {
-      setLoading(false);
+      // Only the latest request may flip the loading spinner off; a
+      // stale one that resolved late must not clear a spinner that
+      // belongs to a newer, still-in-flight request.
+      if (id === requestIdRef.current) setLoading(false);
     }
   };
 
   const loadMore = async () => {
     if (loadingMore || !hasMore) return;
+    // Same request-id counter — a tab switch mid-pagination must not
+    // append the old tab's next page onto the new tab's list.
+    const id = ++requestIdRef.current;
     setLoadingMore(true);
     try {
       const resp = await api.listBattles({
@@ -133,23 +177,28 @@ function AdminBattlesPageInner() {
         limit: PAGE_SIZE,
         offset: nextOffset,
       });
+      if (id !== requestIdRef.current) return;
       setItems((prev) => [...prev, ...resp.items]);
       setHasMore(resp.hasMore);
       setNextOffset(resp.nextOffset ?? nextOffset + PAGE_SIZE);
     } finally {
-      setLoadingMore(false);
+      if (id === requestIdRef.current) setLoadingMore(false);
     }
   };
 
   useEffect(() => {
-    load(filter, sourceFilter);
+    // Filter/tab change: reset = true so old rows clear instantly.
+    void load(filter, sourceFilter, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter, sourceFilter]);
 
   // Real-time refresh — any battle lifecycle (create / cancel / close /
-  // tie) re-fetches the current filter view so the list never goes stale.
+  // tie) re-fetches the current filter view so the list never goes
+  // stale. `reset = false` so the admin's current view isn't yanked
+  // into a full-page skeleton on every SSE tick — the new data slides
+  // in when it arrives.
   useLobby(() => {
-    void load(filter, sourceFilter);
+    void load(filter, sourceFilter, false);
   });
 
   const handleClose = async (id: string) => {
@@ -162,7 +211,9 @@ function AdminBattlesPageInner() {
     setWorking(id);
     try {
       await api.closeBattle(id);
-      await load(filter, sourceFilter);
+      // Silent refetch — the admin just clicked a button, no need to
+      // flash the skeleton on top of that already-obvious feedback.
+      await load(filter, sourceFilter, false);
     } finally {
       setWorking(null);
     }
@@ -181,7 +232,7 @@ function AdminBattlesPageInner() {
     setWorking(id);
     try {
       await api.cancelBattle(id);
-      await load(filter, sourceFilter);
+      await load(filter, sourceFilter, false);
     } finally {
       setWorking(null);
     }
@@ -270,7 +321,7 @@ function AdminBattlesPageInner() {
                     busy={working === b.id}
                     onClose={() => handleClose(b.id)}
                     onCancel={() => handleCancel(b.id)}
-                    onResolved={() => load(filter, sourceFilter)}
+                    onResolved={() => load(filter, sourceFilter, false)}
                   />
                 </li>
               );
@@ -311,7 +362,7 @@ function BattleRow({
     // Returns a div now (was a li) so the parent ul can wrap each row in
     // its own li for focus highlighting; nesting <li> inside <li> would
     // be invalid HTML.
-    <div className="relative bg-stage-900 border border-stage-700/60 rounded-xl p-4 md:p-5 hover:border-spotlight/40 transition-colors">
+    <div className="relative bg-stage-900 border border-stage-600 rounded-xl p-4 md:p-5 hover:border-spotlight/40 transition-colors">
       {/* Full-card click target. Sits behind action buttons (z-0 vs z-10)
           so clicks on Close/Cancel/Resolve don't trigger navigation. */}
       <Link
@@ -342,20 +393,52 @@ function BattleRow({
           <p className="font-display font-bold text-lg">
             {battle.title || 'Untitled battle'}
           </p>
-          <p className="text-xs text-haze mt-1 tabular-nums">
+          {/* Timeline row — always show when voting opened (Started),
+              then the status-specific companion line. Lets admins see
+              start + close windows side by side without opening the
+              detail page, matching the timeline metadata available
+              elsewhere in the console. */}
+          <div className="text-xs text-haze mt-1 tabular-nums space-y-0.5">
+            <p>
+              <span className="text-haze/60">Started:</span>{' '}
+              {new Date(battle.votingOpensAt).toLocaleString()}
+            </p>
             {battle.status === 'live' && (
-              <>Closes {new Date(battle.votingClosesAt).toLocaleString()}</>
+              <p>
+                <span className="text-haze/60">Closes:</span>{' '}
+                {new Date(battle.votingClosesAt).toLocaleString()}
+              </p>
             )}
             {battle.status === 'completed' && battle.closedAt && (
-              <>Completed {new Date(battle.closedAt).toLocaleString()}</>
+              <p>
+                <span className="text-haze/60">Completed:</span>{' '}
+                {new Date(battle.closedAt).toLocaleString()}
+              </p>
             )}
             {battle.status === 'cancelled' && battle.closedAt && (
-              <>Cancelled {new Date(battle.closedAt).toLocaleString()}</>
+              <p>
+                <span className="text-haze/60">Cancelled:</span>{' '}
+                {new Date(battle.closedAt).toLocaleString()}
+              </p>
             )}
             {battle.status === 'needs_decision' && (
-              <>Awaiting your decision</>
+              <p>Awaiting your decision</p>
             )}
-          </p>
+          </div>
+          {/* Engagement stats — admin-only. Total votes + Side A vs Side B
+              so admins can scan-spot high-engagement battles without
+              opening each row. Rendered only when the backend populated
+              the fields (admin-authenticated) and there is at least one
+              vote to talk about; a fresh 0–0 live battle stays clean. */}
+          {battle.totalVotes !== null &&
+            battle.voteCountA !== null &&
+            battle.voteCountB !== null && (
+              <VoteStats
+                total={battle.totalVotes}
+                a={battle.voteCountA}
+                b={battle.voteCountB}
+              />
+            )}
         </div>
 
         {/* Action buttons re-enable pointer events and sit above the link. */}
@@ -375,6 +458,53 @@ function BattleRow({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * At-a-glance engagement row for the admin battle card. Shows total
+ * votes plus a Side A / Side B split with a slim proportional bar so
+ * the admin can visually gauge which battles are tight vs. lopsided
+ * without opening each one.
+ */
+function VoteStats({ total, a, b }: { total: number; a: number; b: number }) {
+  // Zero-vote battles skip the split bar — a 0/0 divisor would render
+  // a solid Side-B bar and lie about the state. Show the counts only.
+  const percentA = total > 0 ? Math.round((a / total) * 100) : 0;
+  const percentB = total > 0 ? 100 - percentA : 0;
+  const leading =
+    a > b ? 'A' : b > a ? 'B' : total > 0 ? 'tie' : 'none';
+  return (
+    <div className="mt-2 flex flex-col gap-1 max-w-xs">
+      <div className="flex items-center gap-3 text-xs tabular-nums">
+        <span className="font-bold text-white">
+          {total.toLocaleString()} {total === 1 ? 'vote' : 'votes'}
+        </span>
+        <span className="text-haze">·</span>
+        <span
+          className={
+            leading === 'A' ? 'font-bold text-spotlight' : 'text-haze'
+          }
+        >
+          A {a.toLocaleString()}
+        </span>
+        <span className="text-haze/50">vs</span>
+        <span
+          className={leading === 'B' ? 'font-bold text-gold' : 'text-haze'}
+        >
+          B {b.toLocaleString()}
+        </span>
+      </div>
+      {total > 0 && (
+        <div
+          className="flex h-1 w-full overflow-hidden rounded-full bg-stage-800"
+          aria-hidden="true"
+        >
+          <div className="bg-spotlight" style={{ width: `${percentA}%` }} />
+          <div className="bg-gold" style={{ width: `${percentB}%` }} />
+        </div>
+      )}
     </div>
   );
 }

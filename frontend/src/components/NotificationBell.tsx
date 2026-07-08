@@ -153,7 +153,7 @@ export default function NotificationBell() {
         // panel needs that offset to land closer to the viewport edge
         // instead of overflowing on the left. Reset to `right-0` at sm:+
         // where the original anchored-to-bell behavior reads cleanly.
-        <div className="absolute right-[-70px] sm:right-0 top-full mt-2 w-80 sm:w-96 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-6rem)] bg-stage-900 border border-stage-700 rounded-xl shadow-2xl overflow-hidden flex flex-col">
+        <div className="absolute right-[-70px] sm:right-0 top-full mt-2 w-80 sm:w-96 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-6rem)] bg-stage-900 border border-stage-600 rounded-xl shadow-2xl overflow-hidden flex flex-col">
           <div className="flex items-center justify-between px-4 py-3 border-b border-stage-700/60">
             <p className="text-xs uppercase tracking-widest font-bold text-haze">
               Notifications

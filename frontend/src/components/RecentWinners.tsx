@@ -81,7 +81,7 @@ export default function RecentWinners() {
           <li key={battle.id}>
             <Link
               href={`/battle/${battle.id}`}
-              className="group block bg-stage-900 border border-stage-700/60 rounded-xl p-4 hover:border-gold/40 transition-colors h-full"
+              className="group block bg-stage-900 border border-stage-600 rounded-xl p-4 hover:border-gold/40 transition-colors h-full"
             >
               <div className="flex items-center gap-2 mb-3">
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] uppercase tracking-widest font-bold rounded-full bg-gold/15 text-gold border border-gold/30">

@@ -59,6 +59,7 @@ export class BattlesController {
       'Set to "true" to include the total matching count (an extra COUNT query). Used by dashboard stat cards; the regular paginated list does not need it.',
   })
   async list(
+    @Req() req: any,
     @Query('status') status?: BattleStatus,
     @Query('songId') songId?: string,
     @Query('source') source?: 'challenge' | 'manual',
@@ -79,6 +80,12 @@ export class BattlesController {
     // Listing endpoint hides standings — clients render cards from card-level
     // data (title, status, songId), not vote counts. The detail endpoint is
     // where the per-user vote-percentage gate matters.
+    //
+    // Admin exception: when the caller is an admin, we surface the vote
+    // counts on each summary too so the admin battles list can show
+    // engagement at a glance (Side A / Side B / total votes) without
+    // opening each battle individually. Non-admin callers get null.
+    const isAdmin = !!req.user?.isAdmin;
     return {
       items: items.map(({ battle: b, fromChallenge }) => ({
         id: b.id,
@@ -93,6 +100,9 @@ export class BattlesController {
         closedAt: b.closedAt,
         winnerPerformanceId: b.winnerPerformanceId,
         fromChallenge,
+        voteCountA: isAdmin ? b.voteCountA : null,
+        voteCountB: isAdmin ? b.voteCountB : null,
+        totalVotes: isAdmin ? b.voteCountA + b.voteCountB : null,
       })),
       hasMore,
       nextOffset,
