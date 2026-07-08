@@ -6,6 +6,7 @@
     "build": "nest build",
     "start": "nest start",
     "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "seed:admin": "ts-node --transpile-only src/scripts/seed-admin.ts",
     "seed:sample": "ts-node --transpile-only src/scripts/seed-sample.ts",
