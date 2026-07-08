@@ -244,7 +244,12 @@ export class AuthService {
     const base =
       process.env.FRONTEND_RESET_URL ?? 'http://localhost:3000/reset-password';
     const resetUrl = `${base}?token=${token}`;
-    await this.mailer.sendPasswordResetEmail(user.email, resetUrl);
+    try {
+      await this.mailer.sendPasswordResetEmail(user.email, resetUrl);
+      } catch (err) {
+      console.error('Failed to send password reset email', err);
+      throw new Error('Failed to send password reset email');
+    }
 
     return { sent: true };
   }
