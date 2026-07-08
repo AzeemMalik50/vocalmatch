@@ -116,11 +116,29 @@ export class MailerService {
         `GMAIL_APP_PASSWORD is ${cleanPass.length} chars — expected 16. Google App Passwords are always exactly 16 lowercase letters. This value is likely a regular password (won't work) or has extra characters.`,
       );
     }
+    // Explicit host/port instead of `service: 'gmail'`. The shorthand
+    // uses port 465 (SMTPS), which Railway (and many other cloud
+    // hosts) block by default to prevent outbound spam. Port 587
+    // (submission) with STARTTLS is the widely-supported alternative
+    // — Gmail supports both and 587 typically survives cloud firewall
+    // rules. Fall back to 465 if you explicitly set SMTP_PORT.
+    const smtpPort = parseInt(process.env.SMTP_PORT ?? '587', 10);
     this.transporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: smtpPort,
+      secure: smtpPort === 465, // true for 465 (SMTPS), false for 587 (STARTTLS)
       auth: { user, pass: cleanPass },
+      // Give the SMTP connection a reasonable timeout so a firewall
+      // block manifests as a fast timeout rather than blocking the
+      // request thread for minutes.
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 10_000,
     });
     this.health.configured = true;
+    this.logger.log(
+      `Gmail transport configured on smtp.gmail.com:${smtpPort} (secure=${smtpPort === 465})`,
+    );
 
     // Verify SMTP handshake immediately at boot rather than waiting
     // for a user to hit forgot-password. If Gmail rejects the auth
