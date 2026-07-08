@@ -630,6 +630,18 @@ export interface AdminChallengeDto {
    * every other status. Drives the admin Remove button.
    */
   isOrphaned: boolean;
+  /**
+   * Which participant is unavailable when `isOrphaned` is true. Lets the
+   * admin badge read accurately — "Champion unavailable" vs "Challenger
+   * unavailable" vs "Both unavailable" vs "No champion yet". `null` when
+   * `isOrphaned` is false or the row is not a `selected`/no-battle row.
+   */
+  orphanReason:
+    | 'no_champion'
+    | 'champion_deleted'
+    | 'challenger_deleted'
+    | 'both_deleted'
+    | null;
   createdAt: string;
   decidedAt: string | null;
   decidedByAdminId: string | null;

@@ -466,19 +466,36 @@ export class ChallengesService {
    * and the admin-UI enrichment (which surfaces a Remove button on
    * orphaned `selected` rows).
    *
+   * Returns a discriminant `code` alongside the human `reason` so the
+   * admin UI can render an accurate badge — previously the frontend
+   * only saw a boolean and defaulted to "Champion unavailable" even
+   * when the challenger's video was the one that had been deleted.
+   * Both sides are always checked so we can distinguish the
+   * `both_deleted` case from a single-side deletion.
+   *
    * `song` may be supplied to save a lookup when the caller already has it.
    */
   private async checkOrphanState(
     sub: ChallengeSubmission,
     song?: { currentChampionPerformanceId: string | null } | null,
   ): Promise<
-    { orphaned: false } | { orphaned: true; reason: string }
+    | { orphaned: false }
+    | {
+        orphaned: true;
+        code:
+          | 'no_champion'
+          | 'champion_deleted'
+          | 'challenger_deleted'
+          | 'both_deleted';
+        reason: string;
+      }
   > {
     const resolvedSong =
       song ?? (await this.songs.findOne(sub.songId).catch(() => null));
     if (!resolvedSong || !resolvedSong.currentChampionPerformanceId) {
       return {
         orphaned: true,
+        code: 'no_champion',
         reason:
           "This song has no current champion — a new champion must be established before this challenge can be promoted.",
       };
@@ -489,16 +506,28 @@ export class ChallengesService {
       }),
       this.videos.findOne({ where: { id: sub.videoId } }),
     ]);
-    if (!championPerf || championPerf.deletedAt) {
+    const championGone = !championPerf || !!championPerf.deletedAt;
+    const challengerGone = !challengerVideo || !!challengerVideo.deletedAt;
+    if (championGone && challengerGone) {
       return {
         orphaned: true,
+        code: 'both_deleted',
+        reason:
+          "Both the Champion's and Challenger's performances have been deleted. Reject this challenge and re-establish the pairing before promoting.",
+      };
+    }
+    if (championGone) {
+      return {
+        orphaned: true,
+        code: 'champion_deleted',
         reason:
           "The Champion's performance has been deleted and is no longer available. A new champion must be established before this challenge can be promoted.",
       };
     }
-    if (!challengerVideo || challengerVideo.deletedAt) {
+    if (challengerGone) {
       return {
         orphaned: true,
+        code: 'challenger_deleted',
         reason:
           "The Challenger's performance has been deleted and is no longer available. Reject this challenge and ask the challenger to re-upload.",
       };
@@ -575,9 +604,16 @@ export class ChallengesService {
     ]);
     const song = await this.songs.findOne(row.songId).catch(() => null);
     let isOrphaned = false;
+    let orphanReason:
+      | 'no_champion'
+      | 'champion_deleted'
+      | 'challenger_deleted'
+      | 'both_deleted'
+      | null = null;
     if (row.status === 'selected' && !row.resultingBattleId) {
       const orphan = await this.checkOrphanState(row, song);
       isOrphaned = orphan.orphaned;
+      if (orphan.orphaned) orphanReason = orphan.code;
     }
     return {
       id: row.id,
@@ -605,6 +641,7 @@ export class ChallengesService {
         : null,
       status: row.status,
       isOrphaned,
+      orphanReason,
       createdAt: row.createdAt,
       decidedAt: row.decidedAt,
       decidedByAdminId: row.decidedByAdminId,

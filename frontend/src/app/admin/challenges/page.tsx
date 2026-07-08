@@ -326,7 +326,17 @@ function ChallengeRow({
             <StatusBadge status={challenge.status} />
             {showRemove && (
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] uppercase tracking-widest font-bold bg-red-500/15 text-red-300 border border-red-500/40 rounded">
-                Champion unavailable
+                {/* Badge label reflects WHICH side is unavailable — the
+                    previous version always read "Champion unavailable"
+                    even when only the challenger's video was deleted,
+                    misleading admins about which side to fix. */}
+                {challenge.orphanReason === 'challenger_deleted'
+                  ? 'Challenger unavailable'
+                  : challenge.orphanReason === 'both_deleted'
+                    ? 'Both unavailable'
+                    : challenge.orphanReason === 'no_champion'
+                      ? 'No champion yet'
+                      : 'Champion unavailable'}
               </span>
             )}
             <span className="text-xs text-haze tabular-nums">
