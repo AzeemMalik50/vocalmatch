@@ -16,6 +16,35 @@ export class MailerService {
   private readonly logger = new Logger('MailerService');
   private readonly transporter: MailTransporter | null;
   private readonly from: string;
+  // Runtime health surfaced via SecurityController → GET
+  // /api/security/mailer-health. Lets an operator confirm on the LIVE
+  // Railway container (not just local dev) whether Gmail SMTP actually
+  // connected without having to chase log lines. Safe to expose
+  // publicly — only reports coarse booleans and the sanitized error
+  // reason, never the credentials themselves.
+  public health: {
+    configured: boolean;
+    from: string;
+    userConfigured: boolean;
+    userMasked: string;
+    passwordLength: number;
+    frontendResetUrlConfigured: boolean;
+    frontendResetUrl: string | null;
+    smtpHandshake: 'pending' | 'ok' | 'failed';
+    smtpHandshakeError: string | null;
+    smtpHandshakeCheckedAt: string | null;
+  } = {
+    configured: false,
+    from: '',
+    userConfigured: false,
+    userMasked: '(unset)',
+    passwordLength: 0,
+    frontendResetUrlConfigured: false,
+    frontendResetUrl: null,
+    smtpHandshake: 'pending',
+    smtpHandshakeError: null,
+    smtpHandshakeCheckedAt: null,
+  };
 
   /**
    * Construct from process.env on boot. The transporter can also be
@@ -27,8 +56,23 @@ export class MailerService {
     this.from =
       process.env.MAIL_FROM ?? (user ? `VOCALMATCH <${user}>` : 'VOCALMATCH');
 
+    // Populate the runtime health snapshot up front so a diagnostic
+    // endpoint can read it even before the async SMTP verify below
+    // resolves.
+    this.health.from = this.from;
+    this.health.userConfigured = !!user;
+    this.health.userMasked = user
+      ? `${user.slice(0, 3)}…${user.slice(-8)}`
+      : '(unset)';
+    this.health.passwordLength = pass?.length ?? 0;
+    this.health.frontendResetUrlConfigured = !!process.env.FRONTEND_RESET_URL;
+    this.health.frontendResetUrl = process.env.FRONTEND_RESET_URL ?? null;
+
     if (injected) {
       this.transporter = injected;
+      this.health.configured = true;
+      this.health.smtpHandshake = 'ok';
+      this.health.smtpHandshakeCheckedAt = new Date().toISOString();
       return;
     }
 
@@ -55,6 +99,10 @@ export class MailerService {
         'Mailer disabled (GMAIL_USER or GMAIL_APP_PASSWORD not set); falling back to console — password-reset URLs will be logged only, not emailed',
       );
       this.transporter = null;
+      this.health.configured = false;
+      this.health.smtpHandshake = 'failed';
+      this.health.smtpHandshakeError = 'GMAIL_USER or GMAIL_APP_PASSWORD not set on this environment';
+      this.health.smtpHandshakeCheckedAt = new Date().toISOString();
       return;
     }
     if (pass.includes(' ')) {
@@ -72,6 +120,7 @@ export class MailerService {
       service: 'gmail',
       auth: { user, pass: cleanPass },
     });
+    this.health.configured = true;
 
     // Verify SMTP handshake immediately at boot rather than waiting
     // for a user to hit forgot-password. If Gmail rejects the auth
@@ -79,12 +128,20 @@ export class MailerService {
     // logs on deploy — not when a real user is stuck at 3am.
     (this.transporter as unknown as nodemailer.Transporter)
       .verify?.()
-      .then(() => this.logger.log('SMTP handshake OK — Gmail is ready to send'))
-      .catch((err) =>
+      .then(() => {
+        this.logger.log('SMTP handshake OK — Gmail is ready to send');
+        this.health.smtpHandshake = 'ok';
+        this.health.smtpHandshakeCheckedAt = new Date().toISOString();
+      })
+      .catch((err) => {
+        const msg = err?.message ?? String(err);
         this.logger.error(
-          `SMTP handshake FAILED at boot — sends will error: ${err?.message ?? err}`,
-        ),
-      );
+          `SMTP handshake FAILED at boot — sends will error: ${msg}`,
+        );
+        this.health.smtpHandshake = 'failed';
+        this.health.smtpHandshakeError = msg;
+        this.health.smtpHandshakeCheckedAt = new Date().toISOString();
+      });
   }
 
   async sendPasswordResetEmail(toEmail: string, resetUrl: string): Promise<void> {
