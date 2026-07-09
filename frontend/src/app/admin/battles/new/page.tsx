@@ -149,13 +149,18 @@ function AdminNewBattleForm() {
     setSubmitting(true);
     setError(null);
     try {
-      const closesAt = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+      // Bug — used to compute `votingClosesAt = Date.now() + hours * 3600 * 1000`
+      // here, then send an absolute ISO string. The backend re-sampled
+      // `opensAt = new Date()` after network + validation latency, so the
+      // final window was `hours - request_latency` (~1-3 seconds short of
+      // the configured duration). Sending `hours` instead lets the backend
+      // derive BOTH timestamps from the same clock reading → exact window.
       const battle = await api.createBattle({
         songId,
         performanceAId: aId,
         performanceBId: bId,
         title: title.trim() || undefined,
-        votingClosesAt: closesAt,
+        hours,
       });
       router.push(`/admin/battles/${battle.id}`);
     } catch (e: any) {

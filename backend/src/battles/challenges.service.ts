@@ -400,17 +400,21 @@ export class ChallengesService {
       throw new BadRequestException(orphan.reason);
     }
 
-    // Prefer an explicit `votingClosesAt` (matches the regular POST /battles
-    // contract); otherwise compute from `hours`, falling back to 48h.
-    let votingClosesAt: string;
-    if (opts.votingClosesAt) {
-      votingClosesAt = new Date(opts.votingClosesAt).toISOString();
-    } else {
-      const hours = Math.min(Math.max(opts.hours ?? 48, 1), 24 * 14);
-      votingClosesAt = new Date(
-        Date.now() + hours * 60 * 60 * 1000,
-      ).toISOString();
-    }
+    // Same-tick clock guarantee: prefer forwarding `hours` to the
+    // battles service so it can derive both `opensAt` and `closesAt`
+    // from a single `Date.now()` reading. That closes the drift bug
+    // where computing `votingClosesAt` here (from a pre-await
+    // `Date.now()`) and then letting the battles service re-sample
+    // `opensAt` after its own awaits gave voters ~1-3s less than the
+    // configured window. The explicit `votingClosesAt` path is kept
+    // for callers that pass an absolute schedule.
+    const useHours = !opts.votingClosesAt;
+    const forwardedHours = useHours
+      ? Math.min(Math.max(opts.hours ?? 48, 1), 24 * 14)
+      : undefined;
+    const forwardedClosesAt = opts.votingClosesAt
+      ? new Date(opts.votingClosesAt).toISOString()
+      : undefined;
 
     // Bug #16 — when admin promoted a challenge without supplying a title,
     // the battle showed as "Untitled Battle" in the admin list. Auto-generate
@@ -434,7 +438,8 @@ export class ChallengesService {
         songId: sub.songId,
         performanceAId: song.currentChampionPerformanceId,
         performanceBId: sub.videoId,
-        votingClosesAt,
+        ...(forwardedHours != null ? { hours: forwardedHours } : {}),
+        ...(forwardedClosesAt ? { votingClosesAt: forwardedClosesAt } : {}),
         title: autoTitle,
       },
       adminId,
