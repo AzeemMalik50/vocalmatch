@@ -1200,15 +1200,25 @@ function ChampionSection() {
                 {personalised ? 'You are the Defending Champion' : 'Defending Champion'}
               </p>
               <div className="flex items-center gap-4 mb-2">
-                {champion?.avatarUrl && (
-                  <Image
-                    src={champion.avatarUrl}
-                    alt={champion.username}
-                    width={56}
-                    height={56}
-                    className="w-14 h-14 rounded-full object-cover border-2 border-yellow-500/60"
-                  />
-                )}
+                {/* Avatar with initial fallback — previously the whole
+                    block was `champion?.avatarUrl && <Image>`, which
+                    silently rendered nothing when the champion had no
+                    uploaded photo. Now falls back to an initial-badge
+                    so the layout stays consistent regardless. */}
+                {champion &&
+                  (champion.avatarUrl ? (
+                    <Image
+                      src={champion.avatarUrl}
+                      alt={champion.username}
+                      width={56}
+                      height={56}
+                      className="w-14 h-14 rounded-full object-cover border-2 border-yellow-500/60"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-full bg-stage-800 border-2 border-yellow-500/60 flex items-center justify-center font-bold text-yellow-200 text-xl">
+                      {champion.username[0]?.toUpperCase() ?? '?'}
+                    </div>
+                  ))}
                 <h2 className="text-5xl font-black text-white">
                   {champion ? `@${champion.username}` : 'The Reigning Voice'}
                 </h2>
@@ -2329,7 +2339,11 @@ function DethronedPanelView({
               <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                 {latest.formerChampion && (
                   <div className="flex items-center gap-2">
-                    {latest.formerChampion.avatarUrl && (
+                    {/* Initial-badge fallback matches the winner banner's
+                        pattern (grayscale + reduced opacity so the badge
+                        reads as "former reign" the same way the real
+                        avatar does). */}
+                    {latest.formerChampion.avatarUrl ? (
                       <Image
                         src={latest.formerChampion.avatarUrl}
                         alt={latest.formerChampion.username}
@@ -2337,6 +2351,10 @@ function DethronedPanelView({
                         height={40}
                         className="h-10 w-10 rounded-full border-2 border-gray-700 object-cover opacity-50 grayscale"
                       />
+                    ) : (
+                      <div className="h-10 w-10 rounded-full bg-stage-800 border-2 border-gray-700 flex items-center justify-center font-bold text-gray-400 opacity-70">
+                        {latest.formerChampion.username[0]?.toUpperCase() ?? '?'}
+                      </div>
                     )}
                     <div>
                       <p className="text-[10px] uppercase tracking-widest text-gray-400">
@@ -2356,7 +2374,7 @@ function DethronedPanelView({
                 </div>
                 {latest.newChampion && (
                   <div className="flex items-center gap-2">
-                    {latest.newChampion.avatarUrl && (
+                    {latest.newChampion.avatarUrl ? (
                       <Image
                         src={latest.newChampion.avatarUrl}
                         alt={latest.newChampion.username}
@@ -2364,6 +2382,10 @@ function DethronedPanelView({
                         height={48}
                         className="h-12 w-12 rounded-full border-2 border-yellow-500 object-cover"
                       />
+                    ) : (
+                      <div className="h-12 w-12 rounded-full bg-stage-800 border-2 border-yellow-500 flex items-center justify-center font-bold text-yellow-200 text-lg">
+                        {latest.newChampion.username[0]?.toUpperCase() ?? '?'}
+                      </div>
                     )}
                     <div>
                       <p className="text-[10px] uppercase tracking-widest text-yellow-400">
