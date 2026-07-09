@@ -419,7 +419,12 @@ function UploadForm() {
     const fd = new FormData();
     fd.append('title', title);
     fd.append('songId', songId);
-    if (selectedSong) fd.append('songTitle', selectedSong.title);
+    // `songTitle` used to be sent as a denormalized copy of the song's
+    // title. Backend now derives it authoritatively from `songId` (see
+    // videos.service.ts). Sending it from the client caused two bugs:
+    // (a) it would fail the DTO's 120-char cap if the linked song had
+    // a legacy long title even though the user couldn't edit it, and
+    // (b) client-supplied value could drift from the real song title.
     if (description) fd.append('description', description);
     fd.append('visibility', visibility);
     if (tags.length > 0) fd.append('tags', tags.join(','));

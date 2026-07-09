@@ -59,8 +59,18 @@ class CreateVideoDto {
   @IsOptional() @IsString() @MaxLength(1000)
   description?: string;
 
-  @IsOptional() @IsString() @MaxLength(120)
-  songTitle?: string;
+  /**
+   * `songTitle` was previously accepted from the client as a denormalized
+   * copy of the selected song's title. That created two failure modes:
+   * a) client-supplied value could drift from the song's real title, and
+   * b) legacy songs with titles longer than the video DTO's cap (120)
+   *    would reject on submit even though the user couldn't edit the
+   *    field — see the bug report tied to this change.
+   * The value is now derived server-side from `songId`, so the client
+   * doesn't send it at all. Field kept as `never` so a stale/curious
+   * caller passing one gets a clear validation error rather than being
+   * silently trusted.
+   */
 
   /** Optional Centerstage Song link. Required if uploading as a battle entry. */
   @IsOptional() @IsUUID()
@@ -193,7 +203,6 @@ export class VideosController {
         video: { type: 'string', format: 'binary' },
         title: { type: 'string', maxLength: 120 },
         description: { type: 'string', maxLength: 1000 },
-        songTitle: { type: 'string', maxLength: 120 },
         songId: { type: 'string', format: 'uuid' },
         category: { type: 'string', enum: ['solo', 'battle_entry', 'challenge_entry'] },
         visibility: { type: 'string', enum: ['public', 'unlisted', 'private'] },
@@ -232,7 +241,9 @@ export class VideosController {
     const created = await this.videos.create({
       title: dto.title,
       description: dto.description,
-      songTitle: dto.songTitle,
+      // songTitle intentionally not passed — the service derives it
+      // from the fetched `songId` so it can't drift from the source
+      // of truth and can't hit a stale UI-length cap.
       songId: dto.songId,
       uploaderId: req.user.userId,
       fileBuffer: file.buffer,
