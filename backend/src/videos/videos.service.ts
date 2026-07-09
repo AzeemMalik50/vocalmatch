@@ -45,7 +45,6 @@ export class VideosService {
   async create(params: {
     title: string;
     description?: string;
-    songTitle?: string;
     songId?: string;
     uploaderId: string;
     fileBuffer: Buffer;
@@ -62,6 +61,14 @@ export class VideosService {
     // retired song (invisible catalog entry, unmatched forever). Verify
     // the song is still `active` BEFORE we push the file to Cloudinary
     // so a doomed upload never wastes bandwidth or an asset slot.
+    //
+    // `songTitle` is derived here too — it's a denormalized copy used by
+    // the video search index (see `findAll`). Deriving from the song row
+    // keeps it authoritative and eliminates the drift where a client
+    // used to POST a `songTitle` that mismatched the linked song, or
+    // failed length validation because a legacy song's real title
+    // exceeded the DTO cap the user couldn't see or fix.
+    let derivedSongTitle: string | null = null;
     if (params.songId) {
       const song = await this.songs.findOne({
         where: { id: params.songId },
@@ -76,6 +83,7 @@ export class VideosService {
           `"${song.title}" was retired while you were on this page. Please pick another Centerstage Song.`,
         );
       }
+      derivedSongTitle = song.title;
     }
 
     const upload = await this.cloudinary.uploadVideo(params.fileBuffer);
@@ -83,7 +91,7 @@ export class VideosService {
     const video = this.videos.create({
       title: params.title,
       description: params.description ?? null,
-      songTitle: params.songTitle ?? null,
+      songTitle: derivedSongTitle,
       songId: params.songId ?? null,
       url: upload.secure_url,
       thumbnailUrl: upload.eager?.[0]?.secure_url ?? null,

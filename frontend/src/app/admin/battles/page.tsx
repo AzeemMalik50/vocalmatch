@@ -475,8 +475,14 @@ function VoteStats({ total, a, b }: { total: number; a: number; b: number }) {
   const percentB = total > 0 ? 100 - percentA : 0;
   const leading =
     a > b ? 'A' : b > a ? 'B' : total > 0 ? 'tie' : 'none';
+  // Bug — `max-w-xs` was only a cap, letting the container shrink to the
+  // width of its widest sibling (usually the battle title). Short titles
+  // gave a narrow bar; long titles gave a wide bar — same vote counts,
+  // different visual widths. Pin the container to a fixed 288px so every
+  // row's bar renders identically; `max-w-full` still lets the container
+  // shrink on very narrow viewports where 288px would overflow the card.
   return (
-    <div className="mt-2 flex flex-col gap-1 max-w-xs">
+    <div className="mt-2 flex flex-col gap-1 w-72 max-w-full">
       <div className="flex items-center gap-3 text-xs tabular-nums">
         <span className="font-bold text-white">
           {total.toLocaleString()} {total === 1 ? 'vote' : 'votes'}

@@ -1,10 +1,13 @@
 import {
   IsDateString,
   IsIn,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   MaxLength,
+  Min,
 } from 'class-validator';
 import { BattleStatus } from './battle.entity';
 
@@ -20,8 +23,24 @@ export class CreateBattleDto {
   @IsOptional() @IsDateString()
   votingOpensAt?: string;
 
-  @IsDateString()
-  votingClosesAt: string;
+  /**
+   * Absolute voting close time. Legacy / explicit-schedule contract.
+   * Callers using this take responsibility for any duration drift caused
+   * by network latency between when they sample `Date.now()` and when
+   * the backend samples `opensAt`. Prefer `hours` for new call sites.
+   */
+  @IsOptional() @IsDateString()
+  votingClosesAt?: string;
+
+  /**
+   * Voting window duration in hours, 1–336 (14 days max). When set, the
+   * backend derives BOTH `opensAt` and `closesAt` from a single clock
+   * reading at save time so the actual window is exactly `hours` — no
+   * drift from client/server latency. Exactly one of `hours` or
+   * `votingClosesAt` must be supplied (service enforces).
+   */
+  @IsOptional() @IsInt() @Min(1) @Max(24 * 14)
+  hours?: number;
 }
 
 export class CastVoteDto {

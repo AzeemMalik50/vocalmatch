@@ -101,7 +101,23 @@ export class BattlesService {
         'A battle cannot have the same performance on both sides',
       );
     }
-    const closesAt = new Date(dto.votingClosesAt);
+    // Callers must supply exactly one of `hours` or `votingClosesAt`.
+    // `hours` is preferred: it lets the backend compute BOTH `opensAt`
+    // and `closesAt` from a single clock reading, so the resulting
+    // window is exactly `hours` regardless of network/processing
+    // latency. The legacy `votingClosesAt` path is kept for scheduled
+    // battles where the caller pre-computed an absolute close time.
+    if (dto.hours == null && !dto.votingClosesAt) {
+      throw new BadRequestException(
+        'Supply either `hours` (recommended) or `votingClosesAt`',
+      );
+    }
+    if (dto.hours != null && dto.votingClosesAt) {
+      throw new BadRequestException(
+        'Supply only one of `hours` or `votingClosesAt`, not both',
+      );
+    }
+
     // Track whether we're auto-defaulting `opensAt` to "now" or using an
     // explicit caller value. When auto-defaulted, we re-sample "now" just
     // before save and pin `createdAt` to the same instant so the two
@@ -111,6 +127,19 @@ export class BattlesService {
     // bug reported by QA).
     const opensExplicit = !!dto.votingOpensAt;
     let opensAt = opensExplicit ? new Date(dto.votingOpensAt!) : new Date();
+    // Bug (reported) — `closesAt` used to be derived from a pre-computed
+    // `dto.votingClosesAt` sampled on the client, while `opensAt` was
+    // sampled here on the backend. The gap between the two clock reads
+    // (network latency + validation await) shortened the actual voting
+    // window by ~1-3s. When `hours` is supplied we now derive `closesAt`
+    // from the SAME `Date.now()` used for `opensAt`, guaranteeing exact
+    // window duration.
+    let closesAt: Date;
+    if (dto.hours != null) {
+      closesAt = new Date(opensAt.getTime() + dto.hours * 60 * 60 * 1000);
+    } else {
+      closesAt = new Date(dto.votingClosesAt!);
+    }
     if (closesAt <= opensAt) {
       throw new BadRequestException('votingClosesAt must be after votingOpensAt');
     }
@@ -178,7 +207,17 @@ export class BattlesService {
     // start), leave `createdAt` unset — TypeORM's `@CreateDateColumn`
     // will stamp it, and a difference between "row created now" and
     // "voting starts in the future" is legitimate.
-    if (!opensExplicit) opensAt = new Date();
+    //
+    // When `hours` is used, re-derive `closesAt` from the resampled
+    // `opensAt` too — otherwise the ~1ms resample gap would re-introduce
+    // the exact drift this fix is closing. Keeping both from the same
+    // `Date.now()` guarantees `closesAt - opensAt === hours*60*60*1000`.
+    if (!opensExplicit) {
+      opensAt = new Date();
+      if (dto.hours != null) {
+        closesAt = new Date(opensAt.getTime() + dto.hours * 60 * 60 * 1000);
+      }
+    }
     const battle = this.battles.create({
       songId: dto.songId,
       title: explicitTitle ?? `Battle · ${song.title}`,

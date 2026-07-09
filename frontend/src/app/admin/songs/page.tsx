@@ -257,11 +257,26 @@ export default function AdminSongsPage() {
           <p className="text-xs uppercase tracking-widest font-bold text-haze">
             {mode === 'new' ? 'New song' : 'Edit song'}
           </p>
-          <Field label="Title" required error={fieldErrors.title}>
+          {/* Title + artist capped at 80 chars — mirrors the backend
+              DTO limit tightened from 200. Real-world song titles all
+              fit; the cap blocks pathological repeated-word inputs
+              that break every card layout. Live counter turns yellow
+              at 90% and red past the cap so admin can self-correct
+              before hitting submit. `maxLength` on the input hard-
+              stops typing at 80 for new entries; existing rows with
+              longer titles show the full value here and the counter
+              flags them until admin trims. */}
+          <Field
+            label="Title"
+            required
+            error={fieldErrors.title}
+            hint="Max 80 characters — keeps the title readable across every card and heading."
+            counter={{ value: form.title.length, max: 80 }}
+          >
             <input
               type="text"
               required
-              maxLength={200}
+              maxLength={80}
               aria-invalid={!!fieldErrors.title}
               value={form.title}
               onChange={(e) => {
@@ -276,11 +291,16 @@ export default function AdminSongsPage() {
               }`}
             />
           </Field>
-          <Field label="Artist" required error={fieldErrors.artist}>
+          <Field
+            label="Artist"
+            required
+            error={fieldErrors.artist}
+            counter={{ value: form.artist.length, max: 80 }}
+          >
             <input
               type="text"
               required
-              maxLength={200}
+              maxLength={80}
               aria-invalid={!!fieldErrors.artist}
               value={form.artist}
               onChange={(e) => {
@@ -440,24 +460,45 @@ function Field({
   label,
   required,
   error,
+  hint,
+  counter,
   children,
 }: {
   label: string;
   required?: boolean;
   error?: string | null;
+  hint?: string;
+  counter?: { value: number; max: number };
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <label className="block text-xs uppercase tracking-widest font-bold text-haze mb-2">
-        {label} {required && <span className="text-spotlight">*</span>}
+      <label className="flex items-baseline justify-between gap-2 text-xs uppercase tracking-widest font-bold text-haze mb-2">
+        <span>
+          {label} {required && <span className="text-spotlight">*</span>}
+        </span>
+        {counter && (
+          <span
+            className={`normal-case tracking-normal tabular-nums text-[11px] ${
+              counter.value > counter.max
+                ? 'text-red-400'
+                : counter.value >= counter.max * 0.9
+                  ? 'text-yellow-400'
+                  : 'text-haze/60'
+            }`}
+          >
+            {counter.value} / {counter.max}
+          </span>
+        )}
       </label>
       {children}
-      {error && (
+      {error ? (
         <p role="alert" className="mt-1.5 text-xs text-red-400">
           {error}
         </p>
-      )}
+      ) : hint ? (
+        <p className="mt-1.5 text-xs text-haze/50">{hint}</p>
+      ) : null}
     </div>
   );
 }

@@ -930,14 +930,18 @@ export const api = {
     }>(`/battles${suffix}`);
   },
   getBattle: (id: string) => request<BattleDto>(`/battles/${id}`),
-  createBattle: (body: {
-    songId: string;
-    performanceAId: string;
-    performanceBId: string;
-    title?: string;
-    votingOpensAt?: string;
-    votingClosesAt: string;
-  }) =>
+  createBattle: (
+    body: {
+      songId: string;
+      performanceAId: string;
+      performanceBId: string;
+      title?: string;
+      votingOpensAt?: string;
+    } & (
+      | { hours: number; votingClosesAt?: never }
+      | { hours?: never; votingClosesAt: string }
+    ),
+  ) =>
     request<BattleDto>('/battles', { method: 'POST', body: JSON.stringify(body) }),
   voteOnBattle: (id: string, performanceId: string) =>
     request<BattleDto>(`/battles/${id}/vote`, {
