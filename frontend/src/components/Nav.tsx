@@ -6,6 +6,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import Logo from './Logo';
 import NotificationBell from './NotificationBell';
+import CountdownRibbon from './CountdownRibbon';
 
 export default function Nav() {
   const { user, logout, loading } = useAuth();
@@ -36,11 +37,46 @@ export default function Nav() {
   }, [menuOpen]);
 
   return (
+    // Fragment wraps the sticky header + the countdown ribbon so both
+    // stack cleanly on scroll — Nav sits at z-30, ribbon at z-20 right
+    // beneath it. Ribbon self-hides when no battle is live.
+    <>
     <header className="sticky top-0 z-30 border-b border-stage-700/60 backdrop-blur-md bg-stage-950/80">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
         <Link href="/" className="hover:opacity-90 transition-opacity shrink-0">
           <Logo size={isHome ? 'lg' : 'md'} />
         </Link>
+
+        {/* Primary spec nav — WATCH | VOTE | CHALLENGES. Hidden on
+            narrow viewports so the header doesn't crowd on iPhone;
+            the FloatingRedPhone widget + LiveBattle section within the
+            page still cover the same intent for mobile users. WATCH
+            and VOTE both drop the visitor at the live battle marquee
+            (voting and watching are the same act — you vote WHILE you
+            watch). CHALLENGES points at the Red Phone section anchor. */}
+        <nav
+          aria-label="Primary"
+          className="hidden md:flex items-center gap-6 lg:gap-8 shrink"
+        >
+          <Link
+            href="/#live-battle"
+            className="text-xs font-black uppercase tracking-[0.25em] text-haze hover:text-white transition-colors"
+          >
+            Watch
+          </Link>
+          <Link
+            href="/#live-battle"
+            className="text-xs font-black uppercase tracking-[0.25em] text-haze hover:text-white transition-colors"
+          >
+            Vote
+          </Link>
+          <Link
+            href="/#red-phone-challenge"
+            className="text-xs font-black uppercase tracking-[0.25em] text-haze hover:text-white transition-colors"
+          >
+            Challenges
+          </Link>
+        </nav>
 
         <nav className="flex items-center gap-1.5 sm:gap-3 text-sm shrink-0">
           {loading ? null : user ? (
@@ -188,9 +224,14 @@ export default function Nav() {
             <>
               <Link
                 href="/login"
-                className="px-2 sm:px-3 py-2 text-haze hover:text-white font-medium transition-colors whitespace-nowrap"
+                // Renamed from "Sign in" → "Login" per Phase 1 brand
+                // spec (WATCH | VOTE | CHALLENGES | LOGIN nav row).
+                // Uppercase + tracking matches the three primary
+                // spec-links to its left so the header reads as a
+                // single unified nav.
+                className="px-2 sm:px-3 py-2 text-xs font-black uppercase tracking-[0.25em] text-haze hover:text-white transition-colors whitespace-nowrap"
               >
-                Sign in
+                Login
               </Link>
               <Link
                 href="/signup"
@@ -209,5 +250,7 @@ export default function Nav() {
         </nav>
       </div>
     </header>
+    <CountdownRibbon />
+    </>
   );
 }
