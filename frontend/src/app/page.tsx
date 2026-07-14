@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   AlertTriangle,
+  CheckSquare,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -13,11 +14,13 @@ import {
   Crown,
   Download,
   Eye,
+  FileText,
   Flame,
   Headphones,
   Mic,
   Music,
   Play,
+  Send,
   Share2,
   Shield,
   Upload,
@@ -96,7 +99,7 @@ export default function HomePage() {
           bridge is the very next thing a visitor sees. Champion +
           Crown-at-Risk + Dethroned form the "current crown" narrative
           block that follows, then the platform-explainer sections
-          (How It Works, The Arena, Recent Winners, Share, Final CTA). */}
+          (How It Works, The Stage, Recent Winners, Share, Final CTA). */}
       <Reveal><ChallengeFlow user={user} /></Reveal>
       <Reveal><ChampionSection /></Reveal>
       <Reveal><CrownAtRiskPanel /></Reveal>
@@ -1020,20 +1023,24 @@ function ChallengeFlow({
           <div
             role="list"
             aria-label="Challenge submission steps"
-            className="relative z-10 grid grid-cols-1 items-stretch gap-5 lg:grid-cols-4"
+            className="relative z-10 grid grid-cols-1 items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-3"
           >
-            <FlowStep number={1} Icon={Download} title="DOWNLOAD" sub="the track" />
-            <FlowStep number={2} Icon={Mic} title="RECORD" sub="your version" />
-            <FlowStep number={3} Icon={Upload} title="UPLOAD" sub="your challenge" />
+            {/* Six-step workflow per Phase 1 spec: Download Lyrics,
+                Download Instrumental, Record, Upload, Accept Rules,
+                Submit. Was previously 4 steps; the "Face the Champion"
+                reveal happens implicitly once the challenge is
+                selected, so it's no longer a step in the submission
+                path. */}
+            <FlowStep number={1} Icon={FileText} title="DOWNLOAD LYRICS" sub="learn the words" />
+            <FlowStep number={2} Icon={Music} title="DOWNLOAD TRACK" sub="the instrumental" />
+            <FlowStep number={3} Icon={Mic} title="RECORD" sub="your version" />
+            <FlowStep number={4} Icon={Upload} title="UPLOAD VIDEO" sub="your challenge take" />
+            <FlowStep number={5} Icon={CheckSquare} title="ACCEPT RULES" sub="competition terms" />
             <FlowStep
-              number={4}
-              Icon={Crown}
-              // Renamed from "IF SELECTED" per Phase 1 brand spec: the
-              // fourth step is the confrontation itself, not the
-              // conditional. "FACE THE CHAMPION" pushes the emotional
-              // stakes ahead of the process language.
-              title="FACE THE CHAMPION"
-              sub="the audience decides"
+              number={6}
+              Icon={Send}
+              title="SUBMIT CHALLENGE"
+              sub="face the champion"
               reward
             />
           </div>
@@ -1546,7 +1553,7 @@ function StageCarousel() {
       <div className="max-w-7xl mx-auto px-4">
         <SectionHeader
           eyebrow="The Battleground"
-          title="The Arena"
+          title="The Stage"
           subtitle="New performances. New challengers. New legends."
           align="left"
         />
@@ -2439,11 +2446,12 @@ function DethronedPanel() {
   return (
     <DethronedPanelView
       latest={latest}
-      // Renamed eyebrow from "Dethroned!" → "Crown Stolen" per Phase 1
-      // brand spec — the two-word phrasing hits harder and matches the
-      // language used in the emotional-journey copy ("Watch → Vote →
-      // Challenge → Win the Crown → Defend it → Lose it → Fight back").
-      eyebrow="Crown Stolen"
+      // Spec: end-of-competition banner phrasing. When the crown
+      // changed hands, we surface "THE CROWN HAS BEEN STOLEN" as the
+      // eyebrow — matches the language used across the emotional
+      // journey ("Watch → Vote → Challenge → Win the Crown → Defend
+      // it → Lose it → Fight back") and the winner reveal panel.
+      eyebrow="The Crown Has Been Stolen"
       subtitle="A new Official Voice has been crowned."
       personalised={false}
     />
@@ -2732,12 +2740,16 @@ function RedPhoneWinnerPanel() {
   if (!loaded || !winner) return null;
 
   const when = winner.crownedAt ? formatRelativeTime(winner.crownedAt) : null;
+  // Spec: end-of-competition banner reads either "THE CROWN HAS BEEN
+  // DEFENDED" or "THE CROWN HAS BEEN STOLEN" depending on outcome.
+  // A first-ever crown on a song gets its own phrasing since neither
+  // defence nor theft applies.
   const outcomeLabel =
     winner.outcome === 'taken'
-      ? 'Took the crown'
+      ? 'The Crown Has Been Stolen'
       : winner.outcome === 'retained'
-        ? 'Defended the crown'
-        : 'First crown';
+        ? 'The Crown Has Been Defended'
+        : 'A New Crown';
   const headline =
     winner.outcome === 'taken'
       ? `${winner.winner?.username ? '@' + winner.winner.username : 'A new voice'} just won a Red Phone battle.`

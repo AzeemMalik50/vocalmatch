@@ -6,7 +6,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import Logo from './Logo';
 import NotificationBell from './NotificationBell';
-import CountdownRibbon from './CountdownRibbon';
+import NowPlayingBar from './NowPlayingBar';
 
 export default function Nav() {
   const { user, logout, loading } = useAuth();
@@ -47,34 +47,44 @@ export default function Nav() {
           <Logo size={isHome ? 'lg' : 'md'} />
         </Link>
 
-        {/* Primary spec nav — WATCH | VOTE | CHALLENGES. Hidden on
-            narrow viewports so the header doesn't crowd on iPhone;
-            the FloatingRedPhone widget + LiveBattle section within the
-            page still cover the same intent for mobile users. WATCH
-            and VOTE both drop the visitor at the live battle marquee
-            (voting and watching are the same act — you vote WHILE you
-            watch). CHALLENGES points at the Red Phone section anchor. */}
+        {/* Primary spec nav — HOME | BATTLES | RED PHONE | SONG SUBMISSION
+            | ABOUT. Hidden on narrow viewports so the header doesn't
+            crowd on iPhone; the FloatingRedPhone widget + LiveBattle
+            section within the page still cover the same intent for
+            mobile users. The LOGIN / JOIN row lives to the right. */}
         <nav
           aria-label="Primary"
-          className="hidden md:flex items-center gap-6 lg:gap-8 shrink"
+          className="hidden md:flex items-center gap-5 lg:gap-7 shrink"
         >
           <Link
-            href="/#live-battle"
+            href="/"
             className="text-xs font-black uppercase tracking-[0.25em] text-haze hover:text-white transition-colors"
           >
-            Watch
+            Home
           </Link>
           <Link
-            href="/#live-battle"
+            href="/battles"
             className="text-xs font-black uppercase tracking-[0.25em] text-haze hover:text-white transition-colors"
           >
-            Vote
+            Battles
           </Link>
           <Link
-            href="/#red-phone-challenge"
+            href="/red-phone"
             className="text-xs font-black uppercase tracking-[0.25em] text-haze hover:text-white transition-colors"
           >
-            Challenges
+            Red Phone
+          </Link>
+          <Link
+            href="/submit-song"
+            className="text-xs font-black uppercase tracking-[0.25em] text-haze hover:text-white transition-colors"
+          >
+            Song Submission
+          </Link>
+          <Link
+            href="/about"
+            className="text-xs font-black uppercase tracking-[0.25em] text-haze hover:text-white transition-colors"
+          >
+            About
           </Link>
         </nav>
 
@@ -250,7 +260,7 @@ export default function Nav() {
         </nav>
       </div>
     </header>
-    <CountdownRibbon />
+    <NowPlayingBar />
     </>
   );
 }

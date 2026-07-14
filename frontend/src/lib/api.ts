@@ -377,6 +377,23 @@ export interface VideoDto {
 
 export type SongStatus = 'active' | 'retired';
 
+export type SongSubmissionStatus = 'pending' | 'approved' | 'rejected';
+
+export interface SongSubmissionDto {
+  id: string;
+  title: string;
+  songwriter: string;
+  lyrics: string;
+  contactName: string;
+  contactEmail: string;
+  notes: string | null;
+  status: SongSubmissionStatus;
+  reviewedByAdminId: string | null;
+  reviewedAt: string | null;
+  reviewNotes: string | null;
+  createdAt: string;
+}
+
 export interface SongDto {
   id: string;
   title: string;
@@ -881,6 +898,20 @@ export const api = {
   getSong: (id: string) => request<SongDto>(`/songs/${id}`),
   getFeaturedRisk: () =>
     request<FeaturedSongRiskDto | null>('/songs/featured/risk'),
+
+  // ─── Song submissions (public "YOUR SONG COULD BE NEXT" form) ────
+  submitSong: (body: {
+    title: string;
+    songwriter: string;
+    lyrics: string;
+    contactName: string;
+    contactEmail: string;
+    notes?: string;
+  }) =>
+    request<SongSubmissionDto>('/song-submissions', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   getRecentDethronements: (limit = 5) =>
     request<DethronementDto[]>(`/battles/dethronements/recent?limit=${limit}`),
   getRecentRedPhoneWinners: (limit = 1) =>
