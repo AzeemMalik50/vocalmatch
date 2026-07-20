@@ -58,7 +58,11 @@ export const HERO_SHARE_POSTER = {
 };
 
 export const BRAND_LOGO = {
-  src: '/hero/vocalmatch-logo.png',
+  // Upgraded to the crown-logo asset (larger crown, warm metallic gold,
+  // ruby gem at the peak — matches the brand direction). The old plain
+  // vocalmatch-logo.png stays in /public/hero as a fallback / smaller
+  // variant if we ever need a lightweight monochrome version.
+  src: '/hero/vocalmatch-crown-logo.png',
   alt: 'VOCALMATCH',
   width: 1024,
   height: 1024,

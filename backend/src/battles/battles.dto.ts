@@ -33,13 +33,18 @@ export class CreateBattleDto {
   votingClosesAt?: string;
 
   /**
-   * Voting window duration in hours, 1–336 (14 days max). When set, the
+   * Voting window duration in hours, 1–720 (30 days max). When set, the
    * backend derives BOTH `opensAt` and `closesAt` from a single clock
    * reading at save time so the actual window is exactly `hours` — no
    * drift from client/server latency. Exactly one of `hours` or
    * `votingClosesAt` must be supplied (service enforces).
+   *
+   * Spec: every Centerstage Song competition runs for 30 consecutive
+   * days (720 hours). The cap allows the standard 30-day competition;
+   * shorter windows are permitted for tie-break rematches and admin
+   * exception cases.
    */
-  @IsOptional() @IsInt() @Min(1) @Max(24 * 14)
+  @IsOptional() @IsInt() @Min(1) @Max(24 * 30)
   hours?: number;
 }
 
