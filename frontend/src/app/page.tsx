@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   AlertTriangle,
+  CheckSquare,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -13,11 +14,13 @@ import {
   Crown,
   Download,
   Eye,
+  FileText,
   Flame,
   Headphones,
   Mic,
   Music,
   Play,
+  Send,
   Share2,
   Shield,
   Upload,
@@ -91,14 +94,21 @@ export default function HomePage() {
       {user && user.profileCompleted === false && <ProfileNudge />}
       <Hero user={user} />
       <Reveal><LiveBattle /></Reveal>
-      <Reveal><CrownAtRiskPanel /></Reveal>
+      {/* Section order per Phase 1 spec: Red Phone challenge moves up
+          to sit directly after the LiveBattle so the WATCH → CHALLENGE
+          bridge is the very next thing a visitor sees. Champion +
+          Crown-at-Risk + Dethroned form the "current crown" narrative
+          block that follows, then the platform-explainer sections
+          (How It Works, The Stage, Recent Winners, Share, Final CTA). */}
       <Reveal><ChallengeFlow user={user} /></Reveal>
       <Reveal><ChampionSection /></Reveal>
+      <Reveal><CrownAtRiskPanel /></Reveal>
       <Reveal><DethronedPanel /></Reveal>
       <Reveal><RedPhoneWinnerPanel /></Reveal>
       <Reveal><HowItWorks /></Reveal>
       <Reveal><StageCarousel /></Reveal>
       <Reveal><WinnersCarousel /></Reveal>
+      <Reveal><HallOfCrowns /></Reveal>
       <Reveal><ShareCardsRow /></Reveal>
       <Reveal><CTAFooter user={user} /></Reveal>
       {/* Floating real-time toast — pops in for ~4s whenever the lobby SSE
@@ -909,7 +919,10 @@ function ChallengeFlow({
     : `/login?next=${encodeURIComponent('/upload?challenge=1')}`;
 
   return (
-    <section className="relative bg-background py-12 md:py-20 overflow-hidden">
+    // `id="red-phone-challenge"` is the scroll target for the floating
+    // Red Phone widget (Phase 2) and any inbound `#red-phone-challenge`
+    // deep links from other pages / share cards.
+    <section id="red-phone-challenge" className="relative bg-background py-12 md:py-20 overflow-hidden">
       {/* Section spotlight — soft crimson backdrop so the section
           doesn't sit on bare black after the hero. */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-40">
@@ -941,16 +954,29 @@ function ChallengeFlow({
             </div>
           </div>
           <div className="text-center lg:text-left">
+            {/* Section copy aligned to Phase 1 brand spec:
+                  eyebrow → "Red Phone Challenge"
+                  headline → "THE RED PHONE IS CALLING."
+                  subhead → "Think you can take the Crown?"
+                  body    → full four-step preamble.
+                The former single-sentence body was too thin; the
+                spec's four-verb list ("Download… Record… Upload…
+                If selected, you face the Official Voice…") tees up
+                the numbered steps below and reinforces the loop. */}
             <p className="mb-2 inline-flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-[0.3em] text-red-500 lg:justify-start">
               <span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
               Red Phone Challenge
             </p>
-            <h2 className="mb-3 text-4xl font-black text-white md:text-5xl">
-              THINK YOU CAN TAKE THE CROWN?
+            <h2 className="mb-2 text-4xl font-black text-white md:text-5xl">
+              THE RED PHONE IS CALLING.
             </h2>
-            <p className="mx-auto max-w-xl text-balance text-lg text-gray-300 lg:mx-0">
-              Pick up the red phone. Record your version. The next Official
-              Voice could be you.
+            <p className="mb-4 text-lg md:text-xl font-bold text-red-400">
+              Think you can take the Crown?
+            </p>
+            <p className="mx-auto max-w-xl text-balance text-base text-gray-300 lg:mx-0">
+              Download the track. Record your version. Upload your challenge.
+              If selected, you face the Official Voice and the audience
+              decides who owns the song.
             </p>
           </div>
         </div>
@@ -997,15 +1023,23 @@ function ChallengeFlow({
           <div
             role="list"
             aria-label="Challenge submission steps"
-            className="relative z-10 grid grid-cols-1 items-stretch gap-5 lg:grid-cols-4"
+            className="relative z-10 grid grid-cols-1 items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-3"
           >
-            <FlowStep number={1} Icon={Download} title="DOWNLOAD" sub="the track" />
-            <FlowStep number={2} Icon={Mic} title="RECORD" sub="your version" />
-            <FlowStep number={3} Icon={Upload} title="UPLOAD" sub="your challenge" />
+            {/* Six-step workflow per Phase 1 spec: Download Lyrics,
+                Download Instrumental, Record, Upload, Accept Rules,
+                Submit. Was previously 4 steps; the "Face the Champion"
+                reveal happens implicitly once the challenge is
+                selected, so it's no longer a step in the submission
+                path. */}
+            <FlowStep number={1} Icon={FileText} title="DOWNLOAD LYRICS" sub="learn the words" />
+            <FlowStep number={2} Icon={Music} title="DOWNLOAD TRACK" sub="the instrumental" />
+            <FlowStep number={3} Icon={Mic} title="RECORD" sub="your version" />
+            <FlowStep number={4} Icon={Upload} title="UPLOAD VIDEO" sub="your challenge take" />
+            <FlowStep number={5} Icon={CheckSquare} title="ACCEPT RULES" sub="competition terms" />
             <FlowStep
-              number={4}
-              Icon={Crown}
-              title="IF SELECTED"
+              number={6}
+              Icon={Send}
+              title="SUBMIT CHALLENGE"
               sub="face the champion"
               reward
             />
@@ -1196,8 +1230,16 @@ function ChampionSection() {
 
           <div className="space-y-6">
             <div>
-              <p className="text-yellow-500 font-bold text-sm mb-2 uppercase tracking-widest">
-                {personalised ? 'You are the Defending Champion' : 'Defending Champion'}
+              {/* Renamed from "Defending Champion" → "Current Official
+                  Voice" per Phase 1 brand copy: the persistent term across
+                  the app is now "Official Voice". The subhead reinforces
+                  the stakes so the section reads as active peril, not
+                  just a bio card. */}
+              <p className="text-yellow-500 font-bold text-sm mb-1 uppercase tracking-widest">
+                {personalised ? 'You are the Current Official Voice' : 'Current Official Voice'}
+              </p>
+              <p className="text-red-500 font-bold text-xs mb-3 uppercase tracking-[0.3em]">
+                The Crown Is On The Line
               </p>
               <div className="flex items-center gap-4 mb-2">
                 {/* Avatar with initial fallback — previously the whole
@@ -1258,6 +1300,16 @@ function ChampionSection() {
             <p className="text-gray-300 text-lg">
               The champion owns the song... until someone takes it.
             </p>
+            {/* Emotional beat per brand spec — this is the line that
+                turns a status card into a stakes card. Only shown when
+                there IS a real champion; skipped in the empty state so
+                we don't ask about surviving a challenge that doesn't
+                exist yet. */}
+            {champion && (
+              <p className="text-yellow-400/90 italic text-base">
+                Can they survive the next challenge?
+              </p>
+            )}
 
             <div className="gold-panel grid grid-cols-2 gap-px bg-yellow-500/20 overflow-hidden">
               <div className="bg-black/70 p-5 text-center">
@@ -1291,12 +1343,24 @@ function ChampionSection() {
             </div>
 
             {champion && (
-              <Link
-                href={`/u/${champion.username}`}
-                className="w-full inline-flex items-center justify-center bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-4 text-lg rounded-lg uppercase tracking-widest transition"
-              >
-                View Champion
-              </Link>
+              // Two-button CTA per Phase 1 brand spec: view the reigning
+              // Official Voice OR jump straight to the challenge flow.
+              // "Challenge the Crown" points at the Red Phone section
+              // anchor so it scrolls up rather than navigating away.
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Link
+                  href={`/u/${champion.username}`}
+                  className="flex-1 inline-flex items-center justify-center bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-4 text-base rounded-lg uppercase tracking-widest transition"
+                >
+                  View Champion
+                </Link>
+                <Link
+                  href="#red-phone-challenge"
+                  className="flex-1 inline-flex items-center justify-center border-2 border-red-600 text-red-500 hover:bg-red-600 hover:text-white font-bold py-4 text-base rounded-lg uppercase tracking-widest transition"
+                >
+                  Challenge the Crown
+                </Link>
+              </div>
             )}
           </div>
         </div>
@@ -1488,7 +1552,7 @@ function StageCarousel() {
     <section className="bg-background py-12 md:py-20">
       <div className="max-w-7xl mx-auto px-4">
         <SectionHeader
-          eyebrow="Spotlight"
+          eyebrow="The Battleground"
           title="The Stage"
           subtitle="New performances. New challengers. New legends."
           align="left"
@@ -1683,6 +1747,11 @@ interface WinnerCard {
   winnerUsername: string | null;
   winnerAvatarUrl: string | null;
   percent: number;
+  // First video tag as a lightweight "genre" — the winner card spec
+  // lists genre alongside song title but the model doesn't carry a
+  // dedicated genre field, so we surface the first uploader-set tag
+  // when there is one. Renders nothing when empty.
+  genre: string | null;
 }
 
 function WinnersCarousel() {
@@ -1725,6 +1794,7 @@ function WinnersCarousel() {
               winnerAvatarUrl:
                 full.winnerUser?.avatarUrl ?? perf?.uploader?.avatarUrl ?? null,
               percent: total > 0 ? Math.round((winnerCount / total) * 100) : 0,
+              genre: perf?.tags?.[0] ?? null,
             } satisfies WinnerCard;
           } catch {
             return null;
@@ -1752,7 +1822,10 @@ function WinnersCarousel() {
   if (!loading && winners.length === 0) return null;
 
   return (
-    <section className="bg-background py-12 md:py-20">
+    // `id="recent-winners"` — anchor target for the Hall of Crowns
+    // "Enter The Hall" fallback link (placeholder until a real /hall
+    // page ships). Also handy for share links pointing here directly.
+    <section id="recent-winners" className="bg-background py-12 md:py-20">
       <div className="max-w-7xl mx-auto px-4">
         <SectionHeader
           eyebrow="Crowned"
@@ -1769,32 +1842,33 @@ function WinnersCarousel() {
                 <Link
                   key={w.battleId}
                   href={`/battle/${w.battleId}`}
-                  className="relative group/card hover:scale-105 transition-transform"
+                  className="relative group/card hover:scale-105 transition-transform block h-full"
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/20 to-yellow-900/20 rounded-2xl blur-xl group-hover/card:blur-2xl transition" />
-                  <div className="relative bg-card/50 backdrop-blur border border-yellow-500/30 rounded-2xl overflow-hidden p-6">
+                  <div className="relative bg-card/50 backdrop-blur border border-yellow-500/30 rounded-2xl overflow-hidden p-6 h-full flex flex-col">
                     <div className="flex items-start justify-between mb-6">
                       <div className="flex-1 min-w-0">
-                        {/* New item #39 — when the winner's user/video has
-                            since been deleted, fall back to "Deleted User"
-                            instead of the previous "Anonymous" or "Crowned"
-                            label, which made it look like a system error.
-                            The winner identity is preserved even when the
-                            media goes away. */}
                         <h3 className="text-2xl font-black text-white mb-1 truncate">
                           {w.winnerUsername
                             ? `@${w.winnerUsername}`
                             : 'Deleted User'}
                         </h3>
-                        {/* Bug #13 — the song title sat at text-gray-400 over a
-                            translucent card, which fell below readable contrast.
-                            Bumped to gray-200 so the song line is legible. */}
                         <p className="text-sm text-gray-200 truncate">
                           {w.songTitle}
                           {w.songArtist && (
                             <span className="text-gray-400"> · {w.songArtist}</span>
                           )}
                         </p>
+                        {/* Genre pill area reserves a fixed row so cards
+                            without a tag still match the height of cards
+                            that carry one. */}
+                        <div className="mt-2 h-5">
+                          {w.genre && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-gold/15 border border-gold/40 text-[10px] uppercase tracking-widest font-bold text-gold">
+                              {w.genre}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <Crown className="w-6 h-6 text-yellow-500 flex-shrink-0 ml-3" />
                     </div>
@@ -1816,13 +1890,63 @@ function WinnersCarousel() {
                       </div>
                     </div>
 
-                    <div className="w-full inline-flex items-center justify-center bg-yellow-500 group-hover/card:bg-yellow-600 text-black font-bold py-2 rounded-lg text-sm uppercase tracking-widest transition">
+                    <div className="mt-auto w-full inline-flex items-center justify-center bg-yellow-500 group-hover/card:bg-yellow-600 text-black font-bold py-2 rounded-lg text-sm uppercase tracking-widest transition">
                       Official Voice
                     </div>
                   </div>
                 </Link>
               ))}
         </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── 7b. Hall of Crowns teaser ───────────────────────────────────────
+
+/**
+ * Teaser section for the future Hall of Crowns page. Copy per Phase 5
+ * brand spec: this sits between Recent Winners and the Share Cards row
+ * to introduce the "history matters" narrative — every crown that
+ * changed hands, every defense, every dethronement is worth
+ * remembering. The Enter The Hall button routes to a placeholder /hall
+ * page (coming soon) or falls back to the winners carousel anchor when
+ * the page doesn't exist yet.
+ */
+function HallOfCrowns() {
+  return (
+    <section className="relative bg-background py-16 md:py-24 overflow-hidden">
+      {/* Soft gold radial glow to distinguish this from the neighboring
+          sections without a whole new photo backdrop. Matches the
+          crown-logo palette that shifted with Phase 1. */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-40">
+        <div className="absolute left-1/2 top-1/2 h-[36rem] w-[52rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gold/10 blur-3xl" />
+      </div>
+
+      <div className="relative max-w-7xl mx-auto px-4 text-center">
+        <div className="inline-flex items-center gap-2 mb-4 px-3 py-1 rounded-full border border-gold/40 bg-black/50 backdrop-blur">
+          <Crown className="w-3.5 h-3.5 text-gold" />
+          <span className="text-[11px] uppercase tracking-[0.3em] text-gold font-black">
+            Legacy
+          </span>
+        </div>
+        <h2 className="font-display font-black text-4xl sm:text-5xl md:text-6xl text-white mb-4 tracking-tight">
+          <span className="text-gold">Hall</span> of Crowns
+        </h2>
+        <p className="text-base md:text-lg text-gray-300 max-w-2xl mx-auto mb-8 leading-relaxed">
+          Every voice that owned the song. Every champion. Every defense.
+          Every dethronement — remembered.
+        </p>
+        {/* Route target: `/hall` doesn't exist yet, so link to the
+            winners carousel anchor as a graceful fallback. When the
+            page ships, flip this href to `/hall`. */}
+        <Link
+          href="#recent-winners"
+          className="inline-flex items-center gap-2 px-8 py-4 bg-gold hover:bg-gold/90 text-stage-950 font-black uppercase tracking-widest text-sm rounded-lg transition-colors shadow-2xl shadow-gold/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-stage-950"
+        >
+          Enter The Hall
+          <span aria-hidden="true">→</span>
+        </Link>
       </div>
     </section>
   );
@@ -1864,6 +1988,20 @@ function CTAFooter({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
               <Play className="w-5 h-5 mr-2" />
               Watch Live Battle
             </Link>
+          </div>
+          {/* Brand sign-off line — spec: "Great songs deserve unforgettable
+              voices. One Song. Two Voices. One Crown. Who's next?" Sits
+              beneath the CTA row so the last thing a scanner reads is the
+              brand thesis, not a button label. Split into two lines so
+              the tagline gets its own emphasis. */}
+          <div className="pt-6 mt-2 border-t border-white/10 space-y-1.5">
+            <p className="text-sm md:text-base text-gray-200 italic">
+              Great songs deserve unforgettable voices.
+            </p>
+            <p className="text-xs md:text-sm text-yellow-400 font-bold uppercase tracking-[0.25em]">
+              One Song. Two Voices. One Crown.
+              <span className="text-white ml-2">Who&apos;s next?</span>
+            </p>
           </div>
         </div>
 
@@ -1959,11 +2097,16 @@ function CrownAtRiskPanel() {
   if (!marquee) return null;
   return (
     <CrownAtRiskPanelView
-      eyebrow="Crown at Risk"
+      // Phase 1 brand spec — the marquee eyebrow now reads "The Crown
+      // Is Never Safe" (the platform's crown-risk thesis). Personalised
+      // callers above keep the "Your Crown At Risk" framing because
+      // the stakes are literally the viewer's own crown.
+      eyebrow="The Crown Is Never Safe"
       subtitle={
         <>
-          The crown on{' '}
-          <span className="text-white">{marquee.song.title}</span> is under attack
+          Every pending challenger moves the Official Voice closer to losing
+          everything. The crown on{' '}
+          <span className="text-white">{marquee.song.title}</span> is under attack.
         </>
       }
       song={marquee.song}
@@ -1992,6 +2135,23 @@ function CrownAtRiskPanelView({
   const circumference = 2 * Math.PI * r;
   const dashOffset = circumference * (1 - survival / 100);
   const tone = riskTone(risk.riskLevel);
+
+  // Phase 5 spec — the displayed Crown-Risk label follows a simpler
+  // three-tier ladder driven purely by pending challenger count, so
+  // the emotional stakes read consistently: 0 = SAFE, 1–2 = WARNING,
+  // 3+ = CRITICAL. The underlying survivalChance / riskLevel from the
+  // backend still drives the ring + progress bar so we keep the fine-
+  // grained visual signal; only the top-line label + accent flip to
+  // the three-tier language.
+  const pendingCount = risk.pendingChallengers;
+  const specLevel: 'SAFE' | 'WARNING' | 'CRITICAL' =
+    pendingCount === 0 ? 'SAFE' : pendingCount <= 2 ? 'WARNING' : 'CRITICAL';
+  const specLabelClass =
+    specLevel === 'SAFE'
+      ? 'text-gold'
+      : specLevel === 'WARNING'
+      ? 'text-yellow-400'
+      : 'text-spotlight';
 
   return (
     <section id="crown-at-risk" className="bg-background py-12 md:py-20">
@@ -2059,10 +2219,10 @@ function CrownAtRiskPanelView({
               <div className="flex flex-wrap items-center gap-x-6 gap-y-4 mb-4">
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">
-                    Crown Risk
+                    Crown Status
                   </p>
-                  <p className={`text-3xl sm:text-4xl font-black ${tone.text}`}>
-                    {risk.riskLevel}
+                  <p className={`text-3xl sm:text-4xl font-black ${specLabelClass}`}>
+                    {specLevel}
                   </p>
                 </div>
                 <div className="hidden sm:block text-gray-500 text-3xl" aria-hidden="true">·</div>
@@ -2129,6 +2289,56 @@ function CrownAtRiskPanelView({
                 <span className="text-[10px] text-gray-400 uppercase tracking-widest mt-1">
                   Survival
                 </span>
+              </div>
+              {/* Tier crown badge — floats above the ring at the top.
+                  SAFE     → static gold crown, calm.
+                  WARNING  → gold crown with a soft red glow, tense.
+                  CRITICAL → gold+ruby crown with a red fissure filter,
+                             shaking. Reads as "the crown is coming
+                             loose" purely through motion + hue, no
+                             extra SVG required. */}
+              <div className="absolute -top-2 left-1/2 -translate-x-1/2">
+                <div
+                  className={`relative rounded-full p-1.5 border-2 backdrop-blur ${
+                    specLevel === 'CRITICAL'
+                      ? 'border-red-500/80 bg-red-950/80 animate-crown-shake'
+                      : specLevel === 'WARNING'
+                      ? 'border-yellow-500/70 bg-black/60 shadow-[0_0_20px_rgba(220,46,60,0.35)]'
+                      : 'border-gold/60 bg-black/60'
+                  }`}
+                >
+                  <Crown
+                    aria-hidden="true"
+                    className={`w-6 h-6 ${
+                      specLevel === 'CRITICAL'
+                        ? 'text-gold crown-fissure'
+                        : specLevel === 'WARNING'
+                        ? 'text-gold'
+                        : 'text-gold'
+                    }`}
+                    fill={specLevel !== 'CRITICAL' ? 'currentColor' : 'none'}
+                    strokeWidth={2}
+                  />
+                  {/* Diagonal red slash overlay — only rendered on
+                      CRITICAL, gives the "crown is cracked" visual
+                      cue on top of the shake animation. */}
+                  {specLevel === 'CRITICAL' && (
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      className="absolute inset-0 w-full h-full pointer-events-none"
+                    >
+                      <path
+                        d="M4 20 L 12 8 L 10 12 L 20 4"
+                        stroke="rgb(220,46,60)"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        fill="none"
+                        opacity="0.9"
+                      />
+                    </svg>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -2236,7 +2446,12 @@ function DethronedPanel() {
   return (
     <DethronedPanelView
       latest={latest}
-      eyebrow="Dethroned!"
+      // Spec: end-of-competition banner phrasing. When the crown
+      // changed hands, we surface "THE CROWN HAS BEEN STOLEN" as the
+      // eyebrow — matches the language used across the emotional
+      // journey ("Watch → Vote → Challenge → Win the Crown → Defend
+      // it → Lose it → Fight back") and the winner reveal panel.
+      eyebrow="The Crown Has Been Stolen"
       subtitle="A new Official Voice has been crowned."
       personalised={false}
     />
@@ -2448,6 +2663,10 @@ function DethronedPanelView({
 function RedPhoneWinnerPanel() {
   const [winner, setWinner] = useState<RedPhoneWinnerDto | null>(null);
   const [loaded, setLoaded] = useState(false);
+  // Confetti fires once per unique winner. A ref (rather than state)
+  // keeps the "last fired for" key across re-renders without triggering
+  // React updates on write.
+  const firedForRef = useRef<string | null>(null);
 
   const refetch = useCallback(async () => {
     try {
@@ -2470,15 +2689,67 @@ function RedPhoneWinnerPanel() {
     if (e.change === 'closed') void refetch();
   });
 
+  // Confetti burst — fires once per newly-observed winner. Uses two
+  // side cannons (bottom-left + bottom-right) angled up-inward so the
+  // particles sweep across the winner panel. Palette matches the
+  // crown-logo (antique gold + ruby) to reinforce brand consistency.
+  // Respects prefers-reduced-motion so a user who has that on doesn't
+  // get particle blasts they've opted out of. Dynamic import keeps the
+  // ~15 KB canvas-confetti out of the initial home-page bundle when
+  // there's no fresh winner to celebrate.
+  useEffect(() => {
+    if (!winner) return;
+    const key = winner.battleId ?? winner.winner?.userId ?? null;
+    if (!key || firedForRef.current === key) return;
+    if (typeof window === 'undefined') return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    firedForRef.current = key;
+
+    void import('canvas-confetti').then((mod) => {
+      const confetti = mod.default;
+      const goldRuby = ['#D4A54B', '#F0C060', '#DC2E3C', '#F04A5E', '#FFFFFF'];
+      const base = { spread: 55, ticks: 200, gravity: 0.9, decay: 0.92, scalar: 1.05, colors: goldRuby };
+      // Left cannon → up-right
+      confetti({
+        ...base,
+        particleCount: 90,
+        angle: 60,
+        origin: { x: 0.05, y: 0.9 },
+      });
+      // Right cannon → up-left
+      confetti({
+        ...base,
+        particleCount: 90,
+        angle: 120,
+        origin: { x: 0.95, y: 0.9 },
+      });
+      // Center follow-up burst 250ms later — feels like the crowd
+      // response after the initial cannons.
+      setTimeout(() => {
+        confetti({
+          ...base,
+          particleCount: 55,
+          spread: 90,
+          startVelocity: 35,
+          origin: { x: 0.5, y: 0.55 },
+        });
+      }, 250);
+    });
+  }, [winner]);
+
   if (!loaded || !winner) return null;
 
   const when = winner.crownedAt ? formatRelativeTime(winner.crownedAt) : null;
+  // Spec: end-of-competition banner reads either "THE CROWN HAS BEEN
+  // DEFENDED" or "THE CROWN HAS BEEN STOLEN" depending on outcome.
+  // A first-ever crown on a song gets its own phrasing since neither
+  // defence nor theft applies.
   const outcomeLabel =
     winner.outcome === 'taken'
-      ? 'Took the crown'
+      ? 'The Crown Has Been Stolen'
       : winner.outcome === 'retained'
-        ? 'Defended the crown'
-        : 'First crown';
+        ? 'The Crown Has Been Defended'
+        : 'A New Crown';
   const headline =
     winner.outcome === 'taken'
       ? `${winner.winner?.username ? '@' + winner.winner.username : 'A new voice'} just won a Red Phone battle.`
@@ -2489,7 +2760,20 @@ function RedPhoneWinnerPanel() {
   return (
     <section id="red-phone-winner" className="bg-background py-12 md:py-20">
       <div className="max-w-7xl mx-auto px-4">
-        <div className="relative overflow-hidden rounded-2xl border border-red-500/40 bg-gradient-to-br from-red-950/40 via-stage-900/60 to-stage-950/60 backdrop-blur">
+        {/* `animate-winner-glow` — Phase 5 addition. A soft golden
+            spotlight that pulses in and out around the whole panel so
+            the crowning moment reads as prestige rather than just
+            another card. The bounce trophy emoji at the top-right
+            adds the "raised trophy" visual with zero graphics work. */}
+        <div className="relative overflow-hidden rounded-2xl border border-gold/40 bg-gradient-to-br from-red-950/40 via-stage-900/60 to-stage-950/60 backdrop-blur animate-winner-glow">
+          {/* Trophy — decorative only, hidden from AT. Positioned so it
+              doesn't collide with the badge row on narrow viewports. */}
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute top-3 right-3 sm:top-5 sm:right-5 text-3xl sm:text-4xl md:text-5xl drop-shadow-[0_0_10px_rgba(212,165,75,0.6)] animate-trophy-bounce"
+          >
+            🏆
+          </span>
           <div
             aria-hidden="true"
             className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-red-600/25 blur-3xl"

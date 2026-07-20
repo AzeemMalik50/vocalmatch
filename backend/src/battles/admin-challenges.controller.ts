@@ -34,10 +34,12 @@ import { ChallengeStatus } from './challenge-submission.entity';
 
 class CreateBattleFromChallengeDto {
   /**
-   * Voting window duration in hours, 1–336 (14 days max). Used only when
-   * `votingClosesAt` is not supplied. Defaults to 48 if both are absent.
+   * Voting window duration in hours, 1–720 (30 days max). Used only when
+   * `votingClosesAt` is not supplied. Defaults to 720 (30 days) when
+   * both are absent — matches the spec's Centerstage Song competition
+   * cadence.
    */
-  @IsOptional() @IsInt() @Min(1) @Max(24 * 14)
+  @IsOptional() @IsInt() @Min(1) @Max(24 * 30)
   hours?: number;
 
   /**

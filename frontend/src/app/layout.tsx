@@ -8,6 +8,7 @@ import ScrollResetOnReload from '@/components/ScrollResetOnReload';
 import ScrollResetOnNavigate from '@/components/ScrollResetOnNavigate';
 import SuppressExtensionErrors from '@/components/SuppressExtensionErrors';
 import Footer from '@/components/Footer';
+import FloatingRedPhone from '@/components/FloatingRedPhone';
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, '') ||
@@ -103,6 +104,11 @@ export default function RootLayout({
             <ConfirmProvider>
               {children}
               <Footer />
+              {/* Global "Red Phone" widget — pulses in the bottom-right
+                  on every non-auth / non-admin page. Click routes to
+                  the challenge section (smooth-scroll on home, cross-
+                  page nav elsewhere). */}
+              <FloatingRedPhone />
             </ConfirmProvider>
           </AuthProvider>
         </ThemeProvider>
