@@ -410,7 +410,7 @@ export class ChallengesService {
     // for callers that pass an absolute schedule.
     const useHours = !opts.votingClosesAt;
     const forwardedHours = useHours
-      ? Math.min(Math.max(opts.hours ?? 48, 1), 24 * 14)
+      ? Math.min(Math.max(opts.hours ?? 24 * 30, 1), 24 * 30)
       : undefined;
     const forwardedClosesAt = opts.votingClosesAt
       ? new Date(opts.votingClosesAt).toISOString()

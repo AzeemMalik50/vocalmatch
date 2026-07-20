@@ -10,6 +10,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { VideosModule } from './videos/videos.module';
 import { SongsModule } from './songs/songs.module';
+import { SongSubmissionsModule } from './song-submissions/song-submissions.module';
 import { BattlesModule } from './battles/battles.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AdminModule } from './admin/admin.module';
@@ -25,6 +26,7 @@ import { User } from './users/user.entity';
 import { Video } from './videos/video.entity';
 import { VideoView } from './videos/video-view.entity';
 import { Song } from './songs/song.entity';
+import { SongSubmission } from './song-submissions/song-submission.entity';
 import { Battle } from './battles/battle.entity';
 import { Vote } from './battles/vote.entity';
 import { ChallengeSubmission } from './battles/challenge-submission.entity';
@@ -38,6 +40,7 @@ const entities = [
   Video,
   VideoView,
   Song,
+  SongSubmission,
   Battle,
   Vote,
   ChallengeSubmission,
@@ -92,6 +95,7 @@ const entities = [
     UsersModule,
     VideosModule,
     SongsModule,
+    SongSubmissionsModule,
     BattlesModule,
     NotificationsModule,
     RealtimeModule,
