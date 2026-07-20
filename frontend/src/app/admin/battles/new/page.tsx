@@ -44,7 +44,10 @@ function AdminNewBattleForm() {
   const [aId, setAId] = useState('');
   const [bId, setBId] = useState('');
   const [title, setTitle] = useState('');
-  const [hours, setHours] = useState(48);
+  // Spec: every Centerstage Song competition runs for 30 consecutive
+  // days (720 hours). Admin can adjust for tie-break rematches and
+  // admin exception cases, up to the same 30-day ceiling.
+  const [hours, setHours] = useState(24 * 30);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
@@ -287,16 +290,21 @@ function AdminNewBattleForm() {
               <input
                 type="number"
                 min={1}
-                max={168}
+                max={24 * 30}
                 value={hours}
                 onChange={(e) =>
-                  setHours(Math.max(1, parseInt(e.target.value || '0', 10) || 0))
+                  setHours(
+                    Math.min(
+                      24 * 30,
+                      Math.max(1, parseInt(e.target.value || '0', 10) || 0),
+                    ),
+                  )
                 }
-                className="no-spinner w-16 px-2 py-2.5 bg-stage-900 border-x border-stage-700 text-center focus:outline-none focus:border-spotlight transition-colors tabular-nums"
+                className="no-spinner w-20 px-2 py-2.5 bg-stage-900 border-x border-stage-700 text-center focus:outline-none focus:border-spotlight transition-colors tabular-nums"
               />
               <button
                 type="button"
-                onClick={() => setHours((h) => Math.min(168, h + 1))}
+                onClick={() => setHours((h) => Math.min(24 * 30, h + 1))}
                 aria-label="Increase voting window by one hour"
                 className="px-3 text-lg font-bold text-haze hover:bg-stage-800 hover:text-white transition-colors"
               >
@@ -305,7 +313,7 @@ function AdminNewBattleForm() {
             </div>
             <span className="text-haze">hours</span>
             <span className="text-xs text-haze/60">
-              (default 48; recommended 24–48)
+              (default 720 = 30 days; shorter for tie-break rematches)
             </span>
           </div>
         </Field>

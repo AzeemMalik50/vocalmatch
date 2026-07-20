@@ -188,7 +188,8 @@ export default function AdminChallengesPage() {
   const handlePromote = async (id: string) => {
     const ok = await confirm({
       title: 'Promote this challenger?',
-      message: 'A new battle goes live immediately with voting open for 48 hours.',
+      message:
+        'A new Centerstage Song competition goes live immediately with voting open for 30 days.',
       detail: 'Both performers get notified that the battle has started.',
       confirmLabel: 'Promote to battle',
     });
