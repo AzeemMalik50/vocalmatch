@@ -15,12 +15,14 @@ interface Props {
 const SIZE_CLASS: Record<NonNullable<Props['size']>, string> = {
   sm: 'h-10 w-32',
   md: 'h-14 w-44',
-  // `lg` is used only on the home page. On mobile it drops to `md`
-  // dimensions so the header row (logo + bell + upload + avatar) fits
-  // an iPhone-portrait viewport — otherwise the avatar gets clipped
-  // and the whole layout overflows horizontally. Full `lg` from the
-  // `sm` breakpoint up.
-  lg: 'h-14 w-44 sm:h-20 sm:w-64',
+  // `lg` is used only on the home page. Sized to visually match one
+  // line of the hero headline ("ONE SONG. / TWO VOICES. / ONE CROWN.")
+  // which scales text-5xl → 8xl across breakpoints. On mobile it holds
+  // near the `md` dimensions so the header row (logo + bell + upload
+  // + avatar) still fits an iPhone-portrait viewport without clipping,
+  // then scales up substantially from `sm` onward to match the
+  // headline weight.
+  lg: 'h-16 w-52 sm:h-24 sm:w-80 md:h-32 md:w-[26rem] lg:h-40 lg:w-[32rem]',
 };
 
 export default function Logo({ size = 'md' }: Props) {
