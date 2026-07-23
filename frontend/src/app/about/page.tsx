@@ -4,7 +4,7 @@ import Nav from '@/components/Nav';
 export const metadata: Metadata = {
   title: 'About',
   description:
-    'The story behind VOCALMATCH — one song, two voices, one crown.',
+    'The story behind VOCALMATCH. One song, two voices, one crown.',
 };
 
 /**
@@ -42,7 +42,7 @@ export default function AboutPage() {
             </h1>
             <p className="text-lg md:text-xl text-white/70 max-w-2xl mx-auto">
               A premium entertainment platform where every performance is a
-              title fight — and the Crown can be taken at any time.
+              title fight, and the Crown can be taken at any time.
             </p>
           </div>
         </section>
@@ -71,7 +71,7 @@ export default function AboutPage() {
               <PullLine>Those weren&rsquo;t just records. They were my classroom.</PullLine>
               <p>
                 Without realizing it, I was learning phrasing, emotion, melody, and the power of a great song. Music
-                wasn&rsquo;t just something I enjoyed — it became part of who I was.
+                wasn&rsquo;t just something I enjoyed. It became part of who I was.
               </p>
               <p>Then, at thirteen years old, something extraordinary happened.</p>
               <PullLine>I discovered I could write songs.</PullLine>
@@ -112,12 +112,12 @@ export default function AboutPage() {
                 permission from record labels to share their music with the world. The gatekeepers were no longer the
                 only path to success.
               </p>
-              <p>That&rsquo;s when an idea came to me — an idea I couldn&rsquo;t stop thinking about.</p>
+              <p>That&rsquo;s when an idea came to me, an idea I couldn&rsquo;t stop thinking about.</p>
               <p>
                 What if there was a platform where great songs and great voices could be discovered together? What if
                 every singer performed the exact same song, allowing audiences to hear, for the first time, how
-                differently one song could be interpreted? What if the world — not judges, not record executives, not
-                industry insiders — decided which voice connected most deeply with the song? And what if one
+                differently one song could be interpreted? What if the world, not judges, not record executives, not
+                industry insiders, decided which voice connected most deeply with the song? And what if one
                 extraordinary song could launch multiple extraordinary careers?
               </p>
               <PullLine>That idea became VOCALMATCH.</PullLine>
@@ -154,7 +154,7 @@ export default function AboutPage() {
               body={
                 'At VOCALMATCH, our mission is to discover and celebrate the extraordinary connection between great songs and unforgettable voices.\n\n' +
                 'We believe that a truly great song deserves its greatest voice. By giving talented singers the opportunity to compete on the same song, and empowering audiences around the world to decide the winner, we are creating a new kind of music competition built on authenticity, talent, and passion.\n\n' +
-                'VOCALMATCH exists to give gifted singers, songwriters, and creators a global stage where talent — not industry connections — determines success. Every performance is an opportunity to inspire, every challenge is a chance to earn the crown, and every vote helps shape the future of music.\n\n' +
+                'VOCALMATCH exists to give gifted singers, songwriters, and creators a global stage where talent, not industry connections, determines success. Every performance is an opportunity to inspire, every challenge is a chance to earn the crown, and every vote helps shape the future of music.\n\n' +
                 'We are committed to restoring the song to its rightful place at the center of the music experience while creating a transparent, exciting, and community-driven platform where artists can be discovered and celebrated.'
               }
             />
@@ -162,13 +162,13 @@ export default function AboutPage() {
             <AboutBlock
               eyebrow="Why VOCALMATCH Exists"
               title="Talent, not connections"
-              body="Thousands of gifted singers and brilliant songwriters were never being discovered. Incredible songs disappeared before anyone heard them. Extraordinary voices never got the opportunity they deserved. VOCALMATCH exists so that talent — not connections — has the opportunity to rise."
+              body="Thousands of gifted singers and brilliant songwriters were never being discovered. Incredible songs disappeared before anyone heard them. Extraordinary voices never got the opportunity they deserved. VOCALMATCH exists so that talent, not connections, has the opportunity to rise."
             />
 
             <AboutBlock
               eyebrow="Vision"
               title="The world decides"
-              body="A platform where great songs and great voices are discovered together. Where every singer performs the exact same song, and audiences hear — for the first time — how differently one song can be interpreted. Where the world decides which voice connects most deeply with the song. And where one extraordinary song can launch multiple extraordinary careers."
+              body="A platform where great songs and great voices are discovered together. Where every singer performs the exact same song, and audiences hear, for the first time, how differently one song can be interpreted. Where the world decides which voice connects most deeply with the song. And where one extraordinary song can launch multiple extraordinary careers."
             />
 
             <AboutBlock
@@ -182,7 +182,7 @@ export default function AboutPage() {
               }
             />
 
-            {/* Championship Experience Design Principles — added per
+            {/* Championship Experience Design Principles, added per
                 spec addendum. Every page in Phase 1 should reinforce
                 these principles; this block is the reference the rest
                 of the platform is designed against. */}
@@ -194,7 +194,7 @@ export default function AboutPage() {
                 Every page is a championship
               </h2>
               <p className="text-base md:text-lg text-white/70 leading-relaxed mb-6">
-                VOCALMATCH is not a traditional singing competition — it&rsquo;s a
+                VOCALMATCH is not a traditional singing competition. It&rsquo;s a
                 live, ongoing championship. Every page, every animation, every
                 line of copy is designed to reinforce one idea: the Crown is on
                 the line, right now.
